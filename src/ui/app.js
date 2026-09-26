@@ -30,12 +30,13 @@ import {
   ponerPresupuesto,
   ponerRegla,
   ponerRetoque,
+  ponerTrato,
   quitarApunte,
   quitarObjetivo,
 } from '../almacen/preferencias.js'
 import { requerir } from './piezas.js'
 import { arrancarNavegacion } from './nav.js'
-import { pintarResumen } from './vistas/resumen.js'
+import { montarResumen, pintarResumen } from './vistas/resumen.js'
 import { montarMovimientos, pintarMovimientos } from './vistas/movimientos.js'
 import { montarPrevision, pintarPrevision } from './vistas/prevision.js'
 import { montarPatrimonio, pintarPatrimonio } from './vistas/patrimonio.js'
@@ -121,6 +122,19 @@ async function arrancar() {
  * manejadores en silencio hasta que un clic hiciera cinco cosas.
  */
 function montarVistas() {
+  /** @param {string} entidadId @param {import('./trato.js').Trato} trato */
+  const alCambiarTrato = async (entidadId, trato) => {
+    await ponerTrato(entidadId, trato)
+    await refrescar()
+    decir(trato === 'baja'
+      ? 'Hecho: deja de contar para el futuro.'
+      : trato === 'suelto'
+        ? 'Hecho: cuenta en el día a día, pero ya no se anuncia con fecha.'
+        : 'Hecho: vuelve a la previsión.')
+  }
+
+  montarResumen({ alCambiarTrato })
+
   montarMovimientos({
     alCambiar: async ({ retoque, regla }) => {
       if (retoque) await ponerRetoque(retoque)
@@ -129,7 +143,7 @@ function montarVistas() {
     },
   })
 
-  montarPrevision()
+  montarPrevision({ alCambiarTrato })
 
   montarPatrimonio({
     nuevoId,
@@ -177,6 +191,7 @@ async function refrescar({ animar = false } = {}) {
     retoques: preferencias.retoques,
     presupuestos: preferencias.presupuestos,
     patrimonio: preferencias.patrimonio,
+    tratos: preferencias.tratos,
     colchon: preferencias.colchon,
   })
 

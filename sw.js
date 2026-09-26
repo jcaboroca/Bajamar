@@ -5,7 +5,7 @@
  * programa, que es lo único que hace falta descargar.
  */
 
-const CAU = 'bajamar-v8'
+const CAU = 'bajamar-v9'
 
 const PROGRAMA = [
   './',
@@ -17,6 +17,7 @@ const PROGRAMA = [
   './src/ui/app.js',
   './src/ui/nav.js',
   './src/ui/piezas.js',
+  './src/ui/trato.js',
   './src/ui/hoja.js',
   './src/ui/lamina.js',
   './src/ui/clave.js',

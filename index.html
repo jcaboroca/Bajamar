@@ -60,7 +60,7 @@
 
     <section class="bloque">
       <p class="rotulo">Lo que viene</p>
-      <ol id="eventos" class="eventos"></ol>
+      <ol id="eventos" class="eventos pulsables"></ol>
     </section>
 
     <section class="bloque" id="bloque-preguntas" hidden>
@@ -142,6 +142,16 @@
     <section class="bloque">
       <p class="rotulo">Gastos fijos</p>
       <div id="fijos"></div>
+      <p class="nota">Toca cualquiera para decirme si lo sigues pagando. Yo sólo veo
+        que se repitió; si cambiaste de compañía o cerraste la cuenta, no hay manera
+        de que lo sepa.</p>
+    </section>
+
+    <section class="bloque" id="bloque-apartados" hidden>
+      <p class="rotulo">Fuera de la previsión</p>
+      <ol id="apartados" class="eventos pulsables"></ol>
+      <p class="nota">Esto ya no se prevé porque me lo dijiste tú. Tócalo si te
+        equivocaste o si has vuelto a contratarlo.</p>
     </section>
 
     <section class="bloque" id="bloque-suscripciones" hidden>

@@ -13,16 +13,28 @@ import { diasEntre, fechaLarga } from '../../dominio/tipos.js'
 import { totalesPorCategoria } from '../../estado.js'
 import { dibujarLamina } from '../lamina.js'
 import { barra, cuentas, diaYMes, linea, nodo, requerir, titular, vacio } from '../piezas.js'
+import { marcarPreguntable, preguntarAlPulsar } from '../trato.js'
 
 /**
  * @typedef {ReturnType<typeof import('../../estado.js').construirEstado>} Estado
  */
+
+/** @type {Estado | null} */
+let ultimo = null
+
+/** @param {{ alCambiarTrato: (entidadId: string, trato: import('../trato.js').Trato) => unknown }} ganchos */
+export function montarResumen({ alCambiarTrato }) {
+  for (const caja of ['eventos', 'avisos']) {
+    preguntarAlPulsar(requerir(caja), () => ultimo, alCambiarTrato)
+  }
+}
 
 /**
  * @param {Estado} estado
  * @param {{ animar: boolean }} opciones
  */
 export function pintarResumen(estado, { animar }) {
+  ultimo = estado
   const { proyeccion } = estado
 
   const cifra = requerir('suelo-cifra')
@@ -64,6 +76,7 @@ function pintarAvisos(estado) {
   requerir('avisos').replaceChildren(...estado.avisos.slice(0, 4).map((a) => {
     const li = nodo('li', `aviso aviso-${a.nivel}`)
     li.append(nodo('p', 'aviso-titulo', a.titulo), nodo('p', 'aviso-detalle', a.detalle))
+    if (a.entidadId) marcarPreguntable(li, a.entidadId)
     return li
   }))
 }
@@ -132,13 +145,15 @@ function pintarEventos(estado) {
     // Ámbar sólo para lo que cae en los próximos tres días: si se pintara
     // todo lo llamativo, no quedaría forma de llamar la atención.
     if (diasEntre(estado.hoy, e.fecha) <= 3 && e.importe < 0) clase.push('urgente')
-    return linea({
+    const fila = linea({
       marca: diaYMes(e.fecha),
       nombre: e.nombre,
       detalle: e.seguro ? 'confirmado' : 'previsto',
       importe: formatEuros(e.importe, { signo: true }),
       clase: clase.join(' '),
     })
+    if (e.entidadId) marcarPreguntable(fila, e.entidadId)
+    return fila
   }))
 }
 

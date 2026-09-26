@@ -36,6 +36,7 @@ import { MESES_DE } from './fijos.js'
  * @property {Nivel} nivel
  * @property {string} titulo
  * @property {string} detalle
+ * @property {string} [entidadId] cuando el aviso se puede contestar tocando
  */
 
 /** Días de antelación con los que avisar de un recibo gordo. */
@@ -109,8 +110,10 @@ export function revisar({ proyeccion, fijos, ingresos, movimientos, nombres, pre
         ? `${lista} no ha vuelto a pasar`
         : `${retrasados.length} recibos no han vuelto a pasar`,
       detalle: retrasados.length === 1
-        ? 'Tocaba hace tiempo y no aparece. Puede que lo hayas dado de baja, o puede que llegue con retraso y se junte con el siguiente.'
-        : `${lista}. Puede que los hayas dado de baja, o puede que lleguen con retraso y se junten con los siguientes.`,
+        ? 'Tocaba hace tiempo y no aparece. Puede que lo hayas dado de baja, o puede que llegue con retraso y se junte con el siguiente. Toca aquí para decírmelo.'
+        : `${lista}. Puede que los hayas dado de baja, o puede que lleguen con retraso y se junten con los siguientes. En Previsión puedes decirme cuáles ya no pagas.`,
+      // Sólo cuando hay uno: con varios, un toque no puede contestar por todos.
+      entidadId: retrasados.length === 1 ? retrasados[0].entidadId : undefined,
     })
   }
 

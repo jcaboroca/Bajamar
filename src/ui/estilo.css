@@ -228,6 +228,8 @@ main {
 .aviso-alto { border-left-color: var(--alarma); }
 .aviso-medio { border-left-color: var(--acento); }
 .aviso-bajo { border-left-color: var(--agua); }
+.aviso[role='button'] { cursor: pointer; }
+.aviso[role='button']:active { transform: scale(0.99); }
 
 .aviso-titulo { margin: 0; font-size: 0.9375rem; font-weight: 500; }
 .aviso-alto .aviso-titulo { color: var(--alarma); }
@@ -498,6 +500,7 @@ main {
   font-size: 0.8125rem;
   color: var(--secundario);
 }
+.campo-pista { margin-top: 0.5rem; }
 
 /* ── Filtros ─────────────────────────────────────────────────── */
 

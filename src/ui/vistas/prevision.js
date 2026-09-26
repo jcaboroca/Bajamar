@@ -17,6 +17,7 @@ import { mesDe, ultimoDiaDelMes, sumarMeses } from '../../dominio/tipos.js'
 import { MESES_DE } from '../../analisis/fijos.js'
 import { dibujarLamina } from '../lamina.js'
 import { cuentas, diaYMes, linea, nodo, nombreDeMes, requerir, vacio } from '../piezas.js'
+import { marcarPreguntable, preguntarAlPulsar } from '../trato.js'
 
 /**
  * @typedef {ReturnType<typeof import('../../estado.js').construirEstado>} Estado
@@ -30,7 +31,11 @@ let mesElegido = null
 /** @type {Estado | null} */
 let ultimo = null
 
-export function montarPrevision() {
+export function montarPrevision({ alCambiarTrato }) {
+  for (const caja of ['fijos', 'apartados']) {
+    preguntarAlPulsar(requerir(caja), () => ultimo, alCambiarTrato)
+  }
+
   requerir('horizonte').addEventListener('click', (e) => {
     const boton = e.target instanceof Element ? e.target.closest('[data-meses]') : null
     if (!(boton instanceof HTMLButtonElement)) return
@@ -75,6 +80,7 @@ function repintar() {
   pintarCalendario(estado, meses)
   pintarCoste(estado)
   pintarFijos(estado)
+  pintarApartados(estado)
   pintarSuscripciones(estado)
 }
 
@@ -199,10 +205,10 @@ function pintarFijos(estado) {
     if (lista.length === 0) return null
     const div = nodo('div', 'grupo')
     div.append(nodo('p', 'rotulo rotulo-menor', titulo), nodo('p', 'aclaracion', explicacion))
-    const ol = nodo('ol', 'eventos')
+    const ol = nodo('ol', 'eventos pulsables')
     for (const f of lista) {
       const cada = f.periodicidad === 'mensual' ? 'al mes' : `cada ${MESES_DE[f.periodicidad]} meses`
-      ol.append(linea({
+      const fila = linea({
         marca: diaYMes(f.proximaPrevista),
         nombre: f.nombre,
         detalle: f.periodicidad === 'mensual'
@@ -210,7 +216,9 @@ function pintarFijos(estado) {
           : `${cada} · ${formatEuros(f.mensualEquivalente)} al mes equivalente`,
         importe: formatEuros(f.importeEsperado),
         clase: f.estado === 'retrasado' ? 'apagado' : '',
-      }))
+      })
+      marcarPreguntable(fila, f.entidadId)
+      ol.append(fila)
     }
     div.append(ol)
     return div
@@ -232,6 +240,26 @@ function pintarFijos(estado) {
   }
 
   caja.replaceChildren(...grupos)
+}
+
+/**
+ * Lo que el usuario ha sacado de la previsión. Sin esta lista, decir «ya no lo
+ * pago» sería una puerta de una sola dirección: lo apartado desaparece de
+ * todas partes y no habría dónde volver a encontrarlo.
+ * @param {Estado} estado
+ */
+function pintarApartados(estado) {
+  requerir('bloque-apartados').hidden = estado.apartados.length === 0
+  requerir('apartados').replaceChildren(...estado.apartados.map((a) => {
+    const fila = linea({
+      nombre: a.nombre,
+      detalle: a.trato === 'baja' ? 'ya no lo pagas' : 'a veces; cuenta en el día a día',
+      importe: '',
+      clase: 'apagado',
+    })
+    marcarPreguntable(fila, a.entidadId)
+    return fila
+  }))
 }
 
 /** @param {Estado} estado */

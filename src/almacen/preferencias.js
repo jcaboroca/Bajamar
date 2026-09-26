@@ -18,19 +18,24 @@ import { borrar, escribir, leer, leerTodo } from './db.js'
  */
 
 /**
+ * @typedef {'fijo' | 'suelto' | 'baja'} Trato
+ */
+
+/**
  * @typedef {object} Preferencias
  * @property {Retoque[]} retoques
  * @property {Presupuesto[]} presupuestos
  * @property {Objetivo[]} objetivos
  * @property {Apunte[]} patrimonio
  * @property {Record<string, string>} reglas   entidadId → categoría
+ * @property {Record<string, Trato>} tratos    entidadId → cómo tratarlo al prever
  * @property {import('../dominio/tipos.js').Bulto[]} bultos
  * @property {number} colchon                  céntimos
  */
 
 /** @returns {Promise<Preferencias>} */
 export async function cargar() {
-  const [retoques, presupuestos, objetivos, patrimonio, reglas, bultos, colchon] = await Promise.all([
+  const [retoques, presupuestos, objetivos, patrimonio, reglas, bultos, colchon, tratos] = await Promise.all([
     leerTodo('retoques'),
     leerTodo('presupuestos'),
     leerTodo('objetivos'),
@@ -38,6 +43,7 @@ export async function cargar() {
     leerTodo('reglas'),
     leerTodo('bultos'),
     leer('ajustes', 'colchon'),
+    leer('ajustes', 'tratos'),
   ])
 
   return {
@@ -47,6 +53,7 @@ export async function cargar() {
     patrimonio,
     bultos,
     reglas: Object.fromEntries(reglas.map((/** @type {any} */ r) => [r.id, r.categoria])),
+    tratos: /** @type {any} */ (tratos)?.valor ?? {},
     colchon: Number(/** @type {any} */ (colchon)?.valor ?? 0),
   }
 }
@@ -108,6 +115,20 @@ export async function quitarApunte(id) {
 /** @param {number} centimos */
 export async function ponerColchon(centimos) {
   return escribir('ajustes', { id: 'colchon', valor: Math.abs(centimos) })
+}
+
+/**
+ * Cambia cómo se trata un compromiso al prever. Van todos en un solo registro
+ * porque siempre se leen juntos y nunca son muchos.
+ * @param {string} entidadId
+ * @param {Trato | null} trato  null lo devuelve a fijo
+ */
+export async function ponerTrato(entidadId, trato) {
+  const guardado = /** @type {any} */ (await leer('ajustes', 'tratos'))
+  const valor = { ...(guardado?.valor ?? {}) }
+  if (trato === null || trato === 'fijo') delete valor[entidadId]
+  else valor[entidadId] = trato
+  return escribir('ajustes', { id: 'tratos', valor })
 }
 
 /** Identificador corto y único para lo que crea el usuario. */

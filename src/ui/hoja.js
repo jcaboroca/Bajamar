@@ -97,6 +97,9 @@ function pintarCampo(campo) {
       select.append(opcion)
     }
     envoltorio.append(select)
+    // Una lista no admite placeholder, y esta pregunta no se contesta bien sin
+    // saber qué hace cada respuesta.
+    if (campo.pista) envoltorio.append(nodo('p', 'aclaracion campo-pista', campo.pista))
   } else {
     const input = document.createElement('input')
     input.className = campo.tipo === 'numero' ? 'campo cifras' : 'campo'

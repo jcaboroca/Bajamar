@@ -54,6 +54,7 @@ const HORIZONTE_LARGO = 12
  * @param {Retoque[]} [opciones.retoques]
  * @param {import('./analisis/presupuestos.js').Presupuesto[]} [opciones.presupuestos]
  * @param {import('./analisis/patrimonio.js').Apunte[]} [opciones.patrimonio]
+ * @param {Record<string, 'fijo' | 'suelto' | 'baja'>} [opciones.tratos] entidadId → cómo preverlo
  * @param {number} [opciones.colchon] céntimos por debajo de los cuales avisar
  * @param {number} [opciones.meses] meses que abarca la proyección de portada
  */
@@ -105,9 +106,35 @@ export function construirEstado(crudos, opciones = {}) {
   // Un traspaso al ahorro propio no es gasto, pero sí sale de la cuenta: tiene
   // que entrar en la proyección aunque no cuente como dinero quemado. Por eso
   // no se excluye aquí, sino más abajo al medir el gasto.
-  const { compromisos, dudosos } = detectarCompromisos(cuenta, nombres, { hoy, categorias })
+  /*
+   * Detectar que algo se repite no es lo mismo que saber que va a volver. Una
+   * cuenta que se cierra, una compañía que se cambia o un gimnasio al que se
+   * puede no ir siguen teniendo un pasado impecablemente regular, y la
+   * previsión los seguiría cobrando para siempre. Sólo el usuario sabe eso, y
+   * lo dice de dos maneras distintas:
+   *
+   * «Ya no lo pago» (baja) lo borra del futuro por completo, y además saca su
+   * historia del ritmo diario: si contáramos los recibos viejos de la luz, el
+   * goteo seguiría cobrándolos con otro nombre.
+   *
+   * «A veces» (suelto) deja de anunciarlo con día y hora, pero su historia sí
+   * alimenta el goteo: el dinero se sigue yendo, sólo que no en una fecha.
+   */
+  const tratos = opciones.tratos ?? {}
+  const deBaja = new Set(Object.keys(tratos).filter((id) => tratos[id] === 'baja'))
+  const apartados = new Set(Object.keys(tratos).filter((id) => tratos[id] !== 'fijo'))
+
+  const deteccion = detectarCompromisos(cuenta, nombres, { hoy, categorias })
+  const compromisos = deteccion.compromisos.filter((c) => !apartados.has(c.entidadId))
+  const dudosos = deteccion.dudosos.filter((d) => !apartados.has(d.entidadId))
   const ingresos = detectarIngresos(cuenta, nombres, { hoy, categorias })
-  const ordinarios = gastoOrdinario(cuenta, compromisos, NO_ES_GASTO, categorias)
+    .filter((c) => !apartados.has(c.entidadId))
+  const ordinarios = gastoOrdinario(
+    cuenta.filter((m) => !(m.entidadId && deBaja.has(m.entidadId))),
+    compromisos,
+    NO_ES_GASTO,
+    categorias,
+  )
   const ritmo = ritmoOrdinario(ordinarios)
 
   const ultimo = cuenta.reduce(
@@ -232,6 +259,10 @@ export function construirEstado(crudos, opciones = {}) {
     compromisos,
     dudosos,
     ingresos,
+    tratos,
+    apartados: [...apartados]
+      .map((id) => ({ entidadId: id, nombre: nombres.get(id) ?? id, trato: tratos[id] }))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre)),
     ingresoMensual,
     ordinarios,
     ritmo,
