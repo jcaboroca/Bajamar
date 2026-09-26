@@ -7,4 +7,4 @@ workers_dev = true
 #   wrangler kv namespace create BUZONES
 [[kv_namespaces]]
 binding = "BUZONES"
-id = "PENDIENTE"
+id = "7f325c35cc1248ad83037172a62c749e"

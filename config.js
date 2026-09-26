@@ -8,4 +8,4 @@
  *
  * Para activarlo: `npm run buzon`. Lo despliega y rellena esta línea solo.
  */
-export const BUZON = ''
+export const BUZON = 'https://bajamar-buzon.mundialisimo.workers.dev'
