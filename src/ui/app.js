@@ -89,6 +89,11 @@ async function arrancar() {
   }
 
   ponerseAlDia()
+
+  // Volver a la app es abrirla: en el móvil casi nunca se arranca de cero.
+  addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') ponerseAlDia()
+  })
 }
 
 /**
@@ -113,12 +118,29 @@ async function ponerseAlDia() {
   }
 }
 
-/** Al importar, el otro dispositivo se entera sin que haya que acordarse. */
+/**
+ * Al importar, el otro dispositivo se entera sin que haya que acordarse.
+ *
+ * La primera vez hace falta una contraseña: sin ella el otro dispositivo no
+ * tendría con qué descifrar. Se pregunta aquí, que es cuando viene a cuento, y
+ * no se vuelve a preguntar.
+ */
 async function contarloAlOtro() {
-  if (!BUZON || !claveRecordada()) return
+  if (!BUZON) return
+
+  let clave = claveRecordada()
+  if (!clave) {
+    clave = (await pedirClave({
+      aceptar: 'Sincronizar',
+      pie: 'Elige una contraseña. Con ella verás estos datos en tus otros dispositivos, y sin ella no los ve nadie. Solo se pide esta vez.',
+    })) ?? ''
+    if (!clave) return decir('Guardado solo en este dispositivo.')
+    if (quiereRecordar()) recordarClave(clave)
+  }
+
   try {
-    await subir(BUZON, hacerMaleta(await leerMovimientos()), claveRecordada())
-    decir('Enviado al otro dispositivo.')
+    await subir(BUZON, hacerMaleta(await leerMovimientos()), clave)
+    decir('Enviado. Al abrir la app en el otro dispositivo aparecerá allí.')
   } catch {
     decir('Guardado aquí, pero no he podido avisar al otro dispositivo.')
   }
