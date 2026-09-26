@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Bajamar">
+  <rect width="512" height="512" fill="#0B0E11"/>
+  <path d="M72 188 C 152 188, 172 312, 240 344 C 308 376, 344 292, 440 274"
+        fill="none" stroke="#DDE3E8" stroke-width="22" stroke-linecap="round"/>
+  <circle cx="251" cy="348" r="32" fill="#E0A458"/>
+</svg>

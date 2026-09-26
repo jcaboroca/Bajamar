@@ -1,0 +1,16 @@
+{
+  "name": "Bajamar",
+  "short_name": "Bajamar",
+  "description": "Cuánto te queda en el punto más bajo del mes.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0B0E11",
+  "theme_color": "#0B0E11",
+  "lang": "es",
+  "icons": [
+    { "src": "icono.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icono.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

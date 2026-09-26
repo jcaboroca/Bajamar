@@ -1,0 +1,14 @@
+# Nada de esto debe salir de aquí: son movimientos bancarios reales.
+*.xls
+*.xlsx
+*.csv
+/muestras/
+
+.DS_Store
+node_modules/
+*.log
+.vscode/
+icono-512.png
+
+# Diagnóstico personal: nombres e importes reales. Se queda en el disco.
+docs/

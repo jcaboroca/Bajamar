@@ -1,0 +1,10 @@
+name = "bajamar-buzon"
+main = "src/index.js"
+compatibility_date = "2025-06-01"
+workers_dev = true
+
+# El namespace se crea una sola vez y el id se pega aquí:
+#   wrangler kv namespace create BUZONES
+[[kv_namespaces]]
+binding = "BUZONES"
+id = "PENDIENTE"

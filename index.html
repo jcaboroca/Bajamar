@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0B0E11">
+<title>Bajamar</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icono.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icono.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="stylesheet" href="src/ui/estilo.css">
+</head>
+<body>
+
+<main id="lienzo" hidden>
+
+  <section class="portada">
+    <p class="rotulo">El punto más bajo</p>
+    <p class="titular"><span id="suelo-cifra" class="cifras">—</span></p>
+    <p class="pie" id="suelo-pie"></p>
+  </section>
+
+  <section class="lamina" aria-labelledby="lamina-rotulo">
+    <p class="rotulo" id="lamina-rotulo">Cómo llegas hasta ahí</p>
+    <div id="lamina"></div>
+  </section>
+
+  <section class="listado">
+    <p class="rotulo">Lo que viene</p>
+    <ol id="eventos" class="eventos"></ol>
+  </section>
+
+  <section class="listado" id="bloque-preguntas" hidden>
+    <p class="rotulo">No lo sé</p>
+    <p class="aclaracion">Esto ha pasado una o dos veces. No son suficientes para
+      saber cada cuánto vuelve, así que no lo doy por hecho.</p>
+    <ol id="preguntas" class="eventos"></ol>
+  </section>
+
+  <section class="listado">
+    <p class="rotulo">En qué se va · al mes</p>
+    <ol id="categorias" class="categorias"></ol>
+  </section>
+
+  <section class="ajustes">
+    <p class="rotulo">Ajustes</p>
+    <dl class="datos">
+      <dt>Movimientos guardados</dt><dd id="dato-movimientos" class="cifras">0</dd>
+      <dt>Gasto ordinario</dt><dd id="dato-ritmo" class="cifras">—</dd>
+      <dt>Saldo de partida</dt><dd id="dato-saldo" class="cifras">—</dd>
+    </dl>
+    <div class="acciones">
+      <label class="boton">
+        Añadir un extracto
+        <input type="file" id="fichero-mas" accept=".xls" multiple hidden>
+      </label>
+      <button type="button" id="olvidar" class="boton boton-sobrio">Olvidarlo todo</button>
+    </div>
+
+    <p class="rotulo rotulo-menor">Otro dispositivo</p>
+    <div class="acciones">
+      <button type="button" id="enviar" class="boton boton-sobrio">Enviar cifrado</button>
+      <label class="boton boton-sobrio">
+        Traer de un fichero
+        <input type="file" id="fichero-sobre" accept=".bajamar,.json" hidden>
+      </label>
+    </div>
+    <p class="nota" id="estado-sincro" role="status"></p>
+
+    <p class="nota">Los extractos se leen y se guardan en este dispositivo. Si
+      envías una copia a otro, sale cifrada con tu contraseña: lo que viaja no
+      se puede leer sin ella, ni por quien lo transporta ni por quien lo guarde.</p>
+  </section>
+
+</main>
+
+<section id="bienvenida" class="bienvenida">
+  <h1>Bajamar</h1>
+  <p class="lema">Cuánto te queda en el punto más bajo del mes.</p>
+  <label class="boton boton-grande">
+    Elegir un extracto
+    <input type="file" id="fichero" accept=".xls" multiple hidden>
+  </label>
+  <p class="nota">Exporta tus movimientos desde la web del banco en formato Excel
+    y suéltalos aquí. También puedes arrastrarlos a esta ventana.</p>
+  <p class="nota"><button type="button" id="traer" class="enlace">Ya los tengo en otro dispositivo</button></p>
+  <p class="nota" id="aviso-bienvenida" role="status"></p>
+</section>
+
+<dialog id="clave" class="clave">
+  <form method="dialog" id="clave-form">
+    <p class="rotulo" id="clave-rotulo">Tu contraseña</p>
+    <p class="nota" id="clave-pie"></p>
+    <input type="password" id="clave-campo" autocomplete="current-password"
+           aria-labelledby="clave-rotulo" required>
+    <p class="nota error" id="clave-error" role="alert"></p>
+    <div class="acciones">
+      <button type="submit" class="boton" id="clave-aceptar">Continuar</button>
+      <button type="button" class="boton boton-sobrio" id="clave-cancelar">Dejarlo</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="soltar" class="soltar"><p>Suelta el extracto</p></div>
+
+<script type="module" src="src/ui/app.js"></script>
+</body>
+</html>

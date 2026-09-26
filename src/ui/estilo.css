@@ -1,0 +1,362 @@
+/*
+  Bajamar.
+
+  Un eje vertical y nada más. Sin barra lateral, sin pestañas, sin tarjetas
+  flotando sobre un fondo. La jerarquía la marca el tamaño del texto y el aire
+  que lo rodea, no las cajas.
+
+  El ámbar está reservado para lo que de verdad pide atención. Si se usa para
+  adornar deja de significar nada, y entonces no queda ningún color con el que
+  avisar.
+*/
+
+:root {
+  --fondo: #0B0E11;        /* azul-carbón: el negro puro vibra sobre OLED */
+  --superficie: #141A1F;
+  --texto: #DDE3E8;
+  --secundario: #7D8B96;
+  --linea: #222B33;
+  --acento: #E0A458;
+  --agua: #3E5C6B;
+
+  --display: 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --cifras: 'Geist Mono', ui-monospace, 'SF Mono', 'JetBrains Mono', monospace;
+
+  --curva: cubic-bezier(0.23, 1, 0.32, 1);
+  --margen: clamp(1.5rem, 6vw, 4rem);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--fondo);
+  color: var(--texto);
+  font-family: var(--display);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.cifras {
+  font-family: var(--cifras);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
+main {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 0 var(--margen) 6rem;
+}
+
+section { padding: clamp(2.5rem, 8vw, 4.5rem) 0; }
+section + section { border-top: 1px solid var(--linea); }
+
+/* El rótulo no compite: nombra el bloque y se aparta. */
+.rotulo {
+  margin: 0 0 1.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--secundario);
+}
+
+.aclaracion {
+  margin: -0.75rem 0 1.5rem;
+  max-width: 34rem;
+  color: var(--secundario);
+  font-size: 0.9375rem;
+}
+
+/* ── La portada ─────────────────────────────────────────────────────────── */
+
+.portada { padding-top: clamp(4rem, 14vh, 8rem); }
+
+.titular {
+  margin: 0;
+  font-family: var(--cifras);
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(3.25rem, 15vw, 6.5rem);
+  font-weight: 300;
+  letter-spacing: -0.04em;
+  line-height: 0.95;
+}
+
+.titular.en-rojo { color: var(--acento); }
+
+/* El símbolo, volado y discreto: a 6 rem compite con la cifra si va al mismo
+   tamaño, y la cifra es lo único que hay que leer. */
+.moneda {
+  font-size: 0.3em;
+  vertical-align: 0.72em;
+  margin-left: 0.1em;
+  color: var(--secundario);
+  letter-spacing: 0;
+}
+
+.pie {
+  margin: 1.25rem 0 0;
+  font-size: 1.0625rem;
+  color: var(--secundario);
+  max-width: 30rem;
+}
+
+.pie strong { color: var(--texto); font-weight: 500; }
+
+/* ── La lámina de agua ──────────────────────────────────────────────────── */
+
+#lamina svg { display: block; width: 100%; height: auto; overflow: visible; }
+
+.trazo-agua {
+  fill: none;
+  stroke: var(--agua);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.relleno-agua { fill: url(#degradado-agua); }
+
+.marca-suelo { stroke: var(--acento); stroke-width: 1; stroke-dasharray: 2 3; }
+.punto-suelo { fill: var(--acento); }
+
+.etiqueta-lamina {
+  font-family: var(--cifras);
+  font-size: 11px;
+  fill: var(--secundario);
+}
+.etiqueta-lamina.destacada { fill: var(--acento); }
+
+/* Se dibuja una vez, al importar. Abrir la aplicación no anima nada: si cada
+   vez que la abres tienes que esperar a que algo se pinte, molesta. */
+.dibujando .trazo-agua {
+  stroke-dasharray: var(--largo);
+  stroke-dashoffset: var(--largo);
+  animation: trazar 600ms var(--curva) forwards;
+}
+.dibujando .relleno-agua,
+.dibujando .marca-suelo,
+.dibujando .punto-suelo,
+.dibujando .etiqueta-lamina {
+  opacity: 0;
+  animation: asomar 500ms var(--curva) 250ms forwards;
+}
+
+@keyframes trazar { to { stroke-dashoffset: 0; } }
+@keyframes asomar { to { opacity: 1; } }
+
+/* ── Listas ─────────────────────────────────────────────────────────────── */
+
+.eventos, .categorias { margin: 0; padding: 0; list-style: none; }
+
+.eventos li {
+  display: grid;
+  grid-template-columns: 3.25rem 1fr auto;
+  gap: 0.875rem;
+  align-items: baseline;
+  padding: 0.875rem 0;
+  border-bottom: 1px solid var(--linea);
+}
+.eventos li:last-child { border-bottom: 0; }
+
+.evento-fecha {
+  font-family: var(--cifras);
+  font-size: 0.8125rem;
+  color: var(--secundario);
+  white-space: nowrap;
+}
+
+.evento-nombre { min-width: 0; }
+.evento-nombre span { display: block; }
+
+.evento-detalle {
+  font-size: 0.8125rem;
+  color: var(--secundario);
+}
+
+.evento-importe {
+  font-family: var(--cifras);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Lo previsto no es lo mismo que lo confirmado, y la interfaz lo dice sin
+   inventarse un icono para ello. */
+.previsto .evento-importe,
+.previsto .evento-nombre > span:first-child { color: #B3BEC7; }
+.confirmado .evento-nombre > span:first-child { font-weight: 500; }
+.urgente .evento-importe { color: var(--acento); }
+
+.categorias li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 1rem 1rem;
+  align-items: baseline;
+  padding: 0.75rem 0;
+}
+.categorias .barra {
+  grid-column: 1 / -1;
+  height: 2px;
+  background: var(--linea);
+  border-radius: 1px;
+  overflow: hidden;
+}
+.categorias .barra i {
+  display: block;
+  height: 100%;
+  background: var(--agua);
+  border-radius: 1px;
+}
+
+/* ── Ajustes ────────────────────────────────────────────────────────────── */
+
+.datos {
+  margin: 0 0 2rem;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.75rem 1rem;
+}
+.datos dt { color: var(--secundario); font-size: 0.9375rem; }
+.datos dd { margin: 0; text-align: right; }
+
+.acciones { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+
+.boton {
+  display: inline-block;
+  padding: 0.6875rem 1.25rem;
+  border: 1px solid var(--linea);
+  border-radius: 0.5rem;
+  background: var(--superficie);
+  color: var(--texto);
+  font: inherit;
+  font-size: 0.9375rem;
+  cursor: pointer;
+  transition: background 150ms var(--curva), border-color 150ms var(--curva), transform 100ms var(--curva);
+}
+.boton:hover { background: #1A222A; border-color: #2D3945; }
+.boton:active { transform: scale(0.97); }
+.boton:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
+
+.boton-sobrio { color: var(--secundario); background: transparent; }
+.boton-grande { padding: 0.875rem 1.75rem; font-size: 1rem; }
+
+.nota {
+  margin: 1.5rem 0 0;
+  max-width: 32rem;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--secundario);
+}
+
+.nota .error, .error { color: var(--acento); }
+
+.rotulo-menor { margin: 2.5rem 0 1rem; }
+
+/* Un botón que no parece un botón: la acción existe pero no reclama el sitio. */
+.enlace {
+  padding: 0;
+  font: inherit;
+  color: var(--texto);
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--linea);
+  cursor: pointer;
+}
+.enlace:hover { border-bottom-color: var(--secundario); }
+.enlace:focus-visible { outline: 2px solid var(--acento); outline-offset: 3px; }
+
+/* ── Contraseña ─────────────────────────────────────────────────────────── */
+
+.clave {
+  width: min(26rem, calc(100vw - 2.5rem));
+  padding: 2rem;
+  color: var(--texto);
+  background: var(--superficie);
+  border: 1px solid var(--linea);
+  border-radius: 4px;
+}
+.clave::backdrop { background: rgb(5 7 9 / 0.75); }
+.clave .rotulo { margin-bottom: 0.75rem; }
+.clave .nota { margin-top: 0; }
+.clave .acciones { margin-top: 1.5rem; }
+
+#clave-campo {
+  width: 100%;
+  margin-top: 1.25rem;
+  padding: 0.75rem;
+  font: inherit;
+  font-family: var(--cifras);
+  color: var(--texto);
+  background: var(--fondo);
+  border: 1px solid var(--linea);
+  border-radius: 3px;
+}
+#clave-campo:focus-visible { outline: 2px solid var(--acento); outline-offset: 1px; }
+#clave-error:empty { display: none; }
+
+/* ── Bienvenida ─────────────────────────────────────────────────────────── */
+
+.bienvenida {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  max-width: 34rem;
+  margin: 0 auto;
+  padding: 0 var(--margen);
+}
+.bienvenida[hidden] { display: none; }
+
+.bienvenida h1 {
+  margin: 0;
+  font-size: clamp(2.5rem, 9vw, 3.5rem);
+  font-weight: 300;
+  letter-spacing: -0.03em;
+}
+
+.lema {
+  margin: 0.75rem 0 2.5rem;
+  font-size: 1.125rem;
+  color: var(--secundario);
+}
+
+.bienvenida .boton { align-self: flex-start; }
+
+/* ── Soltar ficheros ────────────────────────────────────────────────────── */
+
+.soltar {
+  position: fixed;
+  inset: 0;
+  display: none;
+  place-items: center;
+  background: rgb(11 14 17 / 0.92);
+  z-index: 10;
+}
+.soltar p {
+  padding: 2rem 3rem;
+  border: 1px dashed var(--acento);
+  border-radius: 0.75rem;
+  color: var(--acento);
+}
+.soltar.activo { display: grid; }
+
+@media (prefers-reduced-motion: reduce) {
+  /* La lámina aparece ya dibujada. La información es la misma; lo único que
+     se pierde es el gesto. */
+  .dibujando .trazo-agua,
+  .dibujando .relleno-agua,
+  .dibujando .marca-suelo,
+  .dibujando .punto-suelo,
+  .dibujando .etiqueta-lamina {
+    animation: none;
+    opacity: 1;
+    stroke-dasharray: none;
+    stroke-dashoffset: 0;
+  }
+  .boton { transition: none; }
+}
