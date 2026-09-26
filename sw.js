@@ -5,7 +5,7 @@
  * programa, que es lo único que hace falta descargar.
  */
 
-const CAU = 'bajamar-v5'
+const CAU = 'bajamar-v6'
 
 const PROGRAMA = [
   './',
@@ -37,7 +37,9 @@ const PROGRAMA = [
 
 self.addEventListener('install', (evento) => {
   evento.waitUntil(
-    caches.open(CAU).then((cau) => cau.addAll(PROGRAMA)).then(() => self.skipWaiting()),
+    caches.open(CAU)
+      .then((cau) => cau.addAll(PROGRAMA.map((u) => new Request(u, { cache: 'reload' }))))
+      .then(() => self.skipWaiting()),
   )
 })
 
@@ -57,7 +59,9 @@ self.addEventListener('fetch', (evento) => {
 
   evento.respondWith(
     caches.match(peticion).then((guardado) => {
-      const red = fetch(peticion)
+      // `reload` salta la caché HTTP: GitHub sirve el HTML con diez minutos de
+      // vida y, sin esto, revalidar contra ella devolvía lo viejo otra vez.
+      const red = fetch(peticion, { cache: 'reload' })
         .then((respuesta) => {
           if (respuesta.ok) {
             const copia = respuesta.clone()
