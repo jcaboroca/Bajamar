@@ -93,14 +93,24 @@ export function revisar({ proyeccion, fijos, ingresos, movimientos, nombres, pre
     })
   }
 
-  for (const f of fijos) {
-    if (f.estado !== 'retrasado') continue
+  // Los retrasos se dicen en una sola línea. Tres cajas repitiendo el mismo
+  // texto con otro nombre no informan tres veces: empujan hacia abajo lo que
+  // sí importa y enseñan a no leer los avisos.
+  const retrasados = fijos.filter((f) => f.estado === 'retrasado')
+  if (retrasados.length > 0) {
+    const nombra = retrasados.slice(0, 3).map((f) => f.nombre)
+    const resto = retrasados.length - nombra.length
+    const lista = nombra.join(', ') + (resto > 0 ? ` y ${resto} más` : '')
     avisos.push({
-      id: `retraso:${f.entidadId}`,
+      id: `retraso:${retrasados.map((f) => f.entidadId).join('|')}`,
       clase: 'retraso',
       nivel: 'bajo',
-      titulo: `${f.nombre} no ha vuelto a pasar`,
-      detalle: `Tocaba hace tiempo y no aparece. Puede que lo hayas dado de baja, o puede que llegue con retraso y se junte con el siguiente.`,
+      titulo: retrasados.length === 1
+        ? `${lista} no ha vuelto a pasar`
+        : `${retrasados.length} recibos no han vuelto a pasar`,
+      detalle: retrasados.length === 1
+        ? 'Tocaba hace tiempo y no aparece. Puede que lo hayas dado de baja, o puede que llegue con retraso y se junte con el siguiente.'
+        : `${lista}. Puede que los hayas dado de baja, o puede que lleguen con retraso y se junten con los siguientes.`,
     })
   }
 

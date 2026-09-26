@@ -21,9 +21,11 @@ const MARGEN_INFERIOR = 24
 
 /**
  * @param {import('../analisis/bajamar.js').Proyeccion} proyeccion
+ * @param {{ marca?: string }} [opciones] distingue el degradado cuando hay dos láminas a la vez
  * @returns {SVGSVGElement}
  */
-export function dibujarLamina(proyeccion) {
+export function dibujarLamina(proyeccion, opciones = {}) {
+  const marca = opciones.marca ?? 'agua'
   const puntos = proyeccion.curva
   const valores = puntos.map((p) => p.saldo)
   const techo = Math.max(...valores, 0)
@@ -49,7 +51,10 @@ export function dibujarLamina(proyeccion) {
       `El mínimo es ${formatEurosRedondo(proyeccion.suelo.saldo)} el ${fechaLarga(proyeccion.suelo.fecha)}.`,
   })
 
-  svg.append(degradado(), crear('path', { class: 'relleno-agua', d: area }))
+  svg.append(
+    degradado(marca),
+    crear('path', { class: 'relleno-agua', d: area, fill: `url(#degradado-${marca})` }),
+  )
 
   // El cero sólo se dibuja si la proyección lo cruza: si no, es una línea que
   // no cuenta nada y sólo añade ruido.
@@ -83,9 +88,10 @@ export function dibujarLamina(proyeccion) {
   return svg
 }
 
-function degradado() {
+/** @param {string} marca */
+function degradado(marca) {
   const defs = crear('defs')
-  const grad = crear('linearGradient', { id: 'degradado-agua', x1: 0, y1: 0, x2: 0, y2: 1 })
+  const grad = crear('linearGradient', { id: `degradado-${marca}`, x1: 0, y1: 0, x2: 0, y2: 1 })
   grad.append(
     crear('stop', { offset: '0%', 'stop-color': 'var(--agua)', 'stop-opacity': 0.28 }),
     crear('stop', { offset: '100%', 'stop-color': 'var(--agua)', 'stop-opacity': 0 }),

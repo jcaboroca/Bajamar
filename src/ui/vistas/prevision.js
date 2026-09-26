@@ -1,0 +1,252 @@
+// @ts-check
+/**
+ * Previsión: qué viene y cuánto cuesta que venga.
+ *
+ * Aquí conviven dos maneras de mirar el mismo dinero. Mes a mes se ve la
+ * forma del año —dónde hay un mes que no cuadra— y día a día se ve por qué.
+ * Un mes puede cerrar en positivo y aun así haber pasado por un descubierto el
+ * día 12, así que cada mes lleva su propio suelo además de su saldo final.
+ *
+ * Cuanto más lejos se mira, menos se sabe. Lo que hay a doce meses son
+ * recibos que se repiten y un ritmo de gasto medido, no una bola de cristal, y
+ * el pie de la lámina lo dice con esas palabras.
+ */
+
+import { formatEuros, formatEurosRedondo } from '../../dominio/dinero.js'
+import { mesDe, ultimoDiaDelMes, sumarMeses } from '../../dominio/tipos.js'
+import { MESES_DE } from '../../analisis/fijos.js'
+import { dibujarLamina } from '../lamina.js'
+import { cuentas, diaYMes, linea, nodo, nombreDeMes, requerir, vacio } from '../piezas.js'
+
+/**
+ * @typedef {ReturnType<typeof import('../../estado.js').construirEstado>} Estado
+ * @typedef {import('../../analisis/bajamar.js').Proyeccion} Proyeccion
+ */
+
+let horizonte = 3
+/** @type {string | null} */
+let mesElegido = null
+
+/** @type {Estado | null} */
+let ultimo = null
+
+export function montarPrevision() {
+  requerir('horizonte').addEventListener('click', (e) => {
+    const boton = e.target instanceof Element ? e.target.closest('[data-meses]') : null
+    if (!(boton instanceof HTMLButtonElement)) return
+    horizonte = Number(boton.dataset.meses)
+    for (const otro of requerir('horizonte').querySelectorAll('[data-meses]')) {
+      otro.setAttribute('aria-pressed', String(otro === boton))
+    }
+    repintar()
+  })
+
+  requerir('meses-tabla').addEventListener('click', (e) => {
+    const li = e.target instanceof Element ? e.target.closest('li[data-mes]') : null
+    if (!(li instanceof HTMLElement)) return
+    mesElegido = li.dataset.mes ?? null
+    repintar()
+    requerir('calendario-rotulo').scrollIntoView({ behavior: 'smooth', block: 'start' })
+  })
+}
+
+/** @param {Estado} estado */
+export function pintarPrevision(estado) {
+  ultimo = estado
+  mesElegido = null
+  repintar()
+}
+
+function repintar() {
+  if (!ultimo) return
+  const estado = ultimo
+  const hasta = ultimoDiaDelMes(sumarMeses(estado.hoy, horizonte - 1))
+  const proyeccion = recortar(estado.proyeccionLarga, hasta)
+  const meses = estado.meses.filter((f) => f.mes <= mesDe(hasta))
+
+  requerir('lamina-larga').replaceChildren(dibujarLamina(proyeccion, { marca: 'largo' }))
+
+  requerir('prevision-pie').textContent =
+    `El suelo de estos ${horizonte} meses es ${formatEurosRedondo(proyeccion.suelo.saldo)}. `
+    + 'De aquí en adelante sólo hay recibos que se repiten y tu ritmo de gasto medido: '
+    + 'cuanto más lejos, menos seguro.'
+
+  pintarMeses(meses, estado)
+  pintarCalendario(estado, meses)
+  pintarCoste(estado)
+  pintarFijos(estado)
+  pintarSuscripciones(estado)
+}
+
+/**
+ * @param {Proyeccion} proyeccion
+ * @param {string} hasta
+ * @returns {Proyeccion}
+ */
+function recortar(proyeccion, hasta) {
+  const curva = proyeccion.curva.filter((p) => p.fecha <= hasta)
+  if (curva.length === 0) return proyeccion
+  const suelo = curva.reduce((bajo, p) => (p.saldo < bajo.saldo ? p : bajo), curva[0])
+  return {
+    ...proyeccion,
+    hasta,
+    curva,
+    suelo: { ...suelo },
+    saldoFinal: curva[curva.length - 1].saldo,
+    eventos: proyeccion.eventos.filter((e) => e.fecha <= hasta),
+  }
+}
+
+/**
+ * @param {import('../../analisis/mes.js').FilaMes[]} meses
+ * @param {Estado} estado
+ */
+function pintarMeses(meses, estado) {
+  const lista = requerir('meses-tabla')
+  const actual = mesElegido ?? mesDe(estado.hoy)
+
+  lista.replaceChildren(...meses.map((f) => {
+    const li = nodo('li', `mes${f.mes === actual ? ' elegido' : ''}${f.ahorro < 0 ? ' apretado' : ''}`)
+    li.dataset.mes = f.mes
+    li.tabIndex = 0
+    li.setAttribute('role', 'button')
+
+    const cabecera = nodo('div', 'mes-cabecera')
+    cabecera.append(
+      nodo('span', 'mes-nombre', nombreDeMes(f.mes)),
+      nodo('span', `mes-ahorro cifras${f.ahorro < 0 ? ' en-rojo' : ''}`, formatEuros(f.ahorro, { signo: true })),
+    )
+
+    const detalle = nodo('div', 'mes-detalle')
+    detalle.append(
+      nodo('span', '', `entra ${formatEurosRedondo(f.ingresos)}`),
+      nodo('span', '', `sale ${formatEurosRedondo(Math.abs(f.gastos))}`),
+      nodo('span', f.suelo.saldo < 0 ? 'en-rojo' : '', `suelo ${formatEurosRedondo(f.suelo.saldo)}`),
+    )
+
+    li.append(cabecera, detalle)
+    if (f.ahorro < 0) {
+      li.append(nodo('p', 'mes-aviso', `En ${nombreDeMes(f.mes).toLowerCase()} se va más de lo que entra.`))
+    }
+    li.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault()
+        li.click()
+      }
+    })
+    return li
+  }))
+}
+
+/**
+ * Día a día del mes elegido, con el saldo que queda después de cada apunte.
+ * @param {Estado} estado
+ * @param {import('../../analisis/mes.js').FilaMes[]} meses
+ */
+function pintarCalendario(estado, meses) {
+  const mes = mesElegido ?? meses[0]?.mes ?? mesDe(estado.hoy)
+  requerir('calendario-rotulo').textContent = `Día a día · ${nombreDeMes(mes)}`
+
+  const saldos = new Map(estado.proyeccionLarga.curva.map((p) => [p.fecha, p.saldo]))
+  const eventos = estado.proyeccionLarga.eventos.filter((e) => mesDe(e.fecha) === mes)
+  const lista = requerir('calendario')
+
+  if (eventos.length === 0) {
+    lista.replaceChildren(vacio('Ningún recibo ni ingreso previsto en este mes. Sólo el gasto del día a día.'))
+    return
+  }
+
+  /** @type {Node[]} */
+  const filas = []
+  let anterior = ''
+  for (const e of eventos) {
+    const saldo = saldos.get(e.fecha)
+    const li = linea({
+      marca: e.fecha === anterior ? '' : diaYMes(e.fecha),
+      nombre: e.nombre,
+      detalle: saldo === undefined ? undefined : `quedan ${formatEurosRedondo(saldo)}`,
+      importe: formatEuros(e.importe, { signo: true }),
+      clase: `${e.seguro ? 'confirmado' : 'previsto'}${saldo !== undefined && saldo < 0 ? ' urgente' : ''}`,
+    })
+    anterior = e.fecha
+    filas.push(li)
+  }
+  lista.replaceChildren(...filas)
+}
+
+/** @param {Estado} estado */
+function pintarCoste(estado) {
+  const c = estado.costes
+  requerir('coste-resumen').replaceChildren(cuentas([
+    ['Fijos, repartidos por meses', formatEuros(c.costeMensual)],
+    ['Gasto del día a día', formatEuros(estado.ritmo.porMes)],
+    ['Reserva para los no mensuales', formatEuros(c.reservaMensual)],
+    ['Total al mes', formatEuros(c.costeMensual + estado.ritmo.porMes), 'destacado'],
+  ]))
+}
+
+/** @param {Estado} estado */
+function pintarFijos(estado) {
+  const c = estado.costes
+  const caja = requerir('fijos')
+
+  /**
+   * @param {string} titulo
+   * @param {string} explicacion
+   * @param {import('../../analisis/fijos.js').Fijo[]} lista
+   */
+  const grupo = (titulo, explicacion, lista) => {
+    if (lista.length === 0) return null
+    const div = nodo('div', 'grupo')
+    div.append(nodo('p', 'rotulo rotulo-menor', titulo), nodo('p', 'aclaracion', explicacion))
+    const ol = nodo('ol', 'eventos')
+    for (const f of lista) {
+      const cada = f.periodicidad === 'mensual' ? 'al mes' : `cada ${MESES_DE[f.periodicidad]} meses`
+      ol.append(linea({
+        marca: diaYMes(f.proximaPrevista),
+        nombre: f.nombre,
+        detalle: f.periodicidad === 'mensual'
+          ? cada
+          : `${cada} · ${formatEuros(f.mensualEquivalente)} al mes equivalente`,
+        importe: formatEuros(f.importeEsperado),
+        clase: f.estado === 'retrasado' ? 'apagado' : '',
+      }))
+    }
+    div.append(ol)
+    return div
+  }
+
+  const grupos = [
+    grupo('Cada mes, lo mismo', 'Se puede dar por sabido lo que vale.', c.mensuales),
+    grupo('Cada mes, distinto', 'La cifra es la mediana: lo que suele costar, no lo que costó la última vez.', c.variables),
+    grupo('Cada pocos meses', 'Trimestrales y semestrales.', c.periodicos),
+    grupo('Una vez al año', 'Lo que hay que ver venir con meses de antelación.', c.anuales),
+  ].filter((g) => g !== null)
+
+  if (grupos.length === 0) {
+    caja.replaceChildren(vacio(
+      'Todavía no he reconocido ningún recibo periódico. Hacen falta tres o cuatro '
+      + 'apariciones del mismo cobrador para no confundir una costumbre con un compromiso.',
+    ))
+    return
+  }
+
+  caja.replaceChildren(...grupos)
+}
+
+/** @param {Estado} estado */
+function pintarSuscripciones(estado) {
+  const lista = estado.costes.suscripciones
+  requerir('bloque-suscripciones').hidden = lista.length === 0
+  if (lista.length === 0) return
+
+  requerir('suscripciones').replaceChildren(...lista.map((f) => linea({
+    nombre: f.nombre,
+    detalle: `próxima el ${diaYMes(f.proximaPrevista)}`,
+    importe: `${formatEuros(f.mensualEquivalente)} / mes`,
+  })))
+
+  requerir('suscripciones-pie').textContent =
+    `Entre todas, ${formatEuros(estado.costes.suscripcionesMes)} al mes. `
+    + `Al año son ${formatEurosRedondo(estado.costes.suscripcionesAnio)}.`
+}

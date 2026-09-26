@@ -1,9 +1,13 @@
 /*
   Bajamar.
 
-  Un eje vertical y nada más. Sin barra lateral, sin pestañas, sin tarjetas
-  flotando sobre un fondo. La jerarquía la marca el tamaño del texto y el aire
-  que lo rodea, no las cajas.
+  Un eje vertical y nada más dentro de cada área. Sin tarjetas flotando sobre
+  un fondo, sin iconografía de relleno: la jerarquía la marca el tamaño del
+  texto y el aire que lo rodea.
+
+  La navegación va abajo en el móvil —donde llega el pulgar— y arriba en el
+  escritorio. Con palabras, no con iconos: cinco dibujos minúsculos obligan a
+  adivinar, y adivinar con el dinero de uno no apetece.
 
   El ámbar está reservado para lo que de verdad pide atención. Si se usa para
   adornar deja de significar nada, y entonces no queda ningún color con el que
@@ -16,7 +20,9 @@
   --texto: #DDE3E8;
   --secundario: #7D8B96;
   --linea: #222B33;
-  --acento: #E0A458;
+  --acento: #E0A458;       /* ámbar: atención */
+  --alarma: #D9604F;       /* rojo apagado: problema */
+  --bien: #6FA88B;         /* verde sobrio: va bien */
   --agua: #3E5C6B;
 
   --display: 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -27,6 +33,11 @@
 }
 
 *, *::before, *::after { box-sizing: border-box; }
+
+/* `hidden` tiene que ganar siempre. Cualquier regla con clase le pisa el
+   `display: none` de la hoja del navegador, y entonces se queda a la vista lo
+   que el programa cree haber escondido. */
+[hidden] { display: none !important; }
 
 html { -webkit-text-size-adjust: 100%; }
 
@@ -50,11 +61,86 @@ body {
 main {
   max-width: 44rem;
   margin: 0 auto;
-  padding: 0 var(--margen) 6rem;
+  /* Sitio para la barra de abajo más el borde curvo del teléfono. */
+  padding: 0 var(--margen) calc(6rem + env(safe-area-inset-bottom));
 }
 
-section { padding: clamp(2.5rem, 8vw, 4.5rem) 0; }
-section + section { border-top: 1px solid var(--linea); }
+.vista { display: block; }
+.vista[hidden] { display: none; }
+
+.bloque { padding: clamp(2.25rem, 7vw, 4rem) 0; }
+.bloque + .bloque { border-top: 1px solid var(--linea); }
+
+/* ── Navegación ───────────────────────────────────────────────── */
+
+.cabecera {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 5;
+  background: rgb(11 14 17 / 0.92);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid var(--linea);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.cabecera[hidden] { display: none; }
+
+/* En el móvil la marca sobra: ya se sabe qué aplicación está abierta, y ese
+   sitio lo necesita el pulgar. */
+.marca { display: none; margin: 0; }
+
+.navegacion {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  max-width: 44rem;
+  margin: 0 auto;
+}
+
+.pestana {
+  padding: 0.75rem 0.125rem;
+  font: inherit;
+  font-size: 0.6875rem;
+  letter-spacing: 0.01em;
+  color: var(--secundario);
+  background: none;
+  border: 0;
+  border-top: 2px solid transparent;
+  cursor: pointer;
+  transition: color 150ms var(--curva);
+}
+.pestana:hover { color: var(--texto); }
+.pestana:focus-visible { outline: 2px solid var(--acento); outline-offset: -2px; }
+.pestana[aria-current='page'] { color: var(--texto); border-top-color: var(--acento); }
+
+@media (min-width: 46rem) {
+  .cabecera {
+    top: 0;
+    bottom: auto;
+    border-top: 0;
+    border-bottom: 1px solid var(--linea);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 2rem;
+    padding: 0 var(--margen);
+  }
+  .marca {
+    display: block;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+  }
+  .navegacion { display: flex; gap: 0.25rem; margin: 0; }
+  .pestana {
+    padding: 1rem 0.75rem;
+    font-size: 0.875rem;
+    border-top: 0;
+    border-bottom: 2px solid transparent;
+  }
+  .pestana[aria-current='page'] { border-bottom-color: var(--acento); }
+  main { padding-top: 3.5rem; padding-bottom: 6rem; }
+}
 
 /* El rótulo no compite: nombra el bloque y se aparta. */
 .rotulo {
@@ -76,6 +162,9 @@ section + section { border-top: 1px solid var(--linea); }
 /* ── La portada ─────────────────────────────────────────────────────────── */
 
 .portada { padding-top: clamp(4rem, 14vh, 8rem); }
+/* Con avisos delante, la portada no necesita tanto aire: el aire ya lo dio el
+   hueco de arriba, y la cifra tiene que caber en la primera pantalla. */
+.bloque-avisos + .portada { padding-top: clamp(2rem, 6vh, 3rem); }
 
 .titular {
   margin: 0;
@@ -87,7 +176,7 @@ section + section { border-top: 1px solid var(--linea); }
   line-height: 0.95;
 }
 
-.titular.en-rojo { color: var(--acento); }
+.titular.en-rojo { color: var(--alarma); }
 
 /* El símbolo, volado y discreto: a 6 rem compite con la cifra si va al mismo
    tamaño, y la cifra es lo único que hay que leer. */
@@ -107,10 +196,47 @@ section + section { border-top: 1px solid var(--linea); }
 }
 
 .pie strong { color: var(--texto); font-weight: 500; }
+.pie-menor { font-size: 0.9375rem; margin-top: 0.5rem; }
+
+/* Una cifra grande, pero no la de portada: el disponible y el neto mandan
+   dentro de su bloque, no sobre la pantalla entera. */
+.subtitular {
+  margin: 1.5rem 0 0;
+  font-family: var(--cifras);
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(2rem, 8vw, 3rem);
+  font-weight: 300;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+.subtitular.en-rojo { color: var(--alarma); }
+
+/* ── Avisos ────────────────────────────────────────────────────── */
+
+/* Van los primeros y sin rótulo: lo que hay que saber no se anuncia, se dice. */
+.bloque-avisos { padding-top: clamp(1.5rem, 5vw, 2.5rem); padding-bottom: 0; }
+.bloque-avisos[hidden] { display: none; }
+
+.avisos { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.75rem; }
+
+.aviso {
+  padding: 0.875rem 1rem;
+  background: var(--superficie);
+  border-left: 2px solid var(--secundario);
+  border-radius: 0 0.375rem 0.375rem 0;
+}
+.aviso-alto { border-left-color: var(--alarma); }
+.aviso-medio { border-left-color: var(--acento); }
+.aviso-bajo { border-left-color: var(--agua); }
+
+.aviso-titulo { margin: 0; font-size: 0.9375rem; font-weight: 500; }
+.aviso-alto .aviso-titulo { color: var(--alarma); }
+.aviso-medio .aviso-titulo { color: var(--acento); }
+.aviso-detalle { margin: 0.25rem 0 0; font-size: 0.875rem; color: var(--secundario); }
 
 /* ── La lámina de agua ──────────────────────────────────────────────────── */
 
-#lamina svg { display: block; width: 100%; height: auto; overflow: visible; }
+#lamina svg, #lamina-larga svg { display: block; width: 100%; height: auto; overflow: visible; }
 
 .trazo-agua {
   fill: none;
@@ -120,7 +246,7 @@ section + section { border-top: 1px solid var(--linea); }
   stroke-linejoin: round;
 }
 
-.relleno-agua { fill: url(#degradado-agua); }
+.relleno-agua { stroke: none; }
 
 .marca-suelo { stroke: var(--acento); stroke-width: 1; stroke-dasharray: 2 3; }
 .punto-suelo { fill: var(--acento); }
@@ -164,6 +290,26 @@ section + section { border-top: 1px solid var(--linea); }
 }
 .eventos li:last-child { border-bottom: 0; }
 
+/* Sin fecha a la izquierda, el nombre se come esa columna en vez de dejar un
+   hueco de tres cuartos de dedo. */
+.eventos li > .evento-nombre:first-child { grid-column: 1 / 3; }
+
+/* Una cabecera de mes dentro de la lista: no es un movimiento, no se pincha. */
+.eventos li.separador {
+  display: block;
+  padding: 1.75rem 0 0.5rem;
+  border-bottom: 0;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--secundario);
+}
+.eventos li.separador:first-child { padding-top: 0.5rem; }
+
+.apagado { opacity: 0.55; }
+.entrada .evento-importe { color: var(--bien); }
+
 .evento-fecha {
   font-family: var(--cifras);
   font-size: 0.8125rem;
@@ -192,6 +338,20 @@ section + section { border-top: 1px solid var(--linea); }
 .confirmado .evento-nombre > span:first-child { font-weight: 500; }
 .urgente .evento-importe { color: var(--acento); }
 
+/* Una lista donde cada línea lleva a algún sitio. El realce aparece al tocar,
+   no está puesto de antemano: cinco filas resaltadas no resaltan nada. */
+.pulsables li[role='button'] {
+  margin: 0 calc(var(--margen) * -0.4);
+  padding-left: calc(var(--margen) * 0.4);
+  padding-right: calc(var(--margen) * 0.4);
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: background 120ms var(--curva), transform 100ms var(--curva);
+}
+.pulsables li[role='button']:hover { background: var(--superficie); }
+.pulsables li[role='button']:active { transform: scale(0.99); }
+.pulsables li[role='button']:focus-visible { outline: 2px solid var(--acento); outline-offset: -2px; }
+
 .categorias li {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -202,16 +362,98 @@ section + section { border-top: 1px solid var(--linea); }
 .categorias .barra {
   grid-column: 1 / -1;
   height: 2px;
+  margin: 0;
   background: var(--linea);
   border-radius: 1px;
   overflow: hidden;
 }
-.categorias .barra i {
+.categorias .barra i,
+.barra i {
   display: block;
   height: 100%;
   background: var(--agua);
   border-radius: 1px;
 }
+
+.barra {
+  height: 2px;
+  margin: 0.625rem 0 0;
+  background: var(--linea);
+  border-radius: 1px;
+  overflow: hidden;
+}
+/* Pasarse no se dibuja rompiendo el rectángulo: se dice con color, y la cifra
+   de al lado da el cuánto. */
+.barra.pasada i { background: var(--alarma); }
+
+/* ── El mes en tres tramos ─────────────────────────────────────────── */
+
+#mes-resumen { display: grid; gap: 1.5rem; }
+@media (min-width: 34rem) { #mes-resumen { grid-template-columns: repeat(3, 1fr); } }
+
+.tramo-rotulo { margin: 0; font-size: 0.8125rem; color: var(--secundario); }
+.tramo-cifra {
+  margin: 0.25rem 0 0;
+  font-family: var(--cifras);
+  font-variant-numeric: tabular-nums;
+  font-size: 1.5rem;
+  font-weight: 300;
+  letter-spacing: -0.02em;
+}
+.tramo-cifra.en-rojo { color: var(--alarma); }
+.tramo-detalle { margin: 0.25rem 0 0; font-size: 0.8125rem; color: var(--secundario); }
+
+/* ── Mes a mes y objetivos ───────────────────────────────────────── */
+
+.meses, .presupuestos, .objetivos { margin: 0; padding: 0; list-style: none; }
+
+.meses li, .presupuestos li, .objetivos li {
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--linea);
+}
+.meses li:last-child, .presupuestos li:last-child, .objetivos li:last-child { border-bottom: 0; }
+
+.meses li { cursor: pointer; }
+.meses li.elegido .mes-nombre { color: var(--acento); }
+.meses li:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
+
+.mes-cabecera {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+}
+.mes-nombre { font-weight: 500; }
+.mes-ahorro, .mes-cabecera .cifras { font-family: var(--cifras); font-variant-numeric: tabular-nums; }
+.en-rojo { color: var(--alarma); }
+
+.mes-detalle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin-top: 0.25rem;
+  font-size: 0.8125rem;
+  color: var(--secundario);
+}
+
+.mes-aviso { margin: 0.5rem 0 0; font-size: 0.8125rem; color: var(--secundario); }
+.apretado .mes-aviso { color: var(--acento); }
+.presupuesto.pasada .mes-aviso { color: var(--alarma); }
+
+/* ── Grupos ────────────────────────────────────────────────────── */
+
+.grupo + .grupo { margin-top: 2.25rem; }
+.grupo .rotulo { margin-bottom: 0.75rem; }
+.grupo-cabecera {
+  display: flex;
+  gap: 1rem;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--linea);
+}
+.grupo-cabecera .rotulo { margin: 0; }
+.destacado { color: var(--texto); font-weight: 500; }
 
 /* ── Ajustes ────────────────────────────────────────────────────────────── */
 
@@ -225,6 +467,70 @@ section + section { border-top: 1px solid var(--linea); }
 .datos dd { margin: 0; text-align: right; }
 
 .acciones { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+.acciones-centro { justify-content: center; margin-top: 1.5rem; }
+
+/* ── Campos ────────────────────────────────────────────────────── */
+
+.campo {
+  width: 100%;
+  padding: 0.6875rem 0.75rem;
+  font: inherit;
+  font-size: 1rem;              /* menos de 16px y el móvil hace zoom al tocar */
+  color: var(--texto);
+  background: var(--fondo);
+  border: 1px solid var(--linea);
+  border-radius: 0.5rem;
+  transition: border-color 150ms var(--curva);
+}
+.campo::placeholder { color: var(--secundario); opacity: 0.7; }
+.campo:hover { border-color: #2D3945; }
+.campo:focus-visible { outline: 2px solid var(--acento); outline-offset: 1px; }
+.campo.cifras { font-family: var(--cifras); }
+.campo-corto { width: 7rem; }
+
+.campo-linea { display: flex; align-items: center; gap: 0.625rem; flex-wrap: wrap; }
+.sufijo { color: var(--secundario); font-size: 0.875rem; }
+
+.campo-caja + .campo-caja { margin-top: 1rem; }
+.campo-etiqueta {
+  display: block;
+  margin-bottom: 0.375rem;
+  font-size: 0.8125rem;
+  color: var(--secundario);
+}
+
+/* ── Filtros ─────────────────────────────────────────────────── */
+
+.filtros {
+  display: flex;
+  gap: 0.5rem;
+  margin: 1rem 0 1.5rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  /* Que el primero y el último no queden pegados al borde al desplazar. */
+  padding: 0.125rem;
+}
+.filtros::-webkit-scrollbar { display: none; }
+
+.filtro {
+  flex: 0 0 auto;
+  padding: 0.4375rem 0.875rem;
+  font: inherit;
+  font-size: 0.875rem;
+  color: var(--secundario);
+  background: transparent;
+  border: 1px solid var(--linea);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 150ms var(--curva), border-color 150ms var(--curva), background 150ms var(--curva);
+}
+.filtro:hover { color: var(--texto); border-color: #2D3945; }
+.filtro:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
+.filtro[aria-pressed='true'] {
+  color: var(--fondo);
+  background: var(--texto);
+  border-color: var(--texto);
+}
 
 .boton {
   display: inline-block;
@@ -244,6 +550,8 @@ section + section { border-top: 1px solid var(--linea); }
 
 .boton-sobrio { color: var(--secundario); background: transparent; }
 .boton-grande { padding: 0.875rem 1.75rem; font-size: 1rem; }
+.boton-peligro { color: var(--alarma); }
+.boton-peligro:hover { border-color: var(--alarma); }
 
 .nota {
   margin: 1.5rem 0 0;
@@ -254,6 +562,9 @@ section + section { border-top: 1px solid var(--linea); }
 }
 
 .nota .error, .error { color: var(--acento); }
+
+/* Un vacío explicado. Un cero pelado no informa: hace pensar que algo falla. */
+.vacio { margin: 0; max-width: 32rem; }
 
 .rotulo-menor { margin: 2.5rem 0 1rem; }
 
@@ -270,34 +581,73 @@ section + section { border-top: 1px solid var(--linea); }
 .enlace:hover { border-bottom-color: var(--secundario); }
 .enlace:focus-visible { outline: 2px solid var(--acento); outline-offset: 3px; }
 
-/* ── Contraseña ─────────────────────────────────────────────────────────── */
+/* ── Hojas modales ──────────────────────────────────────────────────────── */
 
-.clave {
-  width: min(26rem, calc(100vw - 2.5rem));
+.hoja {
+  width: min(28rem, calc(100vw - 2.5rem));
+  max-height: calc(100svh - 4rem);
   padding: 2rem;
   color: var(--texto);
   background: var(--superficie);
   border: 1px solid var(--linea);
-  border-radius: 4px;
+  border-radius: 0.75rem;
 }
-.clave::backdrop { background: rgb(5 7 9 / 0.75); }
-.clave .rotulo { margin-bottom: 0.75rem; }
-.clave .nota { margin-top: 0; }
-.clave .acciones { margin-top: 1.5rem; }
+.hoja::backdrop { background: rgb(5 7 9 / 0.75); }
+.hoja .rotulo { margin-bottom: 0.75rem; }
+.hoja .nota { margin-top: 0; }
+.hoja .acciones { margin-top: 1.5rem; }
 
-#clave-campo {
-  width: 100%;
-  margin-top: 1.25rem;
-  padding: 0.75rem;
-  font: inherit;
-  font-family: var(--cifras);
-  color: var(--texto);
-  background: var(--fondo);
-  border: 1px solid var(--linea);
-  border-radius: 3px;
-}
-#clave-campo:focus-visible { outline: 2px solid var(--acento); outline-offset: 1px; }
+#clave-campo { margin-top: 1.25rem; font-family: var(--cifras); }
 #clave-error:empty { display: none; }
+
+/* ── Detalle de un movimiento ───────────────────────────────────────────── */
+
+.detalle-cabecera { padding-bottom: 1.25rem; border-bottom: 1px solid var(--linea); }
+.detalle-nombre { margin: 0; font-size: 1.125rem; font-weight: 500; }
+.detalle-importe {
+  margin: 0.25rem 0 0;
+  font-size: 1.75rem;
+  font-weight: 300;
+  letter-spacing: -0.02em;
+}
+.detalle-importe.entrada { color: var(--bien); }
+.detalle-fecha { margin: 0.5rem 0 0; font-size: 0.875rem; color: var(--secundario); }
+/* El concepto tal cual lo escribe el banco: feo, pero es la prueba. */
+.detalle-crudo {
+  margin: 0.5rem 0 0;
+  font-family: var(--cifras);
+  font-size: 0.75rem;
+  color: var(--secundario);
+  word-break: break-word;
+}
+.detalle-campos { margin-top: 1.25rem; }
+.detalle-campos > .campo { margin-top: 1rem; }
+.detalle-campos .recordar { margin-top: 0.875rem; }
+
+/* ── Recado ─────────────────────────────────────────────────────────────── */
+
+/* Lo que la aplicación tiene que contar no puede vivir sólo en Ajustes: con
+   cinco áreas, casi nunca es la que está abierta. */
+.recado {
+  position: fixed;
+  left: 50%;
+  bottom: calc(4.5rem + env(safe-area-inset-bottom));
+  z-index: 8;
+  width: min(24rem, calc(100vw - 2rem));
+  margin: 0;
+  padding: 0.75rem 1rem;
+  transform: translate(-50%, 0.5rem);
+  background: var(--superficie);
+  border: 1px solid var(--linea);
+  border-radius: 0.625rem;
+  font-size: 0.875rem;
+  color: var(--texto);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms var(--curva), transform 200ms var(--curva);
+}
+.recado.visible { opacity: 1; transform: translate(-50%, 0); }
+@media (min-width: 46rem) { .recado { bottom: 1.5rem; } }
 
 .recordar {
   display: flex;
@@ -370,4 +720,6 @@ section + section { border-top: 1px solid var(--linea); }
     stroke-dashoffset: 0;
   }
   .boton { transition: none; }
+  .filtro, .campo, .pestana, .pulsables li[role='button'] { transition: none; }
+  .recado { transition: opacity 1ms; transform: translate(-50%, 0); }
 }

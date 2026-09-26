@@ -5,7 +5,7 @@
  * programa, que es lo único que hace falta descargar.
  */
 
-const CAU = 'bajamar-v7'
+const CAU = 'bajamar-v8'
 
 const PROGRAMA = [
   './',
@@ -15,15 +15,30 @@ const PROGRAMA = [
   './icono.svg',
   './src/ui/estilo.css',
   './src/ui/app.js',
+  './src/ui/nav.js',
+  './src/ui/piezas.js',
+  './src/ui/hoja.js',
   './src/ui/lamina.js',
   './src/ui/clave.js',
+  './src/ui/vistas/resumen.js',
+  './src/ui/vistas/movimientos.js',
+  './src/ui/vistas/prevision.js',
+  './src/ui/vistas/patrimonio.js',
+  './src/ui/vistas/ajustes.js',
   './src/estado.js',
   './src/almacen/db.js',
   './src/almacen/cifrado.js',
   './src/almacen/sincro.js',
   './src/almacen/llavero.js',
+  './src/almacen/preferencias.js',
   './src/analisis/bajamar.js',
   './src/analisis/compromisos.js',
+  './src/analisis/fijos.js',
+  './src/analisis/mes.js',
+  './src/analisis/presupuestos.js',
+  './src/analisis/objetivos.js',
+  './src/analisis/patrimonio.js',
+  './src/analisis/alertas.js',
   './src/dominio/dinero.js',
   './src/dominio/tipos.js',
   './src/entidades/limpiar.js',

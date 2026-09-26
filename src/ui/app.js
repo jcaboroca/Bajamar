@@ -1,14 +1,18 @@
 // @ts-check
 /**
- * Arranque y pintado.
+ * Arranque y reparto.
  *
- * Todo el trabajo ocurre aquí, en el navegador: leer el .xls, agrupar,
- * detectar lo que se repite y proyectar. No hay ninguna llamada de red en
- * toda la aplicación, y no la hay a propósito.
+ * Este fichero ya no pinta: carga lo guardado, arma el estado una sola vez y
+ * se lo da a cada vista. Todo el trabajo ocurre aquí, en el navegador —leer el
+ * .xls, agrupar, detectar lo que se repite y proyectar—, y la única llamada de
+ * red posible es el buzón cifrado, que es opcional.
+ *
+ * El estado se reconstruye entero en cada cambio. Es barato —mil movimientos
+ * no son nada— y ahorra toda una clase de errores: no hay dos verdades que
+ * mantener de acuerdo.
  */
 
-import { formatEuros, formatEurosRedondo } from '../dominio/dinero.js'
-import { diasEntre, fechaLarga, hoyIso } from '../dominio/tipos.js'
+import { hoyIso } from '../dominio/tipos.js'
 import { importarXls } from '../importar/sabadell.js'
 import { guardarMovimientos, leerMovimientos, vaciar } from '../almacen/db.js'
 import { bajar, subir, aFichero, desdeFichero, hacerMaleta, SinBuzon } from '../almacen/sincro.js'
@@ -16,25 +20,40 @@ import { ContrasenaInvalida } from '../almacen/cifrado.js'
 import { BUZON } from '../../config.js'
 import { pedirClave, quiereRecordar } from './clave.js'
 import { claveRecordada, recordarClave, olvidarClave } from '../almacen/llavero.js'
-import { construirEstado, totalesPorCategoria } from '../estado.js'
-import { dibujarLamina } from './lamina.js'
+import { construirEstado } from '../estado.js'
+import {
+  cargar as cargarPreferencias,
+  nuevoId,
+  ponerApunte,
+  ponerColchon,
+  ponerObjetivo,
+  ponerPresupuesto,
+  ponerRegla,
+  ponerRetoque,
+  quitarApunte,
+  quitarObjetivo,
+} from '../almacen/preferencias.js'
+import { requerir } from './piezas.js'
+import { arrancarNavegacion } from './nav.js'
+import { pintarResumen } from './vistas/resumen.js'
+import { montarMovimientos, pintarMovimientos } from './vistas/movimientos.js'
+import { montarPrevision, pintarPrevision } from './vistas/prevision.js'
+import { montarPatrimonio, pintarPatrimonio } from './vistas/patrimonio.js'
+import { montarAjustes, pintarAjustes } from './vistas/ajustes.js'
 
+const barra = requerir('barra')
 const lienzo = requerir('lienzo')
 const bienvenida = requerir('bienvenida')
 const soltar = requerir('soltar')
 
-/** @param {string} id */
-function requerir(id) {
-  const nodo = document.getElementById(id)
-  if (!nodo) throw new Error(`falta el elemento #${id}`)
-  return nodo
-}
-
 arrancar()
 
 async function arrancar() {
+  montarVistas()
+  arrancarNavegacion(() => {})
+
   const guardados = await leerMovimientos()
-  if (guardados.length > 0) pintar(guardados, { animar: false })
+  if (guardados.length > 0) await refrescar({ animar: false })
 
   for (const id of ['fichero', 'fichero-mas']) {
     const entrada = document.getElementById(id)
@@ -97,6 +116,82 @@ async function arrancar() {
 }
 
 /**
+ * Las vistas se enganchan una vez. Lo que cambia con cada dato es el pintado,
+ * no los escuchadores: volver a colgarlos en cada refresco multiplicaría los
+ * manejadores en silencio hasta que un clic hiciera cinco cosas.
+ */
+function montarVistas() {
+  montarMovimientos({
+    alCambiar: async ({ retoque, regla }) => {
+      if (retoque) await ponerRetoque(retoque)
+      if (regla) await ponerRegla(regla[0], regla[1])
+      await refrescar()
+    },
+  })
+
+  montarPrevision()
+
+  montarPatrimonio({
+    nuevoId,
+    alGuardarApunte: async (apunte) => {
+      await ponerApunte(apunte)
+      await refrescar()
+    },
+    alBorrarApunte: async (id) => {
+      await quitarApunte(id)
+      await refrescar()
+    },
+    alGuardarObjetivo: async (objetivo) => {
+      await ponerObjetivo(objetivo)
+      await refrescar()
+    },
+    alBorrarObjetivo: async (id) => {
+      await quitarObjetivo(id)
+      await refrescar()
+    },
+  })
+
+  montarAjustes({
+    alGuardarColchon: async (centimos) => {
+      await ponerColchon(centimos)
+      await refrescar()
+      decir('Colchón guardado.')
+    },
+    alGuardarPresupuesto: async (categoria, centimos) => {
+      await ponerPresupuesto(categoria, centimos)
+      await refrescar()
+    },
+  })
+}
+
+/** @param {{ animar?: boolean }} [opciones] */
+async function refrescar({ animar = false } = {}) {
+  const movimientos = await leerMovimientos()
+  if (movimientos.length === 0) return
+
+  const preferencias = await cargarPreferencias()
+  const estado = construirEstado(movimientos, {
+    hoy: hoyIso(),
+    bultos: preferencias.bultos,
+    categoriasManuales: preferencias.reglas,
+    retoques: preferencias.retoques,
+    presupuestos: preferencias.presupuestos,
+    patrimonio: preferencias.patrimonio,
+    colchon: preferencias.colchon,
+  })
+
+  bienvenida.hidden = true
+  barra.hidden = false
+  lienzo.hidden = false
+
+  pintarResumen(estado, { animar })
+  pintarMovimientos(estado)
+  pintarPrevision(estado)
+  pintarPatrimonio(estado, preferencias.objetivos)
+  pintarAjustes(estado, preferencias.colchon)
+}
+
+/**
  * Al abrir, si hay contraseña recordada, se mira el buzón sin preguntar nada.
  * Los movimientos se identifican por sí mismos, así que traer los del otro
  * dispositivo es mezclar, no elegir cuál gana.
@@ -107,10 +202,10 @@ async function ponerseAlDia() {
     const maleta = await bajar(BUZON, claveRecordada())
     const antes = (await leerMovimientos()).length
     await guardarMovimientos(maleta.movimientos)
-    const ahora = await leerMovimientos()
-    if (ahora.length !== antes) {
-      pintar(ahora, { animar: antes === 0 })
-      decir(`Traídos ${ahora.length - antes} movimientos del otro dispositivo.`)
+    const ahora = (await leerMovimientos()).length
+    if (ahora !== antes) {
+      await refrescar({ animar: antes === 0 })
+      decir(`Traídos ${ahora - antes} movimientos del otro dispositivo.`)
     }
   } catch {
     // Sin buzón todavía, sin red o contraseña cambiada: no es momento de dar la
@@ -146,15 +241,39 @@ async function contarloAlOtro() {
   }
 }
 
-/** @param {string} texto */
-function decir(texto) {
-  const nodo = document.getElementById('estado-sincro')
-  if (nodo) nodo.textContent = texto
+/** @type {ReturnType<typeof setTimeout> | undefined} */
+let recadoPendiente
 
-  // El rótulo de arriba vive en Ajustes, que en el recibimiento no se ve: ahí
-  // un aviso invisible se lee como que no ha pasado nada.
+/**
+ * Un aviso que se lee esté donde esté el usuario.
+ *
+ * El rótulo fijo vive en Ajustes, y ahora que hay cinco áreas casi nunca es la
+ * que está abierta. Escribir sólo ahí sería no decir nada.
+ * @param {string} texto
+ */
+function decir(texto) {
+  const fijo = document.getElementById('estado-sincro')
+  if (fijo) fijo.textContent = texto
+
   const nota = document.getElementById('aviso-bienvenida')
-  if (nota && !bienvenida.hidden) nota.textContent = texto
+  if (nota && !bienvenida.hidden) {
+    nota.textContent = texto
+    return
+  }
+
+  let recado = document.getElementById('recado')
+  if (!recado) {
+    recado = document.createElement('p')
+    recado.id = 'recado'
+    recado.className = 'recado'
+    recado.setAttribute('role', 'status')
+    document.body.append(recado)
+  }
+  const visible = recado
+  visible.textContent = texto
+  visible.classList.add('visible')
+  clearTimeout(recadoPendiente)
+  recadoPendiente = setTimeout(() => visible.classList.remove('visible'), 6000)
 }
 
 async function enviar() {
@@ -189,8 +308,7 @@ async function enviar() {
 
 /** @param {File} [fichero] */
 async function traer(fichero) {
-  // Sin buzón, pedir el fichero es el primer paso. Escribir un aviso no valdría:
-  // el rótulo vive en ajustes, que en el recibimiento ni siquiera se ve.
+  // Sin buzón, pedir el fichero es el primer paso.
   if (!fichero && !BUZON) {
     requerir('fichero-sobre').click()
     return
@@ -211,7 +329,7 @@ async function traer(fichero) {
         : await bajar(BUZON, clave)
       await guardarMovimientos(maleta.movimientos)
       if (quiereRecordar()) recordarClave(clave)
-      pintar(await leerMovimientos(), { animar: true })
+      await refrescar({ animar: true })
       decir(`Traídos ${maleta.movimientos.length} movimientos.`)
       return
     } catch (fallo) {
@@ -250,158 +368,7 @@ async function tragar(ficheros) {
   }
   if (nota) nota.textContent = ''
 
-  pintar(await leerMovimientos(), { animar: true })
+  await refrescar({ animar: true })
   contarloAlOtro()
 }
 
-/**
- * @param {import('../dominio/tipos.js').Movimiento[]} movimientos
- * @param {{ animar: boolean }} opciones
- */
-function pintar(movimientos, { animar }) {
-  const estado = construirEstado(movimientos, { hoy: hoyIso() })
-  const { proyeccion } = estado
-
-  bienvenida.hidden = true
-  lienzo.hidden = false
-
-  const cifra = requerir('suelo-cifra')
-  cifra.replaceChildren(...titular(formatEurosRedondo(proyeccion.suelo.saldo)))
-  cifra.parentElement?.classList.toggle('en-rojo', proyeccion.suelo.saldo < 0)
-
-  const faltan = diasEntre(estado.hoy, proyeccion.suelo.fecha)
-  requerir('suelo-pie').innerHTML = faltan <= 0
-    ? 'Hoy mismo es el punto más bajo del periodo.'
-    : `el <strong>${escapar(fechaLarga(proyeccion.suelo.fecha))}</strong>, dentro de ${faltan} ${faltan === 1 ? 'día' : 'días'}. ` +
-      `Cierras el mes con ${escapar(formatEurosRedondo(proyeccion.saldoFinal))}.`
-
-  const lamina = requerir('lamina')
-  lamina.replaceChildren(dibujarLamina(proyeccion))
-  lamina.classList.remove('dibujando')
-  if (animar) {
-    void lamina.offsetWidth // reiniciar la animación sin esperar a un cuadro
-    lamina.classList.add('dibujando')
-  }
-
-  pintarEventos(proyeccion.eventos, estado.hoy)
-  pintarPreguntas(estado.dudosos)
-  pintarCategorias(estado)
-
-  requerir('dato-movimientos').textContent = String(movimientos.length)
-  requerir('dato-ritmo').textContent = `${formatEuros(estado.ritmo.porMes)} al mes`
-  requerir('dato-saldo').textContent = formatEuros(estado.saldoInicial)
-}
-
-/**
- * @param {import('../analisis/bajamar.js').Evento[]} eventos
- * @param {string} hoy
- */
-function pintarEventos(eventos, hoy) {
-  const lista = requerir('eventos')
-  lista.replaceChildren(...eventos.map((e) => {
-    const li = document.createElement('li')
-    li.className = e.seguro ? 'confirmado' : 'previsto'
-    // Ámbar sólo para lo que cae en los próximos tres días: si se pintara
-    // todo lo llamativo, no quedaría forma de llamar la atención.
-    if (diasEntre(hoy, e.fecha) <= 3 && e.importe < 0) li.classList.add('urgente')
-    li.append(
-      celda('span', 'evento-fecha cifras', diaYMes(e.fecha)),
-      nombreConDetalle(e),
-      celda('span', 'evento-importe', formatEuros(e.importe, { signo: true })),
-    )
-    return li
-  }))
-}
-
-/**
- * A ese tamaño el espacio de una tipografía monoespaciada abre un hueco de
- * medio dedo antes del símbolo. Se separa para poder componerlo aparte.
- * @param {string} texto
- */
-function titular(texto) {
-  const corte = texto.lastIndexOf(' ')
-  if (corte < 0) return [document.createTextNode(texto)]
-  const moneda = document.createElement('span')
-  moneda.className = 'moneda'
-  moneda.textContent = texto.slice(corte + 1)
-  return [document.createTextNode(texto.slice(0, corte)), moneda]
-}
-
-/** @param {import('../analisis/bajamar.js').Evento} e */
-function nombreConDetalle(e) {
-  const div = document.createElement('div')
-  div.className = 'evento-nombre'
-  div.append(celda('span', '', e.nombre))
-  div.append(celda('span', 'evento-detalle', e.seguro ? 'confirmado' : 'previsto'))
-  return div
-}
-
-/** @param {import('../analisis/compromisos.js').Deteccion['dudosos']} dudosos */
-function pintarPreguntas(dudosos) {
-  const bloque = requerir('bloque-preguntas')
-  bloque.hidden = dudosos.length === 0
-  if (dudosos.length === 0) return
-  requerir('preguntas').replaceChildren(...dudosos.map((d) => {
-    const li = document.createElement('li')
-    li.className = 'previsto'
-    li.append(
-      celda('span', 'evento-fecha cifras', diaYMes(d.fecha)),
-      (() => {
-        const div = document.createElement('div')
-        div.className = 'evento-nombre'
-        div.append(
-          celda('span', '', d.nombre),
-          celda('span', 'evento-detalle', `la última vez hace ${d.meses} meses · ¿vuelve?`),
-        )
-        return div
-      })(),
-      celda('span', 'evento-importe', formatEuros(d.importe, { signo: true })),
-    )
-    return li
-  }))
-}
-
-/** @param {ReturnType<typeof construirEstado>} estado */
-function pintarCategorias(estado) {
-  const desde = `${Number(estado.hoy.slice(0, 4)) - 1}${estado.hoy.slice(4, 7)}-01`
-  const totales = totalesPorCategoria(estado.movimientos, estado.categorias, { desde })
-  const mayor = Math.abs(totales[0]?.total ?? 1)
-
-  requerir('categorias').replaceChildren(...totales.slice(0, 12).map((c) => {
-    const li = document.createElement('li')
-    const barra = document.createElement('div')
-    barra.className = 'barra'
-    const relleno = document.createElement('i')
-    relleno.style.width = `${(Math.abs(c.total) / mayor) * 100}%`
-    barra.append(relleno)
-    li.append(
-      celda('span', '', c.nombre),
-      celda('span', 'evento-importe', formatEurosRedondo(Math.round(c.total / 12))),
-      barra,
-    )
-    return li
-  }))
-}
-
-/**
- * @param {string} etiqueta
- * @param {string} clase
- * @param {string} contenido
- */
-function celda(etiqueta, clase, contenido) {
-  const nodo = document.createElement(etiqueta)
-  if (clase) nodo.className = clase
-  nodo.textContent = contenido
-  return nodo
-}
-
-/** @param {string} iso */
-function diaYMes(iso) {
-  const meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
-  return `${Number(iso.slice(8, 10))} ${meses[Number(iso.slice(5, 7)) - 1]}`
-}
-
-/** @param {string} s */
-function escapar(s) {
-  return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] ?? c)
-}

@@ -174,6 +174,24 @@ export function construirEstado(crudos, opciones = {}) {
     hasta: ultimoDiaDelMes(hoy),
   })
 
+  /*
+   * La proyección empieza hoy, así que del mes en curso sólo contiene los días
+   * que quedan. Enseñar eso como si fuera el mes entero es mentir por omisión:
+   * un día 28 la nómina ya cobrada desaparecería y el mes parecería ruinoso.
+   * Los totales del primer mes salen de lo que de verdad ha pasado más lo que
+   * queda; el suelo y el saldo final sí vienen de la proyección, porque mirar
+   * hacia atrás buscando un mínimo no sirve de nada.
+   */
+  const meses = porMeses(proyeccionLarga)
+  if (meses[0] && meses[0].mes === mesDe(hoy)) {
+    meses[0] = {
+      ...meses[0],
+      ingresos: mesEnCurso.ingresos.total,
+      gastos: mesEnCurso.gastos.total,
+      ahorro: mesEnCurso.ahorro,
+    }
+  }
+
   const ingresoMensual = ingresos
     .filter((i) => i.periodicidad === 'mensual')
     .reduce((t, i) => t + i.importeEsperado, 0)
@@ -187,6 +205,11 @@ export function construirEstado(crudos, opciones = {}) {
 
   // El saldo del banco es patrimonio aunque nadie lo haya anotado: dejarlo
   // fuera obligaría a teclear a mano un número que la aplicación ya sabe.
+  //
+  // La fecha nunca puede ir por delante de hoy. Los extractos traen apuntes con
+  // fecha valor posterior, y un apunte fechado mañana no cuenta como vigente:
+  // el patrimonio saldría cero justo cuando acaba de importarse todo.
+  const fechaSaldo = ultimo && ultimo.fecha < hoy ? ultimo.fecha : hoy
   const apuntes = [
     ...(saldoInicial !== 0
       ? [{
@@ -194,7 +217,7 @@ export function construirEstado(crudos, opciones = {}) {
           nombre: 'Cuenta corriente',
           grupo: /** @type {const} */ ('cuentas'),
           valor: saldoInicial,
-          fecha: ultimo?.fecha ?? hoy,
+          fecha: fechaSaldo,
         }]
       : []),
     ...(opciones.patrimonio ?? []),
@@ -216,7 +239,7 @@ export function construirEstado(crudos, opciones = {}) {
     pendienteTarjeta,
     proyeccion,
     proyeccionLarga,
-    meses: porMeses(proyeccionLarga),
+    meses,
     fijos,
     costes,
     presupuestos,
@@ -263,7 +286,7 @@ export function totalesPorCategoria(movimientos, categorias, rango = {}) {
     if (rango.desde && m.fecha < rango.desde) continue
     if (rango.hasta && m.fecha > rango.hasta) continue
     if (m.importe >= 0 || m.origen === 'tarjeta' || m.excluido) continue
-    const categoria = m.categoria ?? (m.entidadId && categorias.get(m.entidadId)) || 'otros'
+    const categoria = m.categoria ?? (m.entidadId ? categorias.get(m.entidadId) : null) ?? 'otros'
     if (NO_ES_GASTO.has(categoria)) continue
     const previo = acumulado.get(categoria) ?? { total: 0, cuantos: 0 }
     acumulado.set(categoria, { total: previo.total + m.importe, cuantos: previo.cuantos + 1 })

@@ -15,71 +15,240 @@
 </head>
 <body>
 
+<header id="barra" class="cabecera" hidden>
+  <p class="marca">Bajamar</p>
+  <nav class="navegacion" aria-label="Secciones">
+    <button type="button" class="pestana" data-vista="resumen" aria-current="page">Resumen</button>
+    <button type="button" class="pestana" data-vista="movimientos">Movimientos</button>
+    <button type="button" class="pestana" data-vista="prevision">Previsión</button>
+    <button type="button" class="pestana" data-vista="patrimonio">Patrimonio</button>
+    <button type="button" class="pestana" data-vista="ajustes">Ajustes</button>
+  </nav>
+</header>
+
 <main id="lienzo" hidden>
 
-  <section class="portada">
-    <p class="rotulo">El punto más bajo</p>
-    <p class="titular"><span id="suelo-cifra" class="cifras">—</span></p>
-    <p class="pie" id="suelo-pie"></p>
-  </section>
+  <!-- ── Resumen ────────────────────────────────────────────────────────── -->
+  <div class="vista" id="vista-resumen">
 
-  <section class="lamina" aria-labelledby="lamina-rotulo">
-    <p class="rotulo" id="lamina-rotulo">Cómo llegas hasta ahí</p>
-    <div id="lamina"></div>
-  </section>
+    <section class="bloque bloque-avisos" id="bloque-avisos" hidden>
+      <ol id="avisos" class="avisos"></ol>
+    </section>
 
-  <section class="listado">
-    <p class="rotulo">Lo que viene</p>
-    <ol id="eventos" class="eventos"></ol>
-  </section>
+    <section class="bloque portada">
+      <p class="rotulo">Tu bajamar · el punto más bajo</p>
+      <p class="titular"><span id="suelo-cifra" class="cifras">—</span></p>
+      <p class="pie" id="suelo-pie"></p>
+    </section>
 
-  <section class="listado" id="bloque-preguntas" hidden>
-    <p class="rotulo">No lo sé</p>
-    <p class="aclaracion">Esto ha pasado una o dos veces. No son suficientes para
-      saber cada cuánto vuelve, así que no lo doy por hecho.</p>
-    <ol id="preguntas" class="eventos"></ol>
-  </section>
+    <section class="bloque" aria-labelledby="lamina-rotulo">
+      <p class="rotulo" id="lamina-rotulo">Cómo llegas hasta ahí</p>
+      <div id="lamina"></div>
+    </section>
 
-  <section class="listado">
-    <p class="rotulo">En qué se va · al mes</p>
-    <ol id="categorias" class="categorias"></ol>
-  </section>
+    <section class="bloque">
+      <p class="rotulo">Cuánto puedes gastar de verdad</p>
+      <div id="disponible"></div>
+      <p class="nota">El saldo del banco ya incluye todo lo que ha pasado. A eso
+        se le suma sólo lo que falta por pasar hasta fin de mes.</p>
+    </section>
 
-  <section class="ajustes">
-    <p class="rotulo">Ajustes</p>
-    <dl class="datos">
-      <dt>Movimientos guardados</dt><dd id="dato-movimientos" class="cifras">0</dd>
-      <dt>Gasto ordinario</dt><dd id="dato-ritmo" class="cifras">—</dd>
-      <dt>Saldo de partida</dt><dd id="dato-saldo" class="cifras">—</dd>
-    </dl>
-    <div class="acciones">
-      <label class="boton">
-        Añadir un extracto
-        <input type="file" id="fichero-mas" accept=".xls" multiple hidden>
-      </label>
-      <button type="button" id="olvidar" class="boton boton-sobrio">Olvidarlo todo</button>
-    </div>
+    <section class="bloque">
+      <p class="rotulo">Este mes</p>
+      <div id="mes-resumen"></div>
+    </section>
 
-    <p class="rotulo rotulo-menor">Otro dispositivo</p>
-    <div class="acciones">
-      <button type="button" id="enviar" class="boton boton-sobrio">Enviar cifrado</button>
-      <label class="boton boton-sobrio">
-        Traer de un fichero
-        <input type="file" id="fichero-sobre" accept=".bajamar,.json" hidden>
-      </label>
-    </div>
-    <p class="nota" id="estado-sincro" role="status"></p>
+    <section class="bloque">
+      <p class="rotulo">Lo que viene</p>
+      <ol id="eventos" class="eventos"></ol>
+    </section>
 
-    <p class="nota">Los extractos se leen y se guardan en este dispositivo. Si
-      envías una copia a otro, sale cifrada con tu contraseña: lo que viaja no
-      se puede leer sin ella, ni por quien lo transporta ni por quien lo guarde.</p>
-  </section>
+    <section class="bloque" id="bloque-preguntas" hidden>
+      <p class="rotulo">No lo sé</p>
+      <p class="aclaracion">Esto ha pasado una o dos veces. No son suficientes para
+        saber cada cuánto vuelve, así que no lo doy por hecho.</p>
+      <ol id="preguntas" class="eventos"></ol>
+    </section>
+
+    <section class="bloque">
+      <p class="rotulo">En qué se va · al mes</p>
+      <ol id="categorias" class="categorias"></ol>
+    </section>
+
+    <section class="bloque">
+      <p class="rotulo">Cuánto puedes ahorrar</p>
+      <div id="capacidad"></div>
+    </section>
+
+  </div>
+
+  <!-- ── Movimientos ────────────────────────────────────────────────────── -->
+  <div class="vista" id="vista-movimientos" hidden>
+
+    <section class="bloque">
+      <p class="rotulo">Movimientos</p>
+      <input type="search" id="buscar" class="campo" placeholder="Buscar un comercio o un concepto"
+             aria-label="Buscar entre los movimientos" autocomplete="off">
+      <div class="filtros" id="filtros" role="group" aria-label="Filtrar">
+        <button type="button" class="filtro" data-filtro="todos" aria-pressed="true">Todos</button>
+        <button type="button" class="filtro" data-filtro="gastos" aria-pressed="false">Gastos</button>
+        <button type="button" class="filtro" data-filtro="ingresos" aria-pressed="false">Ingresos</button>
+        <button type="button" class="filtro" data-filtro="traspasos" aria-pressed="false">Traspasos</button>
+        <button type="button" class="filtro" data-filtro="recurrentes" aria-pressed="false">Recurrentes</button>
+        <button type="button" class="filtro" data-filtro="tarjeta" aria-pressed="false">Tarjeta</button>
+      </div>
+      <p class="aclaracion" id="movimientos-cuenta"></p>
+      <ol id="movimientos-lista" class="eventos pulsables"></ol>
+      <div class="acciones acciones-centro">
+        <button type="button" id="movimientos-mas" class="boton boton-sobrio" hidden>Ver más</button>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ── Previsión ──────────────────────────────────────────────────────── -->
+  <div class="vista" id="vista-prevision" hidden>
+
+    <section class="bloque">
+      <p class="rotulo">Hasta dónde miras</p>
+      <div class="filtros" id="horizonte" role="group" aria-label="Horizonte">
+        <button type="button" class="filtro" data-meses="3" aria-pressed="true">3 meses</button>
+        <button type="button" class="filtro" data-meses="6" aria-pressed="false">6 meses</button>
+        <button type="button" class="filtro" data-meses="12" aria-pressed="false">12 meses</button>
+      </div>
+      <div id="lamina-larga"></div>
+      <p class="nota" id="prevision-pie"></p>
+    </section>
+
+    <section class="bloque">
+      <p class="rotulo">Mes a mes</p>
+      <ol id="meses-tabla" class="meses"></ol>
+    </section>
+
+    <section class="bloque">
+      <p class="rotulo" id="calendario-rotulo">Día a día</p>
+      <p class="aclaracion">Cada línea deja el saldo que quedaría después. Pulsa un
+        mes de arriba para mirar otro.</p>
+      <ol id="calendario" class="eventos"></ol>
+    </section>
+
+    <section class="bloque">
+      <p class="rotulo">Lo que cuesta tu vida</p>
+      <div id="coste-resumen"></div>
+      <p class="nota">El coste mensual reparte los recibos anuales entre los doce
+        meses. No es lo que pagas cada mes: es lo que te cuesta cada mes.</p>
+    </section>
+
+    <section class="bloque">
+      <p class="rotulo">Gastos fijos</p>
+      <div id="fijos"></div>
+    </section>
+
+    <section class="bloque" id="bloque-suscripciones" hidden>
+      <p class="rotulo">Suscripciones</p>
+      <ol id="suscripciones" class="eventos"></ol>
+      <p class="nota" id="suscripciones-pie"></p>
+    </section>
+
+  </div>
+
+  <!-- ── Patrimonio ─────────────────────────────────────────────────────── -->
+  <div class="vista" id="vista-patrimonio" hidden>
+
+    <section class="bloque portada">
+      <p class="rotulo">Patrimonio neto</p>
+      <p class="titular"><span id="neto-cifra" class="cifras">—</span></p>
+      <p class="pie" id="neto-pie"></p>
+    </section>
+
+    <section class="bloque">
+      <p class="rotulo">De qué se compone</p>
+      <div id="patrimonio-grupos"></div>
+      <div class="acciones">
+        <button type="button" id="apunte-nuevo" class="boton boton-sobrio">Anotar una partida</button>
+      </div>
+      <p class="nota">La cuenta corriente sale sola de tus extractos. El resto lo
+        anotas tú, y vale lo que digas el día que lo digas: nadie puede saber lo
+        que vale hoy una furgoneta.</p>
+    </section>
+
+    <section class="bloque">
+      <p class="rotulo">Objetivos</p>
+      <div id="objetivos"></div>
+      <div class="acciones">
+        <button type="button" id="objetivo-nuevo" class="boton boton-sobrio">Nuevo objetivo</button>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ── Ajustes ────────────────────────────────────────────────────────── -->
+  <div class="vista" id="vista-ajustes" hidden>
+
+    <section class="bloque">
+      <p class="rotulo">Tus datos</p>
+      <dl class="datos">
+        <dt>Movimientos guardados</dt><dd id="dato-movimientos" class="cifras">0</dd>
+        <dt>Gasto ordinario</dt><dd id="dato-ritmo" class="cifras">—</dd>
+        <dt>Saldo de partida</dt><dd id="dato-saldo" class="cifras">—</dd>
+      </dl>
+      <div class="acciones">
+        <label class="boton">
+          Añadir un extracto
+          <input type="file" id="fichero-mas" accept=".xls" multiple hidden>
+        </label>
+        <button type="button" id="olvidar" class="boton boton-sobrio">Olvidarlo todo</button>
+      </div>
+    </section>
+
+    <section class="bloque">
+      <p class="rotulo">Tu colchón</p>
+      <p class="aclaracion">El mínimo con el que duermes tranquilo. Si la previsión
+        baja de ahí, te aviso.</p>
+      <div class="campo-linea">
+        <input type="number" id="colchon-campo" class="campo campo-corto cifras" min="0" step="50"
+               aria-label="Colchón mínimo en euros" inputmode="numeric">
+        <span class="sufijo">€</span>
+        <button type="button" id="colchon-guardar" class="boton">Guardar</button>
+      </div>
+    </section>
+
+    <section class="bloque">
+      <p class="rotulo">Presupuestos</p>
+      <p class="aclaracion">En gris, lo que sueles gastar. Si escribes otra cifra,
+        manda la tuya.</p>
+      <ol id="presupuestos" class="presupuestos"></ol>
+    </section>
+
+    <section class="bloque">
+      <p class="rotulo">Otro dispositivo</p>
+      <div class="acciones">
+        <button type="button" id="enviar" class="boton boton-sobrio">Enviar cifrado</button>
+        <label class="boton boton-sobrio">
+          Traer de un fichero
+          <input type="file" id="fichero-sobre" accept=".bajamar,.json" hidden>
+        </label>
+      </div>
+      <p class="nota" id="estado-sincro" role="status"></p>
+    </section>
+
+    <section class="bloque">
+      <p class="rotulo">Tus datos son tuyos</p>
+      <p class="nota">Los extractos se leen y se guardan en este dispositivo. No
+        hay cuenta, no hay registro y nadie más los ve. Si envías una copia a otro
+        dispositivo sale cifrada con tu contraseña: lo que viaja no se puede leer
+        sin ella, ni por quien lo transporta ni por quien lo guarde.</p>
+      <p class="nota">Tampoco se piden claves del banco. La aplicación no se
+        conecta a ningún banco: lee el fichero que tú exportas.</p>
+    </section>
+
+  </div>
 
 </main>
 
 <section id="bienvenida" class="bienvenida">
   <h1>Bajamar</h1>
-  <p class="lema">Cuánto te queda en el punto más bajo del mes.</p>
+  <p class="lema">No sólo dónde está tu dinero. Cuándo vas a necesitarlo.</p>
   <label class="boton boton-grande">
     Elegir un extracto
     <input type="file" id="fichero" accept=".xls" multiple hidden>
@@ -90,11 +259,11 @@
   <p class="nota" id="aviso-bienvenida" role="status"></p>
 </section>
 
-<dialog id="clave" class="clave">
+<dialog id="clave" class="hoja">
   <form method="dialog" id="clave-form">
     <p class="rotulo" id="clave-rotulo">Tu contraseña</p>
     <p class="nota" id="clave-pie"></p>
-    <input type="password" id="clave-campo" autocomplete="current-password"
+    <input type="password" id="clave-campo" class="campo" autocomplete="current-password"
            aria-labelledby="clave-rotulo" required>
     <p class="nota error" id="clave-error" role="alert"></p>
     <label class="recordar">
@@ -104,6 +273,25 @@
     <div class="acciones">
       <button type="submit" class="boton" id="clave-aceptar">Continuar</button>
       <button type="button" class="boton boton-sobrio" id="clave-cancelar">Dejarlo</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="detalle" class="hoja">
+  <div id="detalle-cuerpo"></div>
+  <div class="acciones">
+    <button type="button" class="boton boton-sobrio" id="detalle-cerrar">Cerrar</button>
+  </div>
+</dialog>
+
+<dialog id="formulario" class="hoja">
+  <form id="formulario-form">
+    <p class="rotulo" id="formulario-rotulo"></p>
+    <div id="formulario-campos"></div>
+    <div class="acciones">
+      <button type="submit" class="boton" id="formulario-aceptar">Guardar</button>
+      <button type="button" class="boton boton-sobrio" id="formulario-cancelar">Dejarlo</button>
+      <button type="button" class="boton boton-sobrio boton-peligro" id="formulario-borrar" hidden>Borrar</button>
     </div>
   </form>
 </dialog>
