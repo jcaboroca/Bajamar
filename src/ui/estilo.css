@@ -299,6 +299,17 @@ section + section { border-top: 1px solid var(--linea); }
 #clave-campo:focus-visible { outline: 2px solid var(--acento); outline-offset: 1px; }
 #clave-error:empty { display: none; }
 
+.recordar {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  margin: 1rem 0 0;
+  color: var(--secundario);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.recordar input { accent-color: var(--acento); }
+
 /* ── Bienvenida ─────────────────────────────────────────────────────────── */
 
 .bienvenida {

@@ -3,10 +3,9 @@
 /**
  * El diálogo de la contraseña.
  *
- * Se pide cada vez que algo va a salir del dispositivo o a entrar en él, y no
- * se guarda: vive en memoria mientras dura la operación. Guardarla en
- * `localStorage` habría sido más cómodo y habría convertido la contraseña en
- * un fichero más del navegador, que es justo lo que se intenta evitar.
+ * Se pide cada vez que algo va a salir del dispositivo o a entrar en él. Solo
+ * se guarda si lo pides: en este dispositivo los movimientos ya están en
+ * claro, así que recordarla no destapa nada que no estuviera destapado.
  */
 
 /** @param {string} id */
@@ -14,6 +13,12 @@ function requerir(id) {
   const nodo = document.getElementById(id)
   if (!nodo) throw new Error(`falta el elemento #${id}`)
   return nodo
+}
+
+/** @returns {boolean} */
+export function quiereRecordar() {
+  const casilla = document.getElementById('clave-recordar')
+  return casilla instanceof HTMLInputElement && casilla.checked
 }
 
 /**

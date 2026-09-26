@@ -5,7 +5,7 @@
  * programa, que es lo único que hace falta descargar.
  */
 
-const CAU = 'bajamar-v3'
+const CAU = 'bajamar-v4'
 
 const PROGRAMA = [
   './',
@@ -16,10 +16,12 @@ const PROGRAMA = [
   './src/ui/estilo.css',
   './src/ui/app.js',
   './src/ui/lamina.js',
+  './src/ui/clave.js',
   './src/estado.js',
   './src/almacen/db.js',
   './src/almacen/cifrado.js',
   './src/almacen/sincro.js',
+  './src/almacen/llavero.js',
   './src/analisis/bajamar.js',
   './src/analisis/compromisos.js',
   './src/dominio/dinero.js',

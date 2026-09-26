@@ -14,7 +14,8 @@ import { guardarMovimientos, leerMovimientos, vaciar } from '../almacen/db.js'
 import { bajar, subir, aFichero, desdeFichero, hacerMaleta, SinBuzon } from '../almacen/sincro.js'
 import { ContrasenaInvalida } from '../almacen/cifrado.js'
 import { BUZON } from '../../config.js'
-import { pedirClave } from './clave.js'
+import { pedirClave, quiereRecordar } from './clave.js'
+import { claveRecordada, recordarClave, olvidarClave } from '../almacen/llavero.js'
 import { construirEstado, totalesPorCategoria } from '../estado.js'
 import { dibujarLamina } from './lamina.js'
 
@@ -49,6 +50,7 @@ async function arrancar() {
     const seguro = confirm('Se borra todo lo guardado en este dispositivo. No hay copia en ningún otro sitio.')
     if (!seguro) return
     await vaciar()
+    olvidarClave()
     location.reload()
   })
 
@@ -85,6 +87,41 @@ async function arrancar() {
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
     navigator.serviceWorker.register('sw.js').catch(() => {})
   }
+
+  ponerseAlDia()
+}
+
+/**
+ * Al abrir, si hay contraseña recordada, se mira el buzón sin preguntar nada.
+ * Los movimientos se identifican por sí mismos, así que traer los del otro
+ * dispositivo es mezclar, no elegir cuál gana.
+ */
+async function ponerseAlDia() {
+  if (!BUZON || !claveRecordada()) return
+  try {
+    const maleta = await bajar(BUZON, claveRecordada())
+    const antes = (await leerMovimientos()).length
+    await guardarMovimientos(maleta.movimientos)
+    const ahora = await leerMovimientos()
+    if (ahora.length !== antes) {
+      pintar(ahora, { animar: antes === 0 })
+      decir(`Traídos ${ahora.length - antes} movimientos del otro dispositivo.`)
+    }
+  } catch {
+    // Sin buzón todavía, sin red o contraseña cambiada: no es momento de dar la
+    // lata. Los botones de Ajustes siguen ahí.
+  }
+}
+
+/** Al importar, el otro dispositivo se entera sin que haya que acordarse. */
+async function contarloAlOtro() {
+  if (!BUZON || !claveRecordada()) return
+  try {
+    await subir(BUZON, hacerMaleta(await leerMovimientos()), claveRecordada())
+    decir('Enviado al otro dispositivo.')
+  } catch {
+    decir('Guardado aquí, pero no he podido avisar al otro dispositivo.')
+  }
 }
 
 /** @param {string} texto */
@@ -107,6 +144,7 @@ async function enviar() {
 
   const maleta = hacerMaleta(guardados)
   decir('Cifrando…')
+  if (quiereRecordar()) recordarClave(clave)
   try {
     if (BUZON) {
       await subir(BUZON, maleta, clave)
@@ -145,6 +183,7 @@ async function traer(fichero) {
         ? await desdeFichero(fichero, clave)
         : await bajar(BUZON, clave)
       await guardarMovimientos(maleta.movimientos)
+      if (quiereRecordar()) recordarClave(clave)
       pintar(await leerMovimientos(), { animar: true })
       decir(`Traídos ${maleta.movimientos.length} movimientos.`)
       return
@@ -185,6 +224,7 @@ async function tragar(ficheros) {
   if (nota) nota.textContent = ''
 
   pintar(await leerMovimientos(), { animar: true })
+  contarloAlOtro()
 }
 
 /**
