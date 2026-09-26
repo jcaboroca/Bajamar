@@ -52,14 +52,16 @@ recibe ruido.
 Sin configurar nada, *Enviar cifrado* te descarga un fichero `.bajamar` que
 pasas al otro dispositivo como quieras y abres allí con la misma contraseña.
 
-Si quieres que sea automático, despliega el buzón de [worker/](worker/src/index.js)
-y pon su dirección en [config.js](config.js):
+Si quieres que sea automático, monta el buzón de [worker/](worker/src/index.js):
 
 ```sh
-cd worker
-npx wrangler kv namespace create BUZONES   # pega el id en wrangler.toml
-npx wrangler deploy
+npm run buzon
 ```
+
+Crea el almacén, despliega el worker y deja su dirección en
+[config.js](config.js). Necesita una cuenta de Cloudflare —el plan gratuito
+sobra— y la primera vez abrirá el navegador para que le des acceso. Después,
+`git push`: lo que publica la web es lo que usa el móvil.
 
 El buzón es deliberadamente tonto: guarda bytes que no entiende. No hay cuentas
 ni tokens porque **el identificador del buzón también se deriva de tu

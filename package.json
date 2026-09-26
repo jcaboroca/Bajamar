@@ -9,6 +9,7 @@
   },
   "scripts": {
     "test": "node --test",
-    "dev": "node scripts/servir.mjs"
+    "dev": "node scripts/servir.mjs",
+    "buzon": "node scripts/buzon.mjs"
   }
 }
