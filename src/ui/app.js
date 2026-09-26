@@ -101,7 +101,7 @@ async function enviar() {
     aceptar: 'Enviar',
     pie: BUZON
       ? 'Se cifra aquí antes de salir. Con esta misma contraseña lo recuperas en el otro dispositivo.'
-      : 'Se descargará un fichero cifrado. Ábrelo en el otro dispositivo con esta misma contraseña.',
+      : 'Se cifra aquí antes de salir. Te lo podrás pasar al otro dispositivo y abrirlo con esta misma contraseña.',
   })
   if (!clave) return
 
@@ -112,8 +112,10 @@ async function enviar() {
       await subir(BUZON, maleta, clave)
       decir('Enviado. Ábrelo en el otro dispositivo con esa contraseña.')
     } else {
-      await aFichero(maleta, clave)
-      decir('Fichero cifrado descargado.')
+      const via = await aFichero(maleta, clave)
+      decir(via === 'compartido'
+        ? 'Cifrado y compartido. Ábrelo en el otro dispositivo con esa contraseña.'
+        : 'Fichero cifrado descargado. Pásalo al otro dispositivo y ábrelo allí.')
     }
   } catch (error) {
     decir(`No he podido enviarlo: ${error instanceof Error ? error.message : error}`)

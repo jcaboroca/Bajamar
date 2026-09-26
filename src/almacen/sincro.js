@@ -90,19 +90,34 @@ export async function bajar(base, contrasena) {
 
 /**
  * Camino sin infraestructura: un fichero que te pasas por AirDrop.
+ * Si el sistema sabe compartir ficheros, se lo damos directamente: descargarlo
+ * y luego buscarlo en el móvil son dos pasos donde se pierde la gente.
  * @param {Maleta} maleta
  * @param {string} contrasena
+ * @returns {Promise<'compartido' | 'descargado'>}
  */
 export async function aFichero(maleta, contrasena) {
   const sobre = await cifrar(maleta, contrasena)
-  const url = URL.createObjectURL(
-    new Blob([JSON.stringify(sobre)], { type: 'application/json' }),
-  )
+  const nombre = `bajamar-${maleta.guardado.slice(0, 10)}.bajamar`
+  const fichero = new File([JSON.stringify(sobre)], nombre, { type: 'application/json' })
+
+  if (navigator.canShare?.({ files: [fichero] })) {
+    try {
+      await navigator.share({ files: [fichero] })
+      return 'compartido'
+    } catch (error) {
+      // Cancelar el menú de compartir no es un fallo: se cae a la descarga.
+      if (error instanceof DOMException && error.name === 'AbortError') return 'compartido'
+    }
+  }
+
+  const url = URL.createObjectURL(fichero)
   const enlace = document.createElement('a')
   enlace.href = url
-  enlace.download = `bajamar-${maleta.guardado.slice(0, 10)}.bajamar`
+  enlace.download = nombre
   enlace.click()
   URL.revokeObjectURL(url)
+  return 'descargado'
 }
 
 /**
