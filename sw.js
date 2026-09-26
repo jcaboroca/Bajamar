@@ -5,7 +5,7 @@
  * programa, que es lo único que hace falta descargar.
  */
 
-const CAU = 'bajamar-v1'
+const CAU = 'bajamar-v2'
 
 const PROGRAMA = [
   './',

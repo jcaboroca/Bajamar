@@ -124,8 +124,11 @@ async function enviar() {
 
 /** @param {File} [fichero] */
 async function traer(fichero) {
+  // Sin buzón, pedir el fichero es el primer paso. Escribir un aviso no valdría:
+  // el rótulo vive en ajustes, que en el recibimiento ni siquiera se ve.
   if (!fichero && !BUZON) {
-    return decir('Sin buzón configurado: trae el fichero cifrado que descargaste en el otro dispositivo.')
+    requerir('fichero-sobre').click()
+    return
   }
 
   let error = ''
