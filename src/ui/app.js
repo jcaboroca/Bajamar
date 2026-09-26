@@ -128,6 +128,11 @@ async function contarloAlOtro() {
 function decir(texto) {
   const nodo = document.getElementById('estado-sincro')
   if (nodo) nodo.textContent = texto
+
+  // El rótulo de arriba vive en Ajustes, que en el recibimiento no se ve: ahí
+  // un aviso invisible se lee como que no ha pasado nada.
+  const nota = document.getElementById('aviso-bienvenida')
+  if (nota && !bienvenida.hidden) nota.textContent = texto
 }
 
 async function enviar() {
