@@ -90,25 +90,39 @@ test('lo que ya no se paga tampoco engorda el goteo diario', () => {
   assert.equal(despues.ritmo.porDia, antes.ritmo.porDia)
 })
 
-test('lo suelto deja de anunciarse con fecha pero sigue costando dinero', () => {
-  const antes = armar()
-  const luz = laLuz(antes)
-  assert.ok(luz)
-
-  const despues = armar({ [luz.entidadId]: 'suelto' })
-  assert.equal(laLuz(despues), null)
-  assert.ok(!despues.proyeccion.eventos.some((e) => /HOLALUZ/i.test(e.nombre)))
-  assert.ok(despues.ritmo.porDia < antes.ritmo.porDia, 'el goteo tiene que absorberlo')
-})
-
-test('lo apartado se puede encontrar para deshacerlo', () => {
+test('lo saltable se sigue previendo: el dinero sale casi todos los meses', () => {
   const luz = laLuz(armar())
   assert.ok(luz)
 
-  const estado = armar({ [luz.entidadId]: 'baja' })
+  const estado = armar({ [luz.entidadId]: 'suelto' })
+  const sigue = laLuz(estado)
+  assert.ok(sigue, 'tiene que seguir en la lista de fijos')
+  assert.equal(sigue.aplazable, true)
+  assert.ok(estado.proyeccion.eventos.some((e) => /HOLALUZ/i.test(e.nombre)))
+  assert.equal(estado.proyeccion.suelo.saldo, armar().proyeccion.suelo.saldo)
+})
+
+test('de lo saltable se mide el margen que daría saltarlo', () => {
+  const luz = laLuz(armar())
+  assert.ok(luz)
+
+  assert.equal(armar().margen, null, 'sin nada saltable no hay margen que contar')
+
+  const estado = armar({ [luz.entidadId]: 'suelto' })
+  assert.ok(estado.margen)
+  assert.equal(estado.aplazableAlMes, -6000)
+  assert.ok(estado.margen.gana > 0, 'saltarse un gasto sólo puede subir el suelo')
+  assert.equal(estado.margen.suelo.saldo, estado.proyeccion.suelo.saldo + estado.margen.gana)
+})
+
+test('sólo lo dado de baja se aparta; lo saltable sigue a la vista', () => {
+  const luz = laLuz(armar())
+  assert.ok(luz)
+
+  assert.equal(armar({ [luz.entidadId]: 'suelto' }).apartados.length, 0)
   assert.deepEqual(
-    estado.apartados.map((a) => ({ id: a.entidadId, trato: a.trato })),
-    [{ id: luz.entidadId, trato: 'baja' }],
+    armar({ [luz.entidadId]: 'baja' }).apartados.map((a) => a.entidadId),
+    [luz.entidadId],
   )
 })
 

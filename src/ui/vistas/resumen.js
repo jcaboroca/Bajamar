@@ -52,6 +52,17 @@ export function pintarResumen(estado, { animar }) {
         document.createTextNode(`Cierras el periodo con ${formatEurosRedondo(proyeccion.saldoFinal)}.`),
       ]))
 
+  // El margen sólo es noticia si de verdad mueve el suelo. Decir «ganarías
+  // 3 €» sería ruido con forma de consejo.
+  const margen = estado.margen
+  const alivio = requerir('suelo-margen')
+  alivio.hidden = margen === null || margen.gana < 5000
+  if (margen !== null && !alivio.hidden) {
+    alivio.textContent = proyeccion.suelo.saldo < 0
+      ? `Si te saltas lo que puedes saltarte, el suelo sube a ${formatEurosRedondo(margen.suelo.saldo)}.`
+      : `Tienes ${formatEurosRedondo(margen.gana)} más de margen si te saltas lo que puedes saltarte.`
+  }
+
   const lamina = requerir('lamina')
   lamina.replaceChildren(dibujarLamina(proyeccion))
   lamina.classList.remove('dibujando')

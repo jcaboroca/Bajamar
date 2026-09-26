@@ -39,6 +39,7 @@ const UMBRAL_VARIABLE = 0.18
  * @property {string} categoria
  * @property {boolean} estable
  * @property {Compromiso['estado']} estado
+ * @property {boolean} [aplazable] el usuario dice que puede saltárselo un mes
  */
 
 /**

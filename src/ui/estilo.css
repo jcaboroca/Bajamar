@@ -197,6 +197,8 @@ main {
 
 .pie strong { color: var(--texto); font-weight: 500; }
 .pie-menor { font-size: 0.9375rem; margin-top: 0.5rem; }
+/* El margen es una salida, no una alarma: se dice en el verde de lo que suma. */
+.pie-margen { margin-top: 0.75rem; font-size: 0.9375rem; color: var(--bien); }
 
 /* Una cifra grande, pero no la de portada: el disponible y el neto mandan
    dentro de su bloque, no sobre la pantalla entera. */

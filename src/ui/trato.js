@@ -13,8 +13,8 @@ import { pedirDatos } from './hoja.js'
 /** @typedef {'fijo' | 'suelto' | 'baja'} Trato */
 
 const OPCIONES = /** @type {Array<[string, string]>} */ ([
-  ['fijo', 'Sí, lo pago siempre'],
-  ['suelto', 'A veces; puedo elegir'],
+  ['fijo', 'Sí, siempre'],
+  ['suelto', 'Sí, pero me lo puedo saltar'],
   ['baja', 'Ya no lo pago'],
 ])
 
@@ -34,7 +34,7 @@ export async function preguntarTrato({ nombre, actual = 'fijo' }) {
       tipo: 'lista',
       valor: actual,
       opciones: OPCIONES,
-      pista: 'Si dices que ya no lo pagas, desaparece de la previsión y deja de contar como gasto fijo. Lo que ya pagaste no se toca. Si dices que a veces, sigue contando en el gasto del día a día, pero deja de anunciarse con fecha.',
+      pista: 'Si ya no lo pagas, desaparece de la previsión. Lo que ya pagaste no se toca. Si te lo puedes saltar, lo sigo previendo —porque casi todos los meses sale— pero te digo cuánto margen te daría saltarlo en un mes apurado.',
     }],
   })
   if (respuesta === null || respuesta === 'borrar') return null

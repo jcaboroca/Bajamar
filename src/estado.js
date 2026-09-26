@@ -108,27 +108,28 @@ export function construirEstado(crudos, opciones = {}) {
   // no se excluye aquí, sino más abajo al medir el gasto.
   /*
    * Detectar que algo se repite no es lo mismo que saber que va a volver. Una
-   * cuenta que se cierra, una compañía que se cambia o un gimnasio al que se
-   * puede no ir siguen teniendo un pasado impecablemente regular, y la
-   * previsión los seguiría cobrando para siempre. Sólo el usuario sabe eso, y
-   * lo dice de dos maneras distintas:
+   * cuenta que se cierra o una compañía que se cambia siguen teniendo un
+   * pasado impecablemente regular, y la previsión los seguiría cobrando para
+   * siempre. Sólo el usuario sabe eso, y lo dice de dos maneras distintas.
    *
    * «Ya no lo pago» (baja) lo borra del futuro por completo, y además saca su
    * historia del ritmo diario: si contáramos los recibos viejos de la luz, el
    * goteo seguiría cobrándolos con otro nombre.
    *
-   * «A veces» (suelto) deja de anunciarlo con día y hora, pero su historia sí
-   * alimenta el goteo: el dinero se sigue yendo, sólo que no en una fecha.
+   * «Me lo puedo saltar» (suelto) no lo quita de nada. Una inversión mensual o
+   * un gimnasio salen de la cuenta casi todos los meses: esconderlos dejaría
+   * un suelo falsamente tranquilo. Lo que cambia es que se puede medir cuánto
+   * margen dan si el mes viene apretado, que es la pregunta de verdad.
    */
   const tratos = opciones.tratos ?? {}
   const deBaja = new Set(Object.keys(tratos).filter((id) => tratos[id] === 'baja'))
-  const apartados = new Set(Object.keys(tratos).filter((id) => tratos[id] !== 'fijo'))
+  const aplazables = new Set(Object.keys(tratos).filter((id) => tratos[id] === 'suelto'))
 
   const deteccion = detectarCompromisos(cuenta, nombres, { hoy, categorias })
-  const compromisos = deteccion.compromisos.filter((c) => !apartados.has(c.entidadId))
-  const dudosos = deteccion.dudosos.filter((d) => !apartados.has(d.entidadId))
+  const compromisos = deteccion.compromisos.filter((c) => !deBaja.has(c.entidadId))
+  const dudosos = deteccion.dudosos.filter((d) => !deBaja.has(d.entidadId))
   const ingresos = detectarIngresos(cuenta, nombres, { hoy, categorias })
-    .filter((c) => !apartados.has(c.entidadId))
+    .filter((c) => !deBaja.has(c.entidadId))
   const ordinarios = gastoOrdinario(
     cuenta.filter((m) => !(m.entidadId && deBaja.has(m.entidadId))),
     compromisos,
@@ -161,7 +162,7 @@ export function construirEstado(crudos, opciones = {}) {
     tarjeta: cargoTarjeta,
     desde: hoy,
     hasta: fin,
-  })
+  }).map((e) => ({ ...e, aplazable: e.entidadId ? aplazables.has(e.entidadId) : false }))
 
   const hasta = ultimoDiaDelMes(sumarMeses(hoy, (opciones.meses ?? 2) - 1))
   const finLargo = ultimoDiaDelMes(sumarMeses(hoy, HORIZONTE_LARGO - 1))
@@ -169,8 +170,24 @@ export function construirEstado(crudos, opciones = {}) {
   const proyeccion = proyectar({ saldoInicial, desde: hoy, hasta, eventos: armar(hasta), ritmoPorDia: ritmo.porDia })
   const proyeccionLarga = proyectar({ saldoInicial, desde: hoy, hasta: finLargo, eventos: armar(finLargo), ritmoPorDia: ritmo.porDia })
 
+  // El mismo periodo, suponiendo que se salta todo lo que se puede saltar. No
+  // es una previsión alternativa: es la medida de cuánto margen tienes.
+  const holgado = aplazables.size === 0 ? null : proyectar({
+    saldoInicial,
+    desde: hoy,
+    hasta,
+    eventos: proyeccion.eventos.filter((e) => !e.aplazable),
+    ritmoPorDia: ritmo.porDia,
+  })
+  const margen = holgado === null ? null : {
+    suelo: holgado.suelo,
+    gana: holgado.suelo.saldo - proyeccion.suelo.saldo,
+  }
+
   const fijos = describirFijos(vivos, cuenta, categorias)
+    .map((f) => ({ ...f, aplazable: aplazables.has(f.entidadId) }))
   const costes = estructura(fijos)
+  const aplazableAlMes = fijos.reduce((t, f) => (f.aplazable ? t + f.mensualEquivalente : t), 0)
 
   const presupuestos = revisarPresupuestos({
     movimientos: contables,
@@ -260,9 +277,11 @@ export function construirEstado(crudos, opciones = {}) {
     dudosos,
     ingresos,
     tratos,
-    apartados: [...apartados]
+    apartados: [...deBaja]
       .map((id) => ({ entidadId: id, nombre: nombres.get(id) ?? id, trato: tratos[id] }))
       .sort((a, b) => a.nombre.localeCompare(b.nombre)),
+    margen,
+    aplazableAlMes,
     ingresoMensual,
     ordinarios,
     ritmo,

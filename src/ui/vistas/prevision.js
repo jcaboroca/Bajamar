@@ -188,6 +188,11 @@ function pintarCoste(estado) {
     ['Gasto del día a día', formatEuros(estado.ritmo.porMes)],
     ['Reserva para los no mensuales', formatEuros(c.reservaMensual)],
     ['Total al mes', formatEuros(c.costeMensual + estado.ritmo.porMes), 'destacado'],
+    ...(estado.aplazableAlMes === 0
+      ? []
+      : /** @type {Array<[string, string, string]>} */ ([
+          ['De eso, te puedes saltar', formatEuros(estado.aplazableAlMes), ''],
+        ])),
   ]))
 }
 
@@ -208,12 +213,11 @@ function pintarFijos(estado) {
     const ol = nodo('ol', 'eventos pulsables')
     for (const f of lista) {
       const cada = f.periodicidad === 'mensual' ? 'al mes' : `cada ${MESES_DE[f.periodicidad]} meses`
+      const equivalente = f.periodicidad === 'mensual' ? '' : ` · ${formatEuros(f.mensualEquivalente)} al mes equivalente`
       const fila = linea({
         marca: diaYMes(f.proximaPrevista),
         nombre: f.nombre,
-        detalle: f.periodicidad === 'mensual'
-          ? cada
-          : `${cada} · ${formatEuros(f.mensualEquivalente)} al mes equivalente`,
+        detalle: `${cada}${equivalente}${f.aplazable ? ' · te lo puedes saltar' : ''}`,
         importe: formatEuros(f.importeEsperado),
         clase: f.estado === 'retrasado' ? 'apagado' : '',
       })
@@ -251,12 +255,7 @@ function pintarFijos(estado) {
 function pintarApartados(estado) {
   requerir('bloque-apartados').hidden = estado.apartados.length === 0
   requerir('apartados').replaceChildren(...estado.apartados.map((a) => {
-    const fila = linea({
-      nombre: a.nombre,
-      detalle: a.trato === 'baja' ? 'ya no lo pagas' : 'a veces; cuenta en el día a día',
-      importe: '',
-      clase: 'apagado',
-    })
+    const fila = linea({ nombre: a.nombre, detalle: 'ya no lo pagas', importe: '', clase: 'apagado' })
     marcarPreguntable(fila, a.entidadId)
     return fila
   }))
