@@ -1,11 +1,21 @@
 // @ts-check
 /**
  * Ensamblado: de una lista de movimientos crudos al estado que mira la interfaz.
+ *
+ * Este es el único sitio donde se juntan las piezas. Los módulos de `analisis`
+ * no se conocen entre ellos y no saben nada de la interfaz; aquí se les pasa
+ * lo que necesitan y se devuelve un objeto plano.
  */
 
 import { detectarCompromisos, detectarIngresos, gastoOrdinario, ritmoOrdinario } from './analisis/compromisos.js'
 import { eventosDesde, proyectar } from './analisis/bajamar.js'
-import { hoyIso, sumarMeses, ultimoDiaDelMes } from './dominio/tipos.js'
+import { describirFijos, estructura } from './analisis/fijos.js'
+import { conGotaDiaria, disponibleReal, porMeses, resumenDeMes } from './analisis/mes.js'
+import { revisarPresupuestos } from './analisis/presupuestos.js'
+import { balance, evolucion } from './analisis/patrimonio.js'
+import { capacidadDeAhorro } from './analisis/objetivos.js'
+import { revisar } from './analisis/alertas.js'
+import { hoyIso, mesDe, sumarMeses, ultimoDiaDelMes } from './dominio/tipos.js'
 import { limpiarConcepto } from './entidades/limpiar.js'
 import { indicePorAlias, reconciliar } from './entidades/reconciliar.js'
 import { CATEGORIAS } from './entidades/semillas.js'
@@ -13,6 +23,7 @@ import { CATEGORIAS } from './entidades/semillas.js'
 /**
  * @typedef {import('./dominio/tipos.js').Movimiento} Movimiento
  * @typedef {import('./dominio/tipos.js').Bulto} Bulto
+ * @typedef {import('./dominio/tipos.js').Retoque} Retoque
  */
 
 /**
@@ -30,6 +41,9 @@ const PARECE_CUENTA = /^\d{4}[- ]?\d{6,}$/
 /** El banco liquida la tarjeta con un apunte propio en la cuenta. */
 const LIQUIDACION_TARJETA = /TARJETA\s+(DE\s+)?CREDITO/i
 
+/** Hasta dónde mira la previsión larga. Un año es lo que tarda en volver un recibo anual. */
+const HORIZONTE_LARGO = 12
+
 /**
  * @param {Movimiento[]} crudos
  * @param {object} [opciones]
@@ -37,10 +51,16 @@ const LIQUIDACION_TARJETA = /TARJETA\s+(DE\s+)?CREDITO/i
  * @param {Bulto[]} [opciones.bultos]
  * @param {Record<string, string>} [opciones.categoriasManuales] entidadId → categoría
  * @param {string[]} [opciones.excepcionales] ids de movimientos marcados a mano
+ * @param {Retoque[]} [opciones.retoques]
+ * @param {import('./analisis/presupuestos.js').Presupuesto[]} [opciones.presupuestos]
+ * @param {import('./analisis/patrimonio.js').Apunte[]} [opciones.patrimonio]
+ * @param {number} [opciones.colchon] céntimos por debajo de los cuales avisar
+ * @param {number} [opciones.meses] meses que abarca la proyección de portada
  */
 export function construirEstado(crudos, opciones = {}) {
   const hoy = opciones.hoy ?? hoyIso()
   const excepcionales = new Set(opciones.excepcionales ?? [])
+  const retoques = new Map((opciones.retoques ?? []).map((r) => [r.id, r]))
 
   const limpios = crudos.map((m) => ({ m, ...limpiarConcepto(m.conceptoRaw) }))
   const { entidades, categorias } = reconciliar(limpios.map((x) => x.nombre))
@@ -61,16 +81,26 @@ export function construirEstado(crudos, opciones = {}) {
       if (actual === 'otros' && pista && CATEGORIAS[pista]) categorias.set(entidadId, pista)
       else if (actual === 'otros' && PARECE_CUENTA.test(nombre)) categorias.set(entidadId, 'traspaso')
     }
+    const retoque = retoques.get(m.id)
+    // Un retoque habla de este apunte y sólo de este. Para que valga también
+    // para los siguientes del mismo comercio está la regla por entidad.
+    const categoria = retoque?.traspaso
+      ? 'traspaso'
+      : retoque?.categoria ?? (entidadId ? categorias.get(entidadId) ?? 'otros' : 'otros')
     return {
       ...m,
       entidadId,
+      categoria,
+      nota: retoque?.nota,
+      excluido: retoque?.excluido === true,
       localidad: m.localidad ?? localidad,
-      excepcional: excepcionales.has(m.id),
+      excepcional: excepcionales.has(m.id) || retoque?.excluido === true,
     }
   })
 
-  const cuenta = movimientos.filter((m) => m.origen === 'cuenta')
-  const tarjeta = movimientos.filter((m) => m.origen === 'tarjeta')
+  const contables = movimientos.filter((m) => !m.excluido)
+  const cuenta = contables.filter((m) => m.origen === 'cuenta')
+  const tarjeta = contables.filter((m) => m.origen === 'tarjeta')
 
   // Un traspaso al ahorro propio no es gasto, pero sí sale de la cuenta: tiene
   // que entrar en la proyección aunque no cuente como dinero quemado. Por eso
@@ -96,17 +126,79 @@ export function construirEstado(crudos, opciones = {}) {
     importe: pendienteTarjeta,
   }
 
-  const hasta = ultimoDiaDelMes(sumarMeses(hoy, 1))
-  const eventos = eventosDesde({
-    compromisos: compromisos.filter((c) => c.estado !== 'extinto' && c !== liquidacion),
+  const vivos = compromisos.filter((c) => c.estado !== 'extinto' && c !== liquidacion)
+  const armar = (/** @type {string} */ fin) => eventosDesde({
+    compromisos: vivos,
     ingresos,
     bultos: opciones.bultos ?? [],
     tarjeta: cargoTarjeta,
     desde: hoy,
-    hasta,
+    hasta: fin,
   })
 
-  const proyeccion = proyectar({ saldoInicial, desde: hoy, hasta, eventos, ritmoPorDia: ritmo.porDia })
+  const hasta = ultimoDiaDelMes(sumarMeses(hoy, (opciones.meses ?? 2) - 1))
+  const finLargo = ultimoDiaDelMes(sumarMeses(hoy, HORIZONTE_LARGO - 1))
+
+  const proyeccion = proyectar({ saldoInicial, desde: hoy, hasta, eventos: armar(hasta), ritmoPorDia: ritmo.porDia })
+  const proyeccionLarga = proyectar({ saldoInicial, desde: hoy, hasta: finLargo, eventos: armar(finLargo), ritmoPorDia: ritmo.porDia })
+
+  const fijos = describirFijos(vivos, cuenta, categorias)
+  const costes = estructura(fijos)
+
+  const presupuestos = revisarPresupuestos({
+    movimientos: contables,
+    categorias,
+    noEsGasto: NO_ES_GASTO,
+    presupuestos: opciones.presupuestos ?? [],
+    hoy,
+  })
+
+  const mesEnCurso = conGotaDiaria(
+    resumenDeMes({
+      movimientos: contables,
+      categorias,
+      noEsGasto: NO_ES_GASTO,
+      eventos: proyeccion.eventos,
+      mes: mesDe(hoy),
+      hoy,
+    }),
+    ritmo.porDia,
+    hoy,
+  )
+
+  const disponible = disponibleReal({
+    saldo: saldoInicial,
+    eventos: proyeccion.eventos,
+    ritmoPorDia: ritmo.porDia,
+    hoy,
+    hasta: ultimoDiaDelMes(hoy),
+  })
+
+  const ingresoMensual = ingresos
+    .filter((i) => i.periodicidad === 'mensual')
+    .reduce((t, i) => t + i.importeEsperado, 0)
+
+  const capacidad = capacidadDeAhorro({
+    ingresos: ingresoMensual,
+    fijos: costes.costeMensual,
+    ordinario: ritmo.porMes,
+    reserva: costes.reservaMensual,
+  })
+
+  // El saldo del banco es patrimonio aunque nadie lo haya anotado: dejarlo
+  // fuera obligaría a teclear a mano un número que la aplicación ya sabe.
+  const apuntes = [
+    ...(saldoInicial !== 0
+      ? [{
+          id: 'auto:cuenta',
+          nombre: 'Cuenta corriente',
+          grupo: /** @type {const} */ ('cuentas'),
+          valor: saldoInicial,
+          fecha: ultimo?.fecha ?? hoy,
+        }]
+      : []),
+    ...(opciones.patrimonio ?? []),
+  ]
 
   return {
     hoy,
@@ -117,11 +209,32 @@ export function construirEstado(crudos, opciones = {}) {
     compromisos,
     dudosos,
     ingresos,
+    ingresoMensual,
     ordinarios,
     ritmo,
     saldoInicial,
     pendienteTarjeta,
     proyeccion,
+    proyeccionLarga,
+    meses: porMeses(proyeccionLarga),
+    fijos,
+    costes,
+    presupuestos,
+    mesEnCurso,
+    disponible,
+    capacidad,
+    patrimonio: balance(apuntes, hoy),
+    evolucionPatrimonio: evolucion(apuntes, hoy),
+    avisos: revisar({
+      proyeccion,
+      fijos,
+      ingresos,
+      movimientos: contables,
+      nombres,
+      presupuestos,
+      colchon: opciones.colchon ?? 0,
+      hoy,
+    }),
   }
 }
 
@@ -149,8 +262,8 @@ export function totalesPorCategoria(movimientos, categorias, rango = {}) {
   for (const m of movimientos) {
     if (rango.desde && m.fecha < rango.desde) continue
     if (rango.hasta && m.fecha > rango.hasta) continue
-    if (m.importe >= 0 || m.origen === 'tarjeta') continue
-    const categoria = (m.entidadId && categorias.get(m.entidadId)) || 'otros'
+    if (m.importe >= 0 || m.origen === 'tarjeta' || m.excluido) continue
+    const categoria = m.categoria ?? (m.entidadId && categorias.get(m.entidadId)) || 'otros'
     if (NO_ES_GASTO.has(categoria)) continue
     const previo = acumulado.get(categoria) ?? { total: 0, cuantos: 0 }
     acumulado.set(categoria, { total: previo.total + m.importe, cuantos: previo.cuantos + 1 })

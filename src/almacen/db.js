@@ -8,7 +8,22 @@
  */
 
 const NOMBRE = 'bajamar'
-const VERSION = 1
+const VERSION = 2
+
+/**
+ * Todo lo que el usuario decide a mano vive separado de los movimientos: si
+ * reimporta el extracto, sus correcciones siguen ahí.
+ */
+export const ALMACENES = [
+  'movimientos',
+  'ajustes',
+  'reglas',      // entidadId → categoría elegida por el usuario
+  'bultos',      // gastos futuros anotados a mano
+  'retoques',    // correcciones sobre un movimiento concreto
+  'objetivos',
+  'presupuestos',
+  'patrimonio',
+]
 
 /** @type {IDBDatabase | null} */
 let abierta = null
@@ -23,7 +38,8 @@ export function abrir() {
         const store = db.createObjectStore('movimientos', { keyPath: 'id' })
         store.createIndex('por-fecha', 'fecha')
       }
-      for (const nombre of ['ajustes', 'reglas', 'bultos']) {
+      for (const nombre of ALMACENES) {
+        if (nombre === 'movimientos') continue
         if (!db.objectStoreNames.contains(nombre)) db.createObjectStore(nombre, { keyPath: 'id' })
       }
     }
@@ -119,8 +135,7 @@ export async function borrar(almacen, id) {
 /** Vaciar todo: la única forma honesta de ofrecer «olvídalo todo». */
 export async function vaciar() {
   const db = await abrir()
-  const almacenes = ['movimientos', 'ajustes', 'reglas', 'bultos']
-  await transaccion(db, almacenes, 'readwrite', (t) => {
-    for (const nombre of almacenes) t.objectStore(nombre).clear()
+  await transaccion(db, ALMACENES, 'readwrite', (t) => {
+    for (const nombre of ALMACENES) t.objectStore(nombre).clear()
   })
 }

@@ -25,6 +25,24 @@
  * @property {string | null} localidad
  * @property {boolean} fraccionado     cuota de un pago aplazado, no gasto nuevo
  * @property {boolean} excepcional     marcado a mano: no cuenta para medianas
+ * @property {string} [categoria]      resuelta al construir el estado
+ * @property {boolean} [excluido]      fuera de todos los cálculos, por decisión del usuario
+ * @property {string} [nota]
+ */
+
+/**
+ * Lo que el usuario corrige sobre un apunte concreto.
+ *
+ * Vive aparte de los movimientos a propósito: reimportar el extracto vuelve a
+ * escribir el movimiento entero, y las correcciones tienen que sobrevivir a
+ * eso. Un retoque sin ningún campo puesto equivale a no tenerlo.
+ *
+ * @typedef {object} Retoque
+ * @property {string} id               el del movimiento
+ * @property {string} [categoria]
+ * @property {boolean} [excluido]      no cuenta para nada
+ * @property {boolean} [traspaso]      dinero movido entre cuentas propias
+ * @property {string} [nota]
  */
 
 /**
