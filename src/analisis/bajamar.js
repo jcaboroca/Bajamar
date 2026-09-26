@@ -24,6 +24,7 @@ import { diasEntre, sumarMeses, ultimoDiaDelMes } from '../dominio/tipos.js'
  * @property {'compromiso' | 'ingreso' | 'bulto' | 'tarjeta'} tipo
  * @property {boolean} seguro    false si es una previsión, true si está confirmado
  * @property {string | null} [entidadId] de quién sale, cuando se puede decir que no vuelva
+ * @property {string} [reciboId] qué recibo suyo, cuando el cobrador tiene varios
  */
 
 /**
@@ -133,6 +134,7 @@ export function eventosDesde({ compromisos, ingresos, bultos, tarjeta, desde, ha
             tipo: grupo.tipo,
             seguro: false,
             entidadId: c.entidadId,
+            reciboId: c.reciboId,
           })
         }
         fecha = sumarMeses(fecha, meses[c.periodicidad])

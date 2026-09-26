@@ -17,7 +17,7 @@ import { mesDe, ultimoDiaDelMes, sumarMeses } from '../../dominio/tipos.js'
 import { MESES_DE } from '../../analisis/fijos.js'
 import { dibujarLamina } from '../lamina.js'
 import { cuentas, diaYMes, linea, nodo, nombreDeMes, requerir, vacio } from '../piezas.js'
-import { marcarPreguntable, preguntarAlPulsar } from '../trato.js'
+import { marcarPreguntable, preguntarAlPulsar, rotuloDe } from '../trato.js'
 
 /**
  * @typedef {ReturnType<typeof import('../../estado.js').construirEstado>} Estado
@@ -221,7 +221,7 @@ function pintarFijos(estado) {
         importe: formatEuros(f.importeEsperado),
         clase: f.estado === 'retrasado' ? 'apagado' : '',
       })
-      marcarPreguntable(fila, f.entidadId)
+      marcarPreguntable(fila, f.reciboId, rotuloDe(f.reciboId, f.nombre, f.importeEsperado))
       ol.append(fila)
     }
     div.append(ol)
@@ -256,7 +256,7 @@ function pintarApartados(estado) {
   requerir('bloque-apartados').hidden = estado.apartados.length === 0
   requerir('apartados').replaceChildren(...estado.apartados.map((a) => {
     const fila = linea({ nombre: a.nombre, detalle: 'ya no lo pagas', importe: '', clase: 'apagado' })
-    marcarPreguntable(fila, a.entidadId)
+    marcarPreguntable(fila, a.reciboId, rotuloDe(a.reciboId, a.nombre, a.importe))
     return fila
   }))
 }

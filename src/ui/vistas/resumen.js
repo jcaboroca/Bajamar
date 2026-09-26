@@ -13,7 +13,7 @@ import { diasEntre, fechaLarga } from '../../dominio/tipos.js'
 import { totalesPorCategoria } from '../../estado.js'
 import { dibujarLamina } from '../lamina.js'
 import { barra, cuentas, diaYMes, linea, nodo, requerir, titular, vacio } from '../piezas.js'
-import { marcarPreguntable, preguntarAlPulsar } from '../trato.js'
+import { marcarPreguntable, preguntarAlPulsar, rotuloDe } from '../trato.js'
 
 /**
  * @typedef {ReturnType<typeof import('../../estado.js').construirEstado>} Estado
@@ -87,7 +87,7 @@ function pintarAvisos(estado) {
   requerir('avisos').replaceChildren(...estado.avisos.slice(0, 4).map((a) => {
     const li = nodo('li', `aviso aviso-${a.nivel}`)
     li.append(nodo('p', 'aviso-titulo', a.titulo), nodo('p', 'aviso-detalle', a.detalle))
-    if (a.entidadId) marcarPreguntable(li, a.entidadId)
+    if (a.reciboId) marcarPreguntable(li, a.reciboId)
     return li
   }))
 }
@@ -163,7 +163,7 @@ function pintarEventos(estado) {
       importe: formatEuros(e.importe, { signo: true }),
       clase: clase.join(' '),
     })
-    if (e.entidadId) marcarPreguntable(fila, e.entidadId)
+    if (e.reciboId) marcarPreguntable(fila, e.reciboId, rotuloDe(e.reciboId, e.nombre, e.importe))
     return fila
   }))
 }

@@ -37,6 +37,7 @@ import { MESES_DE } from './fijos.js'
  * @property {string} titulo
  * @property {string} detalle
  * @property {string} [entidadId] cuando el aviso se puede contestar tocando
+ * @property {string} [reciboId] el recibo concreto al que contesta ese toque
  */
 
 /** Días de antelación con los que avisar de un recibo gordo. */
@@ -86,7 +87,7 @@ export function revisar({ proyeccion, fijos, ingresos, movimientos, nombres, pre
     const dias = diasEntre(hoy, f.proximaPrevista)
     if (dias < 0 || dias > ANTELACION) continue
     avisos.push({
-      id: `anual:${f.entidadId}:${f.proximaPrevista}`,
+      id: `anual:${f.reciboId}:${f.proximaPrevista}`,
       clase: 'anual',
       nivel: 'medio',
       titulo: `${f.nombre}: ${formatEuros(f.importeEsperado)} en ${dias} ${dias === 1 ? 'día' : 'días'}`,
@@ -103,7 +104,7 @@ export function revisar({ proyeccion, fijos, ingresos, movimientos, nombres, pre
     const resto = retrasados.length - nombra.length
     const lista = nombra.join(', ') + (resto > 0 ? ` y ${resto} más` : '')
     avisos.push({
-      id: `retraso:${retrasados.map((f) => f.entidadId).join('|')}`,
+      id: `retraso:${retrasados.map((f) => f.reciboId).join('|')}`,
       clase: 'retraso',
       nivel: 'bajo',
       titulo: retrasados.length === 1
@@ -113,7 +114,7 @@ export function revisar({ proyeccion, fijos, ingresos, movimientos, nombres, pre
         ? 'Tocaba hace tiempo y no aparece. Puede que lo hayas dado de baja, o puede que llegue con retraso y se junte con el siguiente. Toca aquí para decírmelo.'
         : `${lista}. Puede que los hayas dado de baja, o puede que lleguen con retraso y se junten con los siguientes. En Previsión puedes decirme cuáles ya no pagas.`,
       // Sólo cuando hay uno: con varios, un toque no puede contestar por todos.
-      entidadId: retrasados.length === 1 ? retrasados[0].entidadId : undefined,
+      reciboId: retrasados.length === 1 ? retrasados[0].reciboId : undefined,
     })
   }
 

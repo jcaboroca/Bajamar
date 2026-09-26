@@ -30,6 +30,7 @@ const UMBRAL_VARIABLE = 0.18
 /**
  * @typedef {object} Fijo
  * @property {string} entidadId
+ * @property {string} reciboId
  * @property {string} nombre
  * @property {Compromiso['periodicidad']} periodicidad
  * @property {number} importeEsperado      céntimos, negativo
@@ -71,6 +72,7 @@ export function describirFijos(compromisos, movimientos, categorias) {
     const variacion = dispersion(cercanos, c.importeEsperado)
     return {
       entidadId: c.entidadId,
+      reciboId: c.reciboId,
       nombre: c.nombre,
       periodicidad: c.periodicidad,
       importeEsperado: c.importeEsperado,

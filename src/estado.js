@@ -54,7 +54,7 @@ const HORIZONTE_LARGO = 12
  * @param {Retoque[]} [opciones.retoques]
  * @param {import('./analisis/presupuestos.js').Presupuesto[]} [opciones.presupuestos]
  * @param {import('./analisis/patrimonio.js').Apunte[]} [opciones.patrimonio]
- * @param {Record<string, 'fijo' | 'suelto' | 'baja'>} [opciones.tratos] entidadId → cómo preverlo
+ * @param {Record<string, 'fijo' | 'suelto' | 'baja'>} [opciones.tratos] reciboId → cómo preverlo
  * @param {number} [opciones.colchon] céntimos por debajo de los cuales avisar
  * @param {number} [opciones.meses] meses que abarca la proyección de portada
  */
@@ -120,18 +120,28 @@ export function construirEstado(crudos, opciones = {}) {
    * un gimnasio salen de la cuenta casi todos los meses: esconderlos dejaría
    * un suelo falsamente tranquilo. Lo que cambia es que se puede medir cuánto
    * margen dan si el mes viene apretado, que es la pregunta de verdad.
+   *
+   * Todo esto va por RECIBO, no por cobrador: del mismo banco pueden salir la
+   * aportación que uno se salta y la letra de la furgoneta que no.
    */
-  const tratos = opciones.tratos ?? {}
+  const deteccion = detectarCompromisos(cuenta, nombres, { hoy, categorias })
+  const ingresosTodos = detectarIngresos(cuenta, nombres, { hoy, categorias })
+  const tratos = porRecibo(
+    opciones.tratos ?? {},
+    [...deteccion.compromisos, ...ingresosTodos],
+    new Set(deteccion.dudosos.map((d) => d.entidadId)),
+  )
   const deBaja = new Set(Object.keys(tratos).filter((id) => tratos[id] === 'baja'))
   const aplazables = new Set(Object.keys(tratos).filter((id) => tratos[id] === 'suelto'))
+  const cobradoresDeBaja = new Set([...deBaja].map((id) => id.split('#')[0]))
 
-  const deteccion = detectarCompromisos(cuenta, nombres, { hoy, categorias })
-  const compromisos = deteccion.compromisos.filter((c) => !deBaja.has(c.entidadId))
+  const compromisos = deteccion.compromisos.filter((c) => !deBaja.has(c.reciboId))
   const dudosos = deteccion.dudosos.filter((d) => !deBaja.has(d.entidadId))
-  const ingresos = detectarIngresos(cuenta, nombres, { hoy, categorias })
-    .filter((c) => !deBaja.has(c.entidadId))
+  const ingresos = ingresosTodos.filter((c) => !deBaja.has(c.reciboId))
   const ordinarios = gastoOrdinario(
-    cuenta.filter((m) => !(m.entidadId && deBaja.has(m.entidadId))),
+    // Sólo se borra la historia del cobrador si ya no le queda ningún recibo
+    // vivo; si le queda, sus movimientos ya están fuera del goteo por serlo.
+    cuenta.filter((m) => !(m.entidadId && cobradoresDeBaja.has(m.entidadId))),
     compromisos,
     NO_ES_GASTO,
     categorias,
@@ -162,7 +172,7 @@ export function construirEstado(crudos, opciones = {}) {
     tarjeta: cargoTarjeta,
     desde: hoy,
     hasta: fin,
-  }).map((e) => ({ ...e, aplazable: e.entidadId ? aplazables.has(e.entidadId) : false }))
+  }).map((e) => ({ ...e, aplazable: e.reciboId ? aplazables.has(e.reciboId) : false }))
 
   const hasta = ultimoDiaDelMes(sumarMeses(hoy, (opciones.meses ?? 2) - 1))
   const finLargo = ultimoDiaDelMes(sumarMeses(hoy, HORIZONTE_LARGO - 1))
@@ -185,7 +195,7 @@ export function construirEstado(crudos, opciones = {}) {
   }
 
   const fijos = describirFijos(vivos, cuenta, categorias)
-    .map((f) => ({ ...f, aplazable: aplazables.has(f.entidadId) }))
+    .map((f) => ({ ...f, aplazable: aplazables.has(f.reciboId) }))
   const costes = estructura(fijos)
   const aplazableAlMes = fijos.reduce((t, f) => (f.aplazable ? t + f.mensualEquivalente : t), 0)
 
@@ -277,8 +287,18 @@ export function construirEstado(crudos, opciones = {}) {
     dudosos,
     ingresos,
     tratos,
+    // Lo apartado se busca en la detección sin filtrar: es la única que aún
+    // sabe cómo se llamaba y cuánto costaba lo que el usuario dio de baja.
     apartados: [...deBaja]
-      .map((id) => ({ entidadId: id, nombre: nombres.get(id) ?? id, trato: tratos[id] }))
+      .map((id) => {
+        const recibo = [...deteccion.compromisos, ...ingresosTodos].find((c) => c.reciboId === id)
+        return {
+          reciboId: id,
+          nombre: recibo?.nombre ?? nombres.get(id.split('#')[0]) ?? id,
+          importe: recibo?.importeEsperado ?? 0,
+          trato: tratos[id],
+        }
+      })
       .sort((a, b) => a.nombre.localeCompare(b.nombre)),
     margen,
     aplazableAlMes,
@@ -344,4 +364,29 @@ export function totalesPorCategoria(movimientos, categorias, rango = {}) {
   return [...acumulado.entries()]
     .map(([id, v]) => ({ id, nombre: CATEGORIAS[id] ?? id, ...v }))
     .sort((a, b) => a.total - b.total)
+}
+
+/**
+ * Las primeras respuestas se guardaron por cobrador, cuando un cobrador era un
+ * recibo. Al separar los recibos, esas claves se quedarían huérfanas y el
+ * usuario perdería en silencio lo que ya había contestado. Se adoptan sólo
+ * cuando no hay duda de a cuál se referían.
+ * @param {Record<string, 'fijo' | 'suelto' | 'baja'>} guardados
+ * @param {import('./dominio/tipos.js').Compromiso[]} recibos
+ * @param {Set<string>} dudosos  aún no son recibos, pero también se contestan
+ * @returns {Record<string, 'fijo' | 'suelto' | 'baja'>}
+ */
+function porRecibo(guardados, recibos, dudosos) {
+  const vivos = new Set(recibos.map((c) => c.reciboId))
+  /** @type {Record<string, 'fijo' | 'suelto' | 'baja'>} */
+  const puestos = {}
+  for (const [clave, trato] of Object.entries(guardados)) {
+    if (vivos.has(clave) || dudosos.has(clave)) {
+      puestos[clave] = trato
+      continue
+    }
+    const suyos = recibos.filter((c) => c.entidadId === clave)
+    if (suyos.length === 1) puestos[suyos[0].reciboId] = trato
+  }
+  return puestos
 }

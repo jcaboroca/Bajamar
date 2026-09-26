@@ -56,6 +56,7 @@
 /**
  * @typedef {object} Compromiso
  * @property {string} entidadId
+ * @property {string} reciboId        distingue dos recibos del mismo cobrador
  * @property {string} nombre
  * @property {'mensual' | 'bimestral' | 'trimestral' | 'semestral' | 'anual'} periodicidad
  * @property {number} importeEsperado  mediana de la serie, en céntimos

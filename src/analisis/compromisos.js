@@ -171,6 +171,7 @@ export function detectarCompromisos(movimientos, nombres, opciones = {}) {
 
     // Segundo intento: varias series distintas bajo el mismo cobrador.
     let encontrada = false
+    const usados = new Set()
     if (orden.length >= 5) {
       for (const serie of separarPorImporte(orden)) {
         if (serie.length < 2) continue
@@ -180,7 +181,12 @@ export function detectarCompromisos(movimientos, nombres, opciones = {}) {
         // Dos préstamos del mismo banco salen como dos líneas con el mismo
         // nombre. No se les pega el importe al nombre: ya está en su columna,
         // y repetirlo sólo consigue que el nombre no quepa en una línea.
-        compromisos.push(construir(entidadId, nombre, cronologica, ritmo))
+        const recibo = construir(entidadId, nombre, cronologica, ritmo, true)
+        // Dos series con el mismo importe compartirían identidad, y entonces
+        // contestar por una contestaría por la otra sin avisar.
+        while (usados.has(recibo.reciboId)) recibo.reciboId += '+'
+        usados.add(recibo.reciboId)
+        compromisos.push(recibo)
         encontrada = true
       }
     }
@@ -209,9 +215,10 @@ export function detectarCompromisos(movimientos, nombres, opciones = {}) {
    * @param {string} nombre
    * @param {Movimiento[]} orden
    * @param {Compromiso['periodicidad']} periodicidad
+   * @param {boolean} [separado] una de varias series del mismo cobrador
    * @returns {Compromiso}
    */
-  function construir(entidadId, nombre, orden, periodicidad) {
+  function construir(entidadId, nombre, orden, periodicidad, separado = false) {
     const meses = PERIODOS.find((p) => p.nombre === periodicidad)?.meses ?? 1
     const ultima = orden[orden.length - 1].fecha
     let proxima = sumarMeses(ultima, meses)
@@ -223,11 +230,17 @@ export function detectarCompromisos(movimientos, nombres, opciones = {}) {
       saltos += 1
     }
     const retraso = diasEntre(sumarMeses(ultima, meses), hoy)
+    const importeEsperado = mediana(orden.map((m) => m.importe))
     return {
       entidadId,
+      // Dos recibos del mismo cobrador pueden no ser la misma cosa: la
+      // aportación que uno puede saltarse y la letra del coche que no. Se
+      // distinguen por el importe en euros enteros, que aguanta los céntimos
+      // de un mes a otro sin confundir dos préstamos de importe parecido.
+      reciboId: separado ? `${entidadId}#${Math.round(Math.abs(importeEsperado) / 100)}` : entidadId,
       nombre,
       periodicidad,
-      importeEsperado: mediana(orden.map((m) => m.importe)),
+      importeEsperado,
       ultimaVista: ultima,
       proximaPrevista: proxima,
       observaciones: orden.length,

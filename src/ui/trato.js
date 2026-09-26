@@ -4,10 +4,12 @@
  *
  * Los extractos sólo saben del pasado. Que algo se haya repetido doce veces no
  * dice nada de la decimotercera: una cuenta se cierra, una compañía se cambia
- * y a un gimnasio se puede no ir. Como la respuesta vale para todo lo que
- * venga de ese comercio, se pregunta una vez y se recuerda.
+ * y a un gimnasio se puede no ir. La respuesta se guarda por recibo, no por
+ * comercio: del mismo banco puede salir una inversión que uno se salta y la
+ * letra de una furgoneta que no.
  */
 
+import { formatEuros } from '../dominio/dinero.js'
 import { pedirDatos } from './hoja.js'
 
 /** @typedef {'fijo' | 'suelto' | 'baja'} Trato */
@@ -43,12 +45,28 @@ export async function preguntarTrato({ nombre, actual = 'fijo' }) {
 }
 
 /**
- * Deja una fila lista para que le pregunten.
- * @param {HTMLElement} fila
- * @param {string} entidadId
+ * Cómo llamar a un recibo al preguntar por él. Cuando el cobrador tiene varios,
+ * el nombre a secas no basta: «MyInvestor» son dos cosas distintas y una de
+ * ellas es la letra de la furgoneta.
+ * @param {string} reciboId
+ * @param {string} nombre
+ * @param {number} importe céntimos
  */
-export function marcarPreguntable(fila, entidadId) {
-  fila.dataset.entidad = entidadId
+export function rotuloDe(reciboId, nombre, importe) {
+  return reciboId.includes('#') ? `${nombre} de ${formatEuros(Math.abs(importe))}` : nombre
+}
+
+/**
+ * Deja una fila lista para que le pregunten. El rótulo viaja con ella porque
+ * dos recibos del mismo cobrador comparten nombre y el diálogo tiene que
+ * decir por cuál de los dos está preguntando.
+ * @param {HTMLElement} fila
+ * @param {string} reciboId
+ * @param {string} [rotulo]
+ */
+export function marcarPreguntable(fila, reciboId, rotulo) {
+  fila.dataset.recibo = reciboId
+  if (rotulo) fila.dataset.rotulo = rotulo
   fila.tabIndex = 0
   fila.setAttribute('role', 'button')
 }
@@ -58,19 +76,20 @@ export function marcarPreguntable(fila, entidadId) {
  * cambio y sus escuchadores morirían con ellas.
  * @param {HTMLElement} caja
  * @param {() => { nombres: Map<string, string>, tratos: Record<string, Trato> } | null} mirarEstado
- * @param {(entidadId: string, trato: Trato) => unknown} alCambiar
+ * @param {(reciboId: string, trato: Trato) => unknown} alCambiar
  */
 export function preguntarAlPulsar(caja, mirarEstado, alCambiar) {
   const abrir = async (/** @type {Element} */ objetivo) => {
-    const fila = objetivo.closest('[data-entidad]')
+    const fila = objetivo.closest('[data-recibo]')
     if (!(fila instanceof HTMLElement)) return
-    const entidadId = fila.dataset.entidad
+    const reciboId = fila.dataset.recibo
     const estado = mirarEstado()
-    if (!entidadId || !estado) return
-    const actual = estado.tratos[entidadId] ?? 'fijo'
-    const elegido = await preguntarTrato({ nombre: estado.nombres.get(entidadId) ?? entidadId, actual })
+    if (!reciboId || !estado) return
+    const actual = estado.tratos[reciboId] ?? 'fijo'
+    const nombre = fila.dataset.rotulo ?? estado.nombres.get(reciboId.split('#')[0]) ?? reciboId
+    const elegido = await preguntarTrato({ nombre, actual })
     if (elegido === null || elegido === actual) return
-    await alCambiar(entidadId, elegido)
+    await alCambiar(reciboId, elegido)
   }
 
   caja.addEventListener('click', (e) => {
