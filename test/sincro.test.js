@@ -2,6 +2,7 @@
 import { describe, test } from 'node:test'
 import assert from 'node:assert/strict'
 import { buzonDesde, hacerMaleta, subir, bajar, desdeFichero, SinBuzon } from '../src/almacen/sincro.js'
+import { fundir } from '../src/almacen/db.js'
 import { cifrar, ContrasenaInvalida } from '../src/almacen/cifrado.js'
 import worker from '../worker/src/index.js'
 
@@ -25,10 +26,10 @@ describe('buzón', () => {
 })
 
 describe('maleta', () => {
-  test('lleva los movimientos y la fecha de guardado', () => {
-    const maleta = hacerMaleta([{ id: 'x' }], { hoy: '2026-09-26' })
+  test('lleva los movimientos, lo decidido y la fecha de guardado', () => {
+    const maleta = hacerMaleta([{ id: 'x' }], { tratos: [{ id: 'netflix', trato: 'baja' }] })
     assert.equal(maleta.movimientos.length, 1)
-    assert.equal(maleta.ajustes.hoy, '2026-09-26')
+    assert.equal(maleta.decisiones.tratos.length, 1)
     assert.match(maleta.guardado, /^\d{4}-\d{2}-\d{2}T/)
   })
 })
@@ -94,5 +95,86 @@ describe('ida y vuelta por fichero', () => {
   test('con otra contraseña no se abre', async () => {
     const fichero = await sobreComoFichero(hacerMaleta([{ id: 'a' }]), 'la buena')
     await assert.rejects(() => desdeFichero(fichero, 'la mala'), ContrasenaInvalida)
+  })
+})
+
+/**
+ * El riesgo de juntar dos dispositivos no es que falle: es que funcione a
+ * medias y se lleve por delante una respuesta sin que nadie se entere.
+ */
+describe('juntar lo decidido en dos sitios', () => {
+  const ANTES = '2026-09-26T10:00:00.000Z'
+  const DESPUES = '2026-09-26T11:00:00.000Z'
+  const trato = (id, tocado, valor = 'baja') => ({ id, trato: valor, tocado })
+
+  test('gana quien decidió más tarde, no quien sincroniza después', () => {
+    const mio = fundir({ tratos: [trato('netflix', DESPUES, 'suelto')] }, { tratos: [trato('netflix', ANTES)] })
+    assert.deepEqual(mio.aEscribir, [], 'lo de aquí es más nuevo: no se toca')
+
+    const suyo = fundir({ tratos: [trato('netflix', ANTES)] }, { tratos: [trato('netflix', DESPUES, 'suelto')] })
+    assert.deepEqual(suyo.aEscribir.map(([, f]) => f.trato), ['suelto'])
+  })
+
+  test('lo decidido en cada aparato se suma, no se sustituye', () => {
+    const plan = fundir({ tratos: [trato('netflix', ANTES)] }, { tratos: [trato('spotify', ANTES)] })
+    assert.deepEqual(plan.aEscribir.map(([, f]) => f.id), ['spotify'])
+    assert.deepEqual(plan.aBorrar, [])
+  })
+
+  test('lo borrado en el otro aparato no vuelve solo', () => {
+    const plan = fundir(
+      { tratos: [trato('netflix', ANTES)] },
+      { lapidas: [{ id: 'tratos/netflix', tocado: DESPUES }] },
+    )
+    assert.deepEqual(plan.aBorrar, [['tratos', 'netflix']])
+    assert.deepEqual(plan.aEnterrar.map((l) => l.id), ['tratos/netflix'])
+  })
+
+  test('pero volver a ponerlo después de borrarlo sí lo devuelve', () => {
+    const plan = fundir(
+      { tratos: [trato('netflix', DESPUES)] },
+      { lapidas: [{ id: 'tratos/netflix', tocado: ANTES }] },
+    )
+    assert.deepEqual(plan.aBorrar, [], 'la lápida es más vieja que la respuesta')
+  })
+
+  test('lo que llega ya enterrado ni se escribe', () => {
+    const plan = fundir({}, {
+      tratos: [trato('netflix', ANTES)],
+      lapidas: [{ id: 'tratos/netflix', tocado: DESPUES }],
+    })
+    assert.deepEqual(plan.aEscribir, [], 'escribirlo para borrarlo parecería un cambio')
+    assert.deepEqual(plan.aBorrar, [])
+    assert.deepEqual(plan.aEnterrar.map((l) => l.id), ['tratos/netflix'])
+  })
+
+  test('la maleta del otro no anuncia cambios que no lo son', () => {
+    // El otro aparato aún lleva en su maleta lo que aquí ya se borró: mientras
+    // no vuelva a subirla seguirá llegando, y no puede avisar cada vez.
+    const mias = { lapidas: [{ id: 'tratos/netflix', tocado: DESPUES }] }
+    const plan = fundir(mias, { tratos: [trato('netflix', ANTES)] })
+    assert.equal(plan.aEscribir.length + plan.aBorrar.length, 0)
+    assert.deepEqual(plan.aEnterrar, [], 'la lápida ya era mía')
+  })
+
+  test('sin novedades no se toca nada', () => {
+    const plan = fundir({ tratos: [trato('netflix', ANTES)] }, { tratos: [trato('netflix', ANTES)] })
+    assert.equal(plan.aEscribir.length + plan.aBorrar.length + plan.aEnterrar.length, 0)
+  })
+
+  test('viajan todas las clases de decisión, no sólo los tratos', () => {
+    const plan = fundir({}, {
+      objetivos: [{ id: 'o1', tocado: ANTES }],
+      patrimonio: [{ id: 'p1', tocado: ANTES }],
+      reglas: [{ id: 'r1', tocado: ANTES }],
+      retoques: [{ id: 'm1', tocado: ANTES }],
+      presupuestos: [{ id: 'casa', tocado: ANTES }],
+      bultos: [{ id: 'b1', tocado: ANTES }],
+      ajustes: [{ id: 'colchon', tocado: ANTES }],
+    })
+    assert.deepEqual(
+      plan.aEscribir.map(([almacen]) => almacen).sort(),
+      ['ajustes', 'bultos', 'objetivos', 'patrimonio', 'presupuestos', 'reglas', 'retoques'],
+    )
   })
 })

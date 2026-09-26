@@ -49,16 +49,17 @@ export async function buzonDesde(contrasena) {
 /**
  * @typedef {object} Maleta
  * @property {import('../dominio/tipos.js').Movimiento[]} movimientos
- * @property {Record<string, unknown>} [ajustes]
+ * @property {import('./db.js').Decisiones} [decisiones]
+ * @property {Record<string, unknown>} [ajustes] maletas viejas, antes de que viajara todo
  * @property {string} guardado ISO
  */
 
 /**
  * @param {import('../dominio/tipos.js').Movimiento[]} movimientos
- * @param {Record<string, unknown>} [ajustes]
+ * @param {import('./db.js').Decisiones} [decisiones]
  */
-export function hacerMaleta(movimientos, ajustes = {}) {
-  return { movimientos, ajustes, guardado: new Date().toISOString() }
+export function hacerMaleta(movimientos, decisiones = {}) {
+  return { movimientos, decisiones, guardado: new Date().toISOString() }
 }
 
 /**

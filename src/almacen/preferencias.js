@@ -28,7 +28,7 @@ import { borrar, escribir, leer, leerTodo } from './db.js'
  * @property {Objetivo[]} objetivos
  * @property {Apunte[]} patrimonio
  * @property {Record<string, string>} reglas   entidadId → categoría
- * @property {Record<string, Trato>} tratos    entidadId → cómo tratarlo al prever
+ * @property {Record<string, Trato>} tratos    reciboId → cómo preverlo
  * @property {import('../dominio/tipos.js').Bulto[]} bultos
  * @property {number} colchon                  céntimos
  */
@@ -43,7 +43,7 @@ export async function cargar() {
     leerTodo('reglas'),
     leerTodo('bultos'),
     leer('ajustes', 'colchon'),
-    leer('ajustes', 'tratos'),
+    leerTodo('tratos'),
   ])
 
   return {
@@ -53,9 +53,23 @@ export async function cargar() {
     patrimonio,
     bultos,
     reglas: Object.fromEntries(reglas.map((/** @type {any} */ r) => [r.id, r.categoria])),
-    tratos: /** @type {any} */ (tratos)?.valor ?? {},
+    tratos: Object.fromEntries(tratos.map((/** @type {any} */ t) => [t.id, t.trato])),
     colchon: Number(/** @type {any} */ (colchon)?.valor ?? 0),
   }
+}
+
+/**
+ * Las primeras respuestas se guardaron todas en un mismo registro. Se reparten
+ * en cuanto se abre la app, y el registro viejo se retira para no leerlo dos
+ * veces ni dejar dos verdades sobre lo mismo.
+ */
+export async function repartirTratosViejos() {
+  const guardado = /** @type {any} */ (await leer('ajustes', 'tratos'))
+  if (!guardado?.valor) return
+  for (const [reciboId, trato] of Object.entries(guardado.valor)) {
+    if (trato === 'suelto' || trato === 'baja') await escribir('tratos', { id: reciboId, trato })
+  }
+  await borrar('ajustes', 'tratos')
 }
 
 /**
@@ -118,17 +132,17 @@ export async function ponerColchon(centimos) {
 }
 
 /**
- * Cambia cómo se trata un compromiso al prever. Van todos en un solo registro
- * porque siempre se leen juntos y nunca son muchos.
- * @param {string} entidadId
+ * Cambia cómo se trata un recibo al prever.
+ *
+ * Cada respuesta se guarda por separado y no en un bulto común: si viajaran
+ * todas juntas, contestar en el móvil borraría lo contestado en el portátil
+ * sólo por ser más reciente el bulto entero.
+ * @param {string} reciboId
  * @param {Trato | null} trato  null lo devuelve a fijo
  */
-export async function ponerTrato(entidadId, trato) {
-  const guardado = /** @type {any} */ (await leer('ajustes', 'tratos'))
-  const valor = { ...(guardado?.valor ?? {}) }
-  if (trato === null || trato === 'fijo') delete valor[entidadId]
-  else valor[entidadId] = trato
-  return escribir('ajustes', { id: 'tratos', valor })
+export async function ponerTrato(reciboId, trato) {
+  if (trato === null || trato === 'fijo') return borrar('tratos', reciboId)
+  return escribir('tratos', { id: reciboId, trato })
 }
 
 /** Identificador corto y único para lo que crea el usuario. */

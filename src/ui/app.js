@@ -14,7 +14,7 @@
 
 import { hoyIso } from '../dominio/tipos.js'
 import { importarXls } from '../importar/sabadell.js'
-import { guardarMovimientos, leerMovimientos, vaciar } from '../almacen/db.js'
+import { guardarMovimientos, leerDecisiones, leerMovimientos, mezclarDecisiones, vaciar } from '../almacen/db.js'
 import { bajar, subir, aFichero, desdeFichero, hacerMaleta, SinBuzon } from '../almacen/sincro.js'
 import { ContrasenaInvalida } from '../almacen/cifrado.js'
 import { BUZON } from '../../config.js'
@@ -33,6 +33,7 @@ import {
   ponerTrato,
   quitarApunte,
   quitarObjetivo,
+  repartirTratosViejos,
 } from '../almacen/preferencias.js'
 import { requerir } from './piezas.js'
 import { arrancarNavegacion } from './nav.js'
@@ -54,7 +55,10 @@ async function arrancar() {
   arrancarNavegacion(() => {})
 
   const guardados = await leerMovimientos()
-  if (guardados.length > 0) await refrescar({ animar: false })
+  if (guardados.length > 0) {
+    await repartirTratosViejos()
+    await refrescar({ animar: false, local: false })
+  }
 
   for (const id of ['fichero', 'fichero-mas']) {
     const entrada = document.getElementById(id)
@@ -114,6 +118,13 @@ async function arrancar() {
   addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') ponerseAlDia()
   })
+  addEventListener('online', ponerseAlDia)
+
+  // Con los dos aparatos abiertos a la vez no hay nada que despierte a este:
+  // mirar de vez en cuando es la única forma de que el cambio aparezca solo.
+  setInterval(() => {
+    if (document.visibilityState === 'visible') ponerseAlDia()
+  }, 20_000)
 }
 
 /**
@@ -122,14 +133,14 @@ async function arrancar() {
  * manejadores en silencio hasta que un clic hiciera cinco cosas.
  */
 function montarVistas() {
-  /** @param {string} entidadId @param {import('./trato.js').Trato} trato */
-  const alCambiarTrato = async (entidadId, trato) => {
-    await ponerTrato(entidadId, trato)
+  /** @param {string} reciboId @param {import('./trato.js').Trato} trato */
+  const alCambiarTrato = async (reciboId, trato) => {
+    await ponerTrato(reciboId, trato)
     await refrescar()
     decir(trato === 'baja'
       ? 'Hecho: deja de contar para el futuro.'
       : trato === 'suelto'
-        ? 'Hecho: cuenta en el día a día, pero ya no se anuncia con fecha.'
+        ? 'Hecho: lo sigo previendo, y te digo cuánto margen te daría saltarlo.'
         : 'Hecho: vuelve a la previsión.')
   }
 
@@ -178,10 +189,15 @@ function montarVistas() {
   })
 }
 
-/** @param {{ animar?: boolean }} [opciones] */
-async function refrescar({ animar = false } = {}) {
+/**
+ * @param {{ animar?: boolean, local?: boolean }} [opciones]
+ * `local` distingue el refresco que nace de una decisión del que sólo repinta
+ * lo que ya sabíamos; sólo el primero tiene algo que contarle al otro aparato.
+ */
+async function refrescar({ animar = false, local = true } = {}) {
   const movimientos = await leerMovimientos()
   if (movimientos.length === 0) return
+  if (local) publicar()
 
   const preferencias = await cargarPreferencias()
   const estado = construirEstado(movimientos, {
@@ -209,7 +225,8 @@ async function refrescar({ animar = false } = {}) {
 /**
  * Al abrir, si hay contraseña recordada, se mira el buzón sin preguntar nada.
  * Los movimientos se identifican por sí mismos, así que traer los del otro
- * dispositivo es mezclar, no elegir cuál gana.
+ * dispositivo es mezclar, no elegir cuál gana. Y lo decidido a mano se funde
+ * con lo de aquí por la hora en que se decidió.
  */
 async function ponerseAlDia() {
   if (!BUZON || !claveRecordada()) return
@@ -217,15 +234,49 @@ async function ponerseAlDia() {
     const maleta = await bajar(BUZON, claveRecordada())
     const antes = (await leerMovimientos()).length
     await guardarMovimientos(maleta.movimientos)
+    const cambios = await mezclarDecisiones(maleta.decisiones ?? {})
     const ahora = (await leerMovimientos()).length
-    if (ahora !== antes) {
-      await refrescar({ animar: antes === 0 })
-      decir(`Traídos ${ahora - antes} movimientos del otro dispositivo.`)
-    }
+    if (ahora === antes && cambios === 0) return
+    await refrescar({ animar: antes === 0, local: false })
+    if (ahora !== antes) decir(`Traídos ${ahora - antes} movimientos del otro dispositivo.`)
+    else decir('Actualizado con lo que cambiaste en el otro dispositivo.')
   } catch {
     // Sin buzón todavía, sin red o contraseña cambiada: no es momento de dar la
     // lata. Los botones de Ajustes siguen ahí.
   }
+}
+
+/** @type {ReturnType<typeof setTimeout> | undefined} */
+let envioPendiente
+
+/**
+ * Cada decisión viaja sola, sin botón de por medio.
+ *
+ * Se espera un momento porque una corrección suele venir en ráfaga —tres
+ * recibos seguidos— y subir tres veces sería pagar tres viajes por el mismo
+ * resultado. Antes de subir se baja: si no, publicar lo de aquí borraría del
+ * buzón lo que el otro dispositivo dejó mientras tanto.
+ */
+function publicar() {
+  if (!BUZON || !claveRecordada()) return
+  clearTimeout(envioPendiente)
+  envioPendiente = setTimeout(async () => {
+    const clave = claveRecordada()
+    if (!clave) return
+    try {
+      try {
+        const suya = await bajar(BUZON, clave)
+        await guardarMovimientos(suya.movimientos)
+        if (await mezclarDecisiones(suya.decisiones ?? {})) await refrescar({ local: false })
+      } catch (fallo) {
+        if (!(fallo instanceof SinBuzon)) throw fallo
+      }
+      await subir(BUZON, hacerMaleta(await leerMovimientos(), await leerDecisiones()), clave)
+    } catch {
+      // El cambio ya está guardado aquí. Viajará con el siguiente, o al volver
+      // a abrir la app: no hay nada que el usuario pueda hacer con este aviso.
+    }
+  }, 1200)
 }
 
 /**
@@ -249,7 +300,7 @@ async function contarloAlOtro() {
   }
 
   try {
-    await subir(BUZON, hacerMaleta(await leerMovimientos()), clave)
+    await subir(BUZON, hacerMaleta(await leerMovimientos(), await leerDecisiones()), clave)
     decir('Enviado. Al abrir la app en el otro dispositivo aparecerá allí.')
   } catch {
     decir('Guardado aquí, pero no he podido avisar al otro dispositivo.')
@@ -303,7 +354,7 @@ async function enviar() {
   })
   if (!clave) return
 
-  const maleta = hacerMaleta(guardados)
+  const maleta = hacerMaleta(guardados, await leerDecisiones())
   decir('Cifrando…')
   if (quiereRecordar()) recordarClave(clave)
   try {
@@ -343,8 +394,9 @@ async function traer(fichero) {
         ? await desdeFichero(fichero, clave)
         : await bajar(BUZON, clave)
       await guardarMovimientos(maleta.movimientos)
+      await mezclarDecisiones(maleta.decisiones ?? {})
       if (quiereRecordar()) recordarClave(clave)
-      await refrescar({ animar: true })
+      await refrescar({ animar: true, local: false })
       decir(`Traídos ${maleta.movimientos.length} movimientos.`)
       return
     } catch (fallo) {
