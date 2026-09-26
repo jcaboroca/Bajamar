@@ -1,7 +1,8 @@
 // @ts-check
 import { describe, test } from 'node:test'
 import assert from 'node:assert/strict'
-import { buzonDesde, hacerMaleta, subir, bajar, SinBuzon } from '../src/almacen/sincro.js'
+import { buzonDesde, hacerMaleta, subir, bajar, desdeFichero, SinBuzon } from '../src/almacen/sincro.js'
+import { cifrar, ContrasenaInvalida } from '../src/almacen/cifrado.js'
 import worker from '../worker/src/index.js'
 
 describe('buzón', () => {
@@ -76,5 +77,22 @@ describe('ida y vuelta por el buzón', () => {
   test('el buzón rechaza identificadores inventados', async () => {
     const respuesta = await atender(new Request('https://buzon.test/../etc/passwd'))
     assert.equal(respuesta.status, 400)
+  })
+})
+
+/** El otro camino: el sobre viaja como fichero y se abre en el otro dispositivo. */
+describe('ida y vuelta por fichero', () => {
+  const sobreComoFichero = async (maleta, contrasena) =>
+    new File([JSON.stringify(await cifrar(maleta, contrasena))], 'bajamar.bajamar')
+
+  test('lo que se envía se abre con la misma contraseña', async () => {
+    const fichero = await sobreComoFichero(hacerMaleta([{ id: 'a', importe: -4891 }]), 'la buena')
+    const maleta = await desdeFichero(fichero, 'la buena')
+    assert.equal(maleta.movimientos[0].importe, -4891)
+  })
+
+  test('con otra contraseña no se abre', async () => {
+    const fichero = await sobreComoFichero(hacerMaleta([{ id: 'a' }]), 'la buena')
+    await assert.rejects(() => desdeFichero(fichero, 'la mala'), ContrasenaInvalida)
   })
 })

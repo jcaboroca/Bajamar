@@ -2,6 +2,9 @@
 
 Cuánto te queda en el punto más bajo del mes.
 
+**[jcaboroca.github.io/Bajamar](https://jcaboroca.github.io/Bajamar/)** — se
+instala desde el navegador y luego funciona sin red.
+
 El total de un mes no sirve para decidir nada. Si la nómina entra el 25 y el
 recibo gordo sale el 1, lo que importa no es cerrar en positivo: es no quedarte
 en descubierto el día 10. Bajamar calcula ese mínimo —el punto más bajo al que
