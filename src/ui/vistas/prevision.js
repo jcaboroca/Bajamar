@@ -255,7 +255,10 @@ function pintarFijos(estado) {
 function pintarApartados(estado) {
   requerir('bloque-apartados').hidden = estado.apartados.length === 0
   requerir('apartados').replaceChildren(...estado.apartados.map((a) => {
-    const fila = linea({ nombre: a.nombre, detalle: 'ya no lo pagas', importe: '', clase: 'apagado' })
+    const detalle = a.motivo === 'extinto'
+      ? `dejó de pasar en ${nombreDeMes(a.ultima).toLowerCase()}`
+      : 'ya no lo pagas'
+    const fila = linea({ nombre: a.nombre, detalle, importe: '', clase: 'apagado' })
     marcarPreguntable(fila, a.reciboId, rotuloDe(a.reciboId, a.nombre, a.importe))
     return fila
   }))

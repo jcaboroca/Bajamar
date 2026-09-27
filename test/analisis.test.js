@@ -199,3 +199,57 @@ describe('proyección', () => {
     assert.equal(sumarDias('2028-02-28', 1), '2028-02-29')
   })
 })
+
+/**
+ * Una cuota que termina no avisa. Si se sigue contando, la previsión enseña un
+ * suelo más bajo del real y todo el propósito de la aplicación se cae.
+ */
+describe('recibos que se acaban', () => {
+  const MENSUAL = ['2026-01-30', '2026-03-02', '2026-04-01', '2026-04-30', '2026-05-30']
+
+  test('un mes sin pasar es un retraso, no un final', () => {
+    const { compromisos } = detectarCompromisos(
+      MENSUAL.map((f) => mov(f, -12550)), NOMBRES, { hoy: '2026-07-10' },
+    )
+    assert.equal(compromisos[0].estado, 'retrasado')
+  })
+
+  test('tres veces seguidas sin pasar es que se acabó', () => {
+    const { compromisos } = detectarCompromisos(
+      MENSUAL.map((f) => mov(f, -12550)), NOMBRES, { hoy: '2026-09-27' },
+    )
+    assert.equal(compromisos[0].estado, 'extinto')
+  })
+
+  test('la cuota vieja se apaga y la nueva sigue viva', () => {
+    // Una financiación que se renueva con otro importe, tal como pasó de
+    // verdad: trece cuotas, una liquidación de céntimos distintos, y la nueva.
+    const vieja = [
+      '2025-01-30', '2025-03-03', '2025-04-01', '2025-04-30', '2025-05-30', '2025-07-01',
+      '2025-07-30', '2025-09-01', '2025-09-30', '2025-10-30', '2025-12-02', '2025-12-30',
+      '2026-01-30',
+    ]
+    const nueva = ['2026-03-26', '2026-04-28', '2026-05-26', '2026-06-26', '2026-07-28', '2026-08-26']
+    const { compromisos } = detectarCompromisos(
+      [
+        ...vieja.map((f) => mov(f, -12550)),
+        mov('2026-03-03', -12538),
+        ...nueva.map((f) => mov(f, -13495)),
+      ],
+      NOMBRES,
+      { hoy: '2026-09-27' },
+    )
+    const porImporte = new Map(compromisos.map((c) => [c.importeEsperado, c.estado]))
+    assert.equal(porImporte.get(-12550), 'extinto')
+    assert.notEqual(porImporte.get(-13495), 'extinto')
+  })
+
+  test('un recibo anual no se da por muerto por tardar unos meses', () => {
+    const { compromisos } = detectarCompromisos(
+      ['2023-06-10', '2024-06-12', '2025-06-11', '2026-06-10'].map((f) => mov(f, -21000)),
+      NOMBRES,
+      { hoy: '2027-09-27' },
+    )
+    assert.equal(compromisos[0].estado, 'retrasado')
+  })
+})

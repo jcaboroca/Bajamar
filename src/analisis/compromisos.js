@@ -219,7 +219,8 @@ export function detectarCompromisos(movimientos, nombres, opciones = {}) {
    * @returns {Compromiso}
    */
   function construir(entidadId, nombre, orden, periodicidad, separado = false) {
-    const meses = PERIODOS.find((p) => p.nombre === periodicidad)?.meses ?? 1
+    const periodo = PERIODOS.find((p) => p.nombre === periodicidad)
+    const meses = periodo?.meses ?? 1
     const ultima = orden[orden.length - 1].fecha
     let proxima = sumarMeses(ultima, meses)
     // Si han pasado varios periodos sin aparecer, proyectar al siguiente futuro
@@ -230,6 +231,11 @@ export function detectarCompromisos(movimientos, nombres, opciones = {}) {
       saltos += 1
     }
     const retraso = diasEntre(sumarMeses(ultima, meses), hoy)
+    // Un recibo puede retrasarse; tres seguidos sin pasar no es retraso, es que
+    // se acabó. Seguir contándolo hunde la previsión con un gasto que ya no
+    // existe, y nadie debería tener que venir a avisar de cada cuota que
+    // termina. Si vuelve a pasar, vuelve sola.
+    const muerto = retraso > (periodo?.dias ?? 30) * 2 + (periodo?.margen ?? 7)
     const importeEsperado = mediana(orden.map((m) => m.importe))
     return {
       entidadId,
@@ -244,7 +250,7 @@ export function detectarCompromisos(movimientos, nombres, opciones = {}) {
       ultimaVista: ultima,
       proximaPrevista: proxima,
       observaciones: orden.length,
-      estado: retraso > GRACIA[periodicidad] ? 'retrasado' : 'activo',
+      estado: muerto ? 'extinto' : retraso > GRACIA[periodicidad] ? 'retrasado' : 'activo',
     }
   }
 

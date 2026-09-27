@@ -289,17 +289,29 @@ export function construirEstado(crudos, opciones = {}) {
     tratos,
     // Lo apartado se busca en la detección sin filtrar: es la única que aún
     // sabe cómo se llamaba y cuánto costaba lo que el usuario dio de baja.
-    apartados: [...deBaja]
-      .map((id) => {
+    apartados: [
+      ...[...deBaja].map((id) => {
         const recibo = [...deteccion.compromisos, ...ingresosTodos].find((c) => c.reciboId === id)
         return {
           reciboId: id,
           nombre: recibo?.nombre ?? nombres.get(id.split('#')[0]) ?? id,
           importe: recibo?.importeEsperado ?? 0,
+          motivo: /** @type {'baja' | 'extinto'} */ ('baja'),
+          ultima: recibo?.ultimaVista ?? '',
           trato: tratos[id],
         }
-      })
-      .sort((a, b) => a.nombre.localeCompare(b.nombre)),
+      }),
+      // Los que se apagaron solos van aquí y no en otra lista: para quien mira,
+      // «esto ya no cuenta» es lo mismo lo decida él o lo decidan los hechos.
+      ...compromisos.filter((c) => c.estado === 'extinto').map((c) => ({
+        reciboId: c.reciboId,
+        nombre: c.nombre,
+        importe: c.importeEsperado,
+        motivo: /** @type {'baja' | 'extinto'} */ ('extinto'),
+        ultima: c.ultimaVista,
+        trato: tratos[c.reciboId],
+      })),
+    ].sort((a, b) => a.nombre.localeCompare(b.nombre)),
     margen,
     aplazableAlMes,
     ingresoMensual,
