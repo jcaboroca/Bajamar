@@ -214,3 +214,29 @@ test('un nombre puesto a un recibo no se le pega a los demas del mismo cobrador'
   assert.equal(bautizado.fijos.find((f) => f.reciboId === uno.reciboId)?.nombre, 'La furgoneta')
   assert.match(bautizado.fijos.find((f) => f.reciboId === otro.reciboId)?.nombre ?? '', /MYINVESTOR/i)
 })
+
+test('lo que no sé clasificar se ordena por lo que pesa, no por cuántas veces', () => {
+  const movimientos = extracto()
+  movimientos.push(fila('x1', '2026-06-11', 'COMPRA TARJ. ELECTRICITAT BOQUET SL', -193393, 100000))
+  for (let i = 0; i < 9; i += 1) {
+    movimientos.push(fila(`x2-${i}`, `2026-0${1 + (i % 8)}-14`, 'COMPRA TARJ. KIOSCO PEPE', -500, 100000))
+  }
+
+  const estado = construirEstado(movimientos, { hoy: HOY })
+  const pendientes = estado.sinClasificar.map((p) => p.nombre)
+  assert.match(pendientes[0], /BOQUET/i, 'un pago gordo pesa más que nueve pequeños')
+  assert.ok(
+    pendientes.findIndex((n) => /PEPE/i.test(n)) > 0,
+    'el kiosco aparece, pero detrás de lo que pesa',
+  )
+  assert.equal(estado.sinClasificar.find((p) => /PEPE/i.test(p.nombre))?.cuantos, 9)
+
+  const gordo = estado.sinClasificar[0]
+  const clasificado = construirEstado(movimientos, {
+    hoy: HOY, categoriasManuales: { [gordo.entidadId]: 'hogar' },
+  })
+  assert.ok(
+    !clasificado.sinClasificar.some((p) => p.entidadId === gordo.entidadId),
+    'contestado una vez, no vuelve a preguntar',
+  )
+})

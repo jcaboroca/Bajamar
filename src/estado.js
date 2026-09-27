@@ -327,6 +327,7 @@ export function construirEstado(crudos, opciones = {}) {
       })),
     ].sort((a, b) => a.nombre.localeCompare(b.nombre)),
     margen,
+    sinClasificar: sinCajon(contables, nombres),
     aplazableAlMes,
     ingresoMensual,
     ordinarios,
@@ -355,6 +356,30 @@ export function construirEstado(crudos, opciones = {}) {
       hoy,
     }),
   }
+}
+
+/**
+ * A quién le pagamos sin saber en qué cajón va, de más a menos dinero.
+ * Mientras esto pese, cualquier reparto del gasto por categorías es a medias.
+ * @param {Movimiento[]} movimientos
+ * @param {Map<string, string>} nombres
+ */
+function sinCajon(movimientos, nombres) {
+  /** @type {Map<string, { total: number, cuantos: number, ultima: string }>} */
+  const acumulado = new Map()
+  for (const m of movimientos) {
+    if (m.importe >= 0 || m.origen === 'tarjeta') continue
+    if ((m.categoria ?? 'otros') !== 'otros' || !m.entidadId) continue
+    const previo = acumulado.get(m.entidadId) ?? { total: 0, cuantos: 0, ultima: '' }
+    acumulado.set(m.entidadId, {
+      total: previo.total + m.importe,
+      cuantos: previo.cuantos + 1,
+      ultima: m.fecha > previo.ultima ? m.fecha : previo.ultima,
+    })
+  }
+  return [...acumulado.entries()]
+    .map(([entidadId, v]) => ({ entidadId, nombre: nombres.get(entidadId) ?? entidadId, ...v }))
+    .sort((a, b) => a.total - b.total)
 }
 
 /**

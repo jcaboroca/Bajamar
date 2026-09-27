@@ -11,6 +11,7 @@
  */
 
 import { formatEuros } from '../../dominio/dinero.js'
+import { CATEGORIAS } from '../../entidades/semillas.js'
 import { barra, nodo, requerir, vacio } from '../piezas.js'
 
 /**
@@ -21,9 +22,14 @@ import { barra, nodo, requerir, vacio } from '../piezas.js'
  * @type {{
  *   alGuardarColchon: (centimos: number) => Promise<void>,
  *   alGuardarPresupuesto: (categoria: string, centimos: number | null) => Promise<void>,
+ *   alClasificar: (entidadId: string, categoria: string) => Promise<void>,
  * }}
  */
 let ganchos
+
+/** Cuántos cobradores sin clasificar se enseñan antes de pedir permiso. */
+const DE_ENTRADA = 25
+let todos = false
 
 /** @param {typeof ganchos} enganches */
 export function montarAjustes(enganches) {
@@ -43,6 +49,19 @@ export function montarAjustes(enganches) {
     const valor = campo.value.trim()
     await ganchos.alGuardarPresupuesto(categoria, valor === '' ? null : Math.round(Number(valor) * 100))
   })
+
+  requerir('sin-clasificar').addEventListener('change', async (e) => {
+    const campo = e.target
+    if (!(campo instanceof HTMLSelectElement)) return
+    const entidadId = campo.dataset.entidad
+    if (!entidadId || campo.value === '') return
+    await ganchos.alClasificar(entidadId, campo.value)
+  })
+
+  requerir('sin-clasificar-mas').addEventListener('click', (e) => {
+    todos = true
+    if (e.target instanceof HTMLElement) e.target.hidden = true
+  })
 }
 
 /**
@@ -59,7 +78,66 @@ export function pintarAjustes(estado, colchon) {
     campo.value = colchon > 0 ? String(colchon / 100) : ''
   }
 
+  pintarSinClasificar(estado)
   pintarPresupuestos(estado)
+}
+
+/**
+ * El reparto del gasto por categorías vale lo que valga esta lista: cada euro
+ * que sigue aquí es un euro del que no se puede decir en qué se va.
+ * @param {Estado} estado
+ */
+function pintarSinClasificar(estado) {
+  const lista = requerir('sin-clasificar')
+  const resumen = requerir('sin-clasificar-resumen')
+  const mas = requerir('sin-clasificar-mas')
+  const pendientes = estado.sinClasificar
+
+  if (pendientes.length === 0) {
+    resumen.textContent = 'Nada pendiente: sé en qué se va cada euro que sale.'
+    lista.replaceChildren()
+    mas.hidden = true
+    return
+  }
+
+  const total = pendientes.reduce((a, p) => a + p.total, 0)
+  const meses = Math.max(estado.ritmo.meses, 1)
+  resumen.textContent = `${formatEuros(total / meses)} al mes que no sé dónde meter, `
+    + `repartidos en ${pendientes.length} sitios. Empieza por arriba: los primeros pesan.`
+
+  const visibles = todos ? pendientes : pendientes.slice(0, DE_ENTRADA)
+  mas.hidden = todos || pendientes.length <= DE_ENTRADA
+  if (!mas.hidden) mas.textContent = `Ver los ${pendientes.length - DE_ENTRADA} restantes`
+
+  lista.replaceChildren(...visibles.map((p) => {
+    const li = nodo('li', 'clasificar-fila')
+
+    const cabecera = nodo('div', 'mes-cabecera')
+    cabecera.append(nodo('span', 'mes-nombre', p.nombre))
+    cabecera.append(nodo('span', 'cifras', formatEuros(p.total)))
+    li.append(cabecera)
+
+    const veces = p.cuantos === 1 ? 'una sola vez' : `${p.cuantos} veces`
+    li.append(nodo('p', 'mes-aviso', `${veces}, la última el ${p.ultima}`))
+
+    const menu = document.createElement('select')
+    menu.className = 'campo'
+    menu.dataset.entidad = p.entidadId
+    menu.setAttribute('aria-label', `En qué va ${p.nombre}`)
+    const ninguna = document.createElement('option')
+    ninguna.value = ''
+    ninguna.textContent = '¿En qué va?'
+    menu.append(ninguna)
+    for (const [id, nombre] of Object.entries(CATEGORIAS)) {
+      if (id === 'otros') continue
+      const opcion = document.createElement('option')
+      opcion.value = id
+      opcion.textContent = nombre
+      menu.append(opcion)
+    }
+    li.append(menu)
+    return li
+  }))
 }
 
 /** @param {Estado} estado */

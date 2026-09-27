@@ -409,13 +409,16 @@ main {
 
 /* ── Mes a mes y objetivos ───────────────────────────────────────── */
 
-.meses, .presupuestos, .objetivos { margin: 0; padding: 0; list-style: none; }
+.meses, .presupuestos, .objetivos, .clasificar { margin: 0; padding: 0; list-style: none; }
 
-.meses li, .presupuestos li, .objetivos li {
+.meses li, .presupuestos li, .objetivos li, .clasificar li {
   padding: 1rem 0;
   border-bottom: 1px solid var(--linea);
 }
-.meses li:last-child, .presupuestos li:last-child, .objetivos li:last-child { border-bottom: 0; }
+.meses li:last-child, .presupuestos li:last-child, .objetivos li:last-child,
+.clasificar li:last-child { border-bottom: 0; }
+
+.clasificar-fila select { margin-top: 0.5rem; width: 100%; }
 
 .meses li { cursor: pointer; }
 .meses li.elegido .mes-nombre { color: var(--acento); }

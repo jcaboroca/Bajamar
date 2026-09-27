@@ -189,6 +189,10 @@ function montarVistas() {
       await ponerPresupuesto(categoria, centimos)
       await refrescar()
     },
+    alClasificar: async (entidadId, categoria) => {
+      await ponerRegla(entidadId, categoria)
+      await refrescar()
+    },
   })
 }
 
