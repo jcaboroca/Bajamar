@@ -65,6 +65,33 @@ function desviacionDia(dia, tipico) {
 }
 
 /**
+ * Lo que costará la próxima vez.
+ *
+ * Normalmente la mediana, por la regla 1. Pero un recibo que llevaba veinte
+ * meses cobrando exactamente lo mismo y de pronto cobra más dos veces seguidas
+ * no está variando: ha subido de precio, y la mediana seguiría prometiendo el
+ * precio viejo durante un año. Se exige que el pasado fuera plano —la luz varía
+ * todos los meses y nunca cambia de precio— y que las dos últimas vayan en la
+ * misma dirección. La cifra buena es la última: en una subida, la primera vuelta
+ * suele venir prorrateada a medias.
+ * @param {Movimiento[]} orden  ordenados por fecha ascendente
+ */
+function importeEsperadoDe(orden) {
+  const importes = orden.map((m) => m.importe)
+  const base = mediana(importes)
+  if (importes.length < 6) return base
+
+  const cuerpo = importes.slice(0, -2).map(Math.abs)
+  const tipico = mediana(cuerpo)
+  if (!cuerpo.every((v) => Math.abs(v - tipico) <= Math.max(10, tipico * 0.02))) return base
+
+  const salto = Math.max(50, tipico * 0.05)
+  const cola = importes.slice(-2).map(Math.abs)
+  const cambio = cola.every((v) => v - tipico > salto) || cola.every((v) => tipico - v > salto)
+  return cambio ? importes[importes.length - 1] : base
+}
+
+/**
  * @param {Movimiento[]} orden  ordenados por fecha ascendente
  * @returns {Compromiso['periodicidad'] | null}
  */
@@ -96,6 +123,35 @@ function periodicidadDe(orden) {
   }
 
   return encaja.nombre
+}
+
+/**
+ * Comparten precio, no sólo tamaño. El primer cobro suele venir prorrateado,
+ * así que no se exige a todos: se exige a la mayoría.
+ * @param {number[]} importes
+ */
+function casiIguales(importes) {
+  const tipico = mediana(importes)
+  const holgura = Math.max(10, tipico * 0.02)
+  const dentro = importes.filter((v) => Math.abs(v - tipico) <= holgura).length
+  return dentro >= Math.ceil(importes.length * 0.7)
+}
+
+/**
+ * Una suscripción cuesta lo mismo cada vez. Cuando hemos tenido que partir a un
+ * cobrador por importes el grupo es una conjetura, y tres compras parecidas
+ * espaciadas tres meses se parecen mucho a un recibo trimestral sin serlo.
+ * @param {Movimiento[]} serie  ordenada por fecha ascendente
+ */
+function tienenElMismoPrecio(serie) {
+  const importes = serie.map((m) => Math.abs(m.importe))
+  if (casiIguales(importes)) return true
+  // Una subida de precio deja dos tramos planos, uno detrás del otro. Un montón
+  // de compras parecidas no deja ninguno.
+  for (let corte = 2; corte <= importes.length - 2; corte += 1) {
+    if (casiIguales(importes.slice(0, corte)) && casiIguales(importes.slice(corte))) return true
+  }
+  return false
 }
 
 /**
@@ -195,6 +251,7 @@ export function detectarCompromisos(movimientos, nombres, opciones = {}) {
         const cronologica = [...serie].sort((a, b) => a.fecha.localeCompare(b.fecha))
         const ritmo = periodicidadDe(cronologica)
         if (!ritmo) continue
+        if (!tienenElMismoPrecio(cronologica)) continue
         // Dos préstamos del mismo banco salen como dos líneas con el mismo
         // nombre. No se les pega el importe al nombre: ya está en su columna,
         // y repetirlo sólo consigue que el nombre no quepa en una línea.
@@ -253,7 +310,7 @@ export function detectarCompromisos(movimientos, nombres, opciones = {}) {
     // existe, y nadie debería tener que venir a avisar de cada cuota que
     // termina. Si vuelve a pasar, vuelve sola.
     const muerto = retraso > (periodo?.dias ?? 30) * 2 + (periodo?.margen ?? 7)
-    const importeEsperado = mediana(orden.map((m) => m.importe))
+    const importeEsperado = importeEsperadoDe(orden)
     return {
       entidadId,
       // Dos recibos del mismo cobrador pueden no ser la misma cosa: la

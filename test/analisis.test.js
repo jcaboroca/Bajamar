@@ -320,3 +320,53 @@ describe('varias series bajo un mismo cobrador opaco', () => {
     assert.equal(compromisos.find((c) => c.importeEsperado < -600)?.observaciones, 6)
   })
 })
+
+describe('lo que costará la próxima vez', () => {
+  const fibra = (fechas, importe) => fechas.map((f) => mov(f, importe, { entidadId: 'o2' }))
+
+  test('una cuota que nunca varió y sube dos veces seguidas ya cuesta lo nuevo', () => {
+    const { compromisos } = detectarCompromisos(
+      [
+        ...fibra([
+          '2025-01-02', '2025-02-03', '2025-03-03', '2025-04-01', '2025-05-02', '2025-06-02',
+          '2025-07-01', '2025-08-01', '2025-09-01', '2025-10-01', '2025-11-03', '2025-12-01',
+          '2026-01-02', '2026-02-02', '2026-03-02', '2026-04-01', '2026-05-04', '2026-06-01',
+          '2026-07-01',
+        ], -3800),
+        mov('2026-08-03', -4550, { entidadId: 'o2' }),
+        mov('2026-09-01', -5300, { entidadId: 'o2' }),
+      ],
+      new Map([['o2', 'O2 Fibra']]),
+      { hoy: '2026-09-27' },
+    )
+    assert.equal(compromisos.length, 1)
+    assert.equal(compromisos[0].importeEsperado, -5300, 'la mediana prometería el precio viejo un año')
+  })
+
+  test('un recibo que varía todos los meses no persigue al último', () => {
+    const luz = [
+      ['2026-02-24', -3063], ['2026-03-19', -4345], ['2026-04-28', -3711], ['2026-05-21', -3421],
+      ['2026-06-17', -2623], ['2026-07-20', -3121], ['2026-09-03', -1914], ['2026-09-21', -1622],
+    ]
+    const { compromisos } = detectarCompromisos(
+      luz.map(([f, i]) => mov(f, i, { entidadId: 'luz' })),
+      new Map([['luz', 'La luz']]),
+      { hoy: '2026-09-27' },
+    )
+    assert.equal(compromisos.length, 1)
+    assert.equal(compromisos[0].importeEsperado, -3092, 'dos meses baratos no son una bajada de precio')
+  })
+
+  test('unas compras parecidas espaciadas tres meses no son un recibo trimestral', () => {
+    const compras = [
+      ['2025-03-18', -699], ['2025-07-30', -767], ['2025-10-06', -645], ['2026-01-12', -690],
+      ['2026-02-16', -695], ['2026-03-03', -739], ['2026-04-10', -669],
+    ]
+    const { compromisos } = detectarCompromisos(
+      compras.map(([f, i]) => mov(f, i, { entidadId: 'amazon' })),
+      new Map([['amazon', 'Amazon']]),
+      { hoy: '2026-09-27' },
+    )
+    assert.deepEqual(compromisos, [], 'una suscripción cuesta lo mismo, no algo parecido')
+  })
+})
