@@ -240,3 +240,24 @@ test('lo que no sé clasificar se ordena por lo que pesa, no por cuántas veces'
     'contestado una vez, no vuelve a preguntar',
   )
 })
+
+test('una categoría apagada sale del goteo y de las barras', () => {
+  // Comercios distintos cada vez: nada se repite, así que todo es goteo y no
+  // hay recibos de por medio que enturbien la cuenta.
+  const sueltos = []
+  let saldo = 300000
+  for (const [i, mes] of ['05', '06', '07', '08'].entries()) {
+    saldo -= 4000 + i * 100
+    sueltos.push(fila(`c${i}`, `2026-${mes}-07`, `COMPRA BAZAR NUMERO ${i}`, -(4000 + i * 100), saldo))
+  }
+  const armado = (apagadas) => construirEstado(sueltos, { hoy: HOY, meses: 3, apagadas })
+
+  const normal = armado(undefined)
+  const gorda = normal.reparto[0]
+  const sin = armado({ [gorda.categoria]: true })
+
+  assert.ok(Math.abs(sin.ritmo.porMes) < Math.abs(normal.ritmo.porMes))
+  assert.equal(sin.reparto.some((t) => t.categoria === gorda.categoria), false)
+  // Sigue nombrada para poder volver a encenderla.
+  assert.deepEqual(sin.apagadas, [gorda.categoria])
+})

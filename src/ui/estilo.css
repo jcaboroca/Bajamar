@@ -451,6 +451,32 @@ main {
 .palanca:last-child { border-bottom: 0; }
 .palanca-fija { opacity: 0.65; }
 
+/* Diecinueve categorías son diecinueve interruptores: a la derecha y pequeño
+   para que la lista se siga leyendo por los nombres y las cifras. */
+.palanca-apagar {
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+  justify-content: flex-end;
+  margin-top: 0.125rem;
+  font-size: 0.75rem;
+  color: var(--secundario);
+  cursor: pointer;
+}
+
+.palanca-apagar input[type='checkbox'] {
+  order: 1;
+  width: 0.9rem;
+  height: 0.9rem;
+  flex: none;
+  accent-color: var(--acento);
+}
+
+/* Apagada no se tacha ni se esconde: sigue siendo dinero que gastas, sólo que
+   no ahora. Se atenúa lo justo para no competir con lo que sí cuenta. */
+.palanca-apagada .mes-nombre { color: var(--secundario); }
+.palanca-apagada .palanca-apagar { color: var(--texto); }
+
 /* La aclaración sube -0.75rem para pegarse a un párrafo normal; debajo de una
    cifra de 6rem eso la mete dentro de los números. */
 #simulador-efecto { margin-top: 0.5rem; }

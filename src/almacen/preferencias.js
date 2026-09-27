@@ -32,13 +32,14 @@ import { borrar, escribir, leer, leerTodo } from './db.js'
  * @property {Record<string, string>} apodos   reciboId → cómo lo llama el usuario
  * @property {Record<string, true>} unicos     entidadId → no va a repetirse
  * @property {Record<string, true>} anuales    entidadId → vuelve cada año
+ * @property {Record<string, true>} apagadas   categoría → no toca esta temporada
  * @property {import('../dominio/tipos.js').Bulto[]} bultos
  * @property {number} colchon                  céntimos
  */
 
 /** @returns {Promise<Preferencias>} */
 export async function cargar() {
-  const [retoques, presupuestos, objetivos, patrimonio, reglas, bultos, colchon, tratos, apodos, unicos, anuales] = await Promise.all([
+  const [retoques, presupuestos, objetivos, patrimonio, reglas, bultos, colchon, tratos, apodos, unicos, anuales, apagadas] = await Promise.all([
     leerTodo('retoques'),
     leerTodo('presupuestos'),
     leerTodo('objetivos'),
@@ -50,6 +51,7 @@ export async function cargar() {
     leerTodo('apodos'),
     leerTodo('unicos'),
     leerTodo('anuales'),
+    leerTodo('apagadas'),
   ])
 
   return {
@@ -63,6 +65,7 @@ export async function cargar() {
     apodos: Object.fromEntries(apodos.map((/** @type {any} */ a) => [a.id, a.nombre])),
     unicos: Object.fromEntries(unicos.map((/** @type {any} */ u) => [u.id, true])),
     anuales: Object.fromEntries(anuales.map((/** @type {any} */ a) => [a.id, true])),
+    apagadas: Object.fromEntries(apagadas.map((/** @type {any} */ a) => [a.id, true])),
     colchon: Number(/** @type {any} */ (colchon)?.valor ?? 0),
   }
 }
@@ -127,6 +130,17 @@ export async function ponerUnico(entidadId, esUnico) {
 export async function ponerAnual(entidadId, esAnual) {
   if (!esAnual) return borrar('anuales', entidadId)
   return escribir('anuales', { id: entidadId })
+}
+
+/**
+ * El goteo da por hecho que sigues gastando en todo como hasta ahora. Hay
+ * categorías que van por temporadas y sobre eso el histórico no sabe nada.
+ * @param {string} categoria
+ * @param {boolean} apagada
+ */
+export async function ponerApagada(categoria, apagada) {
+  if (!apagada) return borrar('apagadas', categoria)
+  return escribir('apagadas', { id: categoria })
 }
 
 /**

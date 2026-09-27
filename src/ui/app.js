@@ -31,6 +31,7 @@ import {
   ponerRegla,
   ponerUnico,
   ponerAnual,
+  ponerApagada,
   ponerRetoque,
   ponerTrato,
   ponerApodo,
@@ -165,7 +166,13 @@ function montarVistas() {
     },
   })
 
-  montarPrevision({ alCambiarTrato })
+  montarPrevision({
+    alCambiarTrato,
+    alApagarCategoria: async (categoria, apagada) => {
+      await ponerApagada(categoria, apagada)
+      await refrescar()
+    },
+  })
 
   montarPatrimonio({
     nuevoId,
@@ -230,6 +237,7 @@ async function refrescar({ animar = false, local = true } = {}) {
     apodos: preferencias.apodos,
     unicos: preferencias.unicos,
     anuales: preferencias.anuales,
+    apagadas: preferencias.apagadas,
     colchon: preferencias.colchon,
   })
 

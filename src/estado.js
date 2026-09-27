@@ -60,6 +60,7 @@ const HORIZONTE_LARGO = 12
  * @param {Record<string, string>} [opciones.apodos] reciboId → cómo lo llama el usuario
  * @param {Record<string, true>} [opciones.unicos] entidadId → pasó una vez y no volverá
  * @param {Record<string, true>} [opciones.anuales] entidadId → pasó una vez y vuelve cada año
+ * @param {Record<string, true>} [opciones.apagadas] categoría → no toca esta temporada
  * @param {number} [opciones.colchon] céntimos por debajo de los cuales avisar
  * @param {number} [opciones.meses] meses que abarca la proyección de portada
  */
@@ -163,12 +164,15 @@ export function construirEstado(crudos, opciones = {}) {
       .filter((c) => deBaja.has(c.reciboId))
       .flatMap((c) => c.cobros),
   )
+  const apagadas = opciones.apagadas ?? {}
+  // Se filtra por la misma clave que usa el reparto, no por la entidad, para que
+  // las barras y el goteo no puedan discrepar sobre qué se está contando.
   const ordinarios = gastoOrdinario(
     cuenta.filter((m) => !cobrosDeBaja.has(m.id)),
     compromisos,
     NO_ES_GASTO,
     categorias,
-  )
+  ).filter((m) => !apagadas[m.categoria ?? 'otros'])
   const ritmo = ritmoOrdinario(ordinarios)
 
   const ultimo = cuenta.reduce(
@@ -345,6 +349,7 @@ export function construirEstado(crudos, opciones = {}) {
     ordinarios,
     ritmo,
     reparto: repartirGasto(ordinarios, ritmo),
+    apagadas: Object.keys(apagadas).sort(),
     saldoInicial,
     pendienteTarjeta,
     proyeccion,
