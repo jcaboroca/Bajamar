@@ -113,15 +113,16 @@ describe('periodicidad', () => {
 
 describe('gasto ordinario', () => {
   test('excluye lo comprometido, la tarjeta y lo excepcional', () => {
+    const recibo = mov('2026-09-01', -3800)
     const movimientos = [
-      mov('2026-09-01', -3800),                              // comprometido
+      recibo,
       mov('2026-09-02', -2000, { entidadId: 'super' }),       // ordinario
       mov('2026-09-03', -9000, { origen: 'tarjeta', entidadId: 'super' }),
       mov('2026-09-04', -50000, { entidadId: 'super', excepcional: true }),
       mov('2026-09-05', -50000, { entidadId: 'ahorro' }),     // traspaso
       mov('2026-09-06', 300000, { entidadId: 'super' }),      // ingreso
     ]
-    const compromisos = [{ entidadId: 'e' }]
+    const compromisos = [{ entidadId: 'e', cobros: [recibo.id] }]
     const ordinarios = gastoOrdinario(
       movimientos,
       /** @type {any} */ (compromisos),
@@ -129,6 +130,21 @@ describe('gasto ordinario', () => {
       new Map([['ahorro', 'traspaso'], ['super', 'super']]),
     )
     assert.deepEqual(ordinarios.map((m) => m.importe), [-2000])
+  })
+
+  test('lo demás que cobra el mismo cobrador sigue siendo gasto del día a día', () => {
+    // Bajo un solo PayPal caben una suscripción y cien compras sueltas.
+    const suscripciones = ['2026-07-24', '2026-08-24', '2026-09-24']
+      .map((f) => mov(f, -699, { entidadId: 'paypal' }))
+    const compras = [mov('2026-08-11', -4500, { entidadId: 'paypal' })]
+    const compromisos = [{ entidadId: 'paypal', cobros: suscripciones.map((m) => m.id) }]
+    const ordinarios = gastoOrdinario(
+      [...suscripciones, ...compras],
+      /** @type {any} */ (compromisos),
+      new Set(),
+      new Map([['paypal', 'compras']]),
+    )
+    assert.deepEqual(ordinarios.map((m) => m.importe), [-4500])
   })
 
   test('el mes en curso no cuenta para la mediana', () => {
@@ -251,5 +267,56 @@ describe('recibos que se acaban', () => {
       { hoy: '2027-09-27' },
     )
     assert.equal(compromisos[0].estado, 'retrasado')
+  })
+})
+
+/**
+ * Un pagador opaco —PayPal, Bizum— cobra por igual dos suscripciones y cien
+ * compras sueltas. Si las series se encadenan por parecido de importe, con
+ * suficientes cobros pequeños todo acaba siendo un solo grupo y no se detecta
+ * nada.
+ */
+describe('varias series bajo un mismo cobrador opaco', () => {
+  const meses = ['2026-03', '2026-04', '2026-05', '2026-06', '2026-07', '2026-08']
+
+  test('dos suscripciones de precio parecido no se funden en una', () => {
+    const { compromisos } = detectarCompromisos(
+      [
+        ...meses.map((m) => mov(`${m}-24`, -699, { entidadId: 'paypal' })),
+        ...meses.map((m) => mov(`${m}-04`, -549, { entidadId: 'paypal' })),
+      ],
+      new Map([['paypal', 'PayPal']]),
+      { hoy: '2026-09-10' },
+    )
+    assert.deepEqual(
+      compromisos.map((c) => c.importeEsperado).sort((a, b) => a - b),
+      [-699, -549],
+    )
+  })
+
+  test('las compras sueltas no impiden ver la suscripción', () => {
+    const sueltas = [-1234, -2750, -890, -4510, -1999, -640, -760, -3120]
+      .map((i, n) => mov(`2026-0${(n % 6) + 3}-1${n}`, i, { entidadId: 'paypal' }))
+    const { compromisos } = detectarCompromisos(
+      [...meses.map((m) => mov(`${m}-24`, -699, { entidadId: 'paypal' })), ...sueltas],
+      new Map([['paypal', 'PayPal']]),
+      { hoy: '2026-09-10' },
+    )
+    assert.equal(compromisos.length, 1)
+    assert.equal(compromisos[0].importeEsperado, -699)
+  })
+
+  test('una subida de precio no parte la serie en dos', () => {
+    const { compromisos } = detectarCompromisos(
+      [
+        ...['2026-03', '2026-04', '2026-05'].map((m) => mov(`${m}-24`, -699, { entidadId: 'paypal' })),
+        ...['2026-06', '2026-07', '2026-08'].map((m) => mov(`${m}-24`, -729, { entidadId: 'paypal' })),
+        ...meses.map((m) => mov(`${m}-04`, -549, { entidadId: 'paypal' })),
+      ],
+      new Map([['paypal', 'PayPal']]),
+      { hoy: '2026-09-10' },
+    )
+    assert.equal(compromisos.length, 2)
+    assert.equal(compromisos.find((c) => c.importeEsperado < -600)?.observaciones, 6)
   })
 })

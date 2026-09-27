@@ -63,6 +63,7 @@
  * @property {string} ultimaVista      ISO
  * @property {string} proximaPrevista  ISO
  * @property {number} observaciones
+ * @property {string[]} cobros         los movimientos de los que sale la serie
  * @property {'activo' | 'retrasado' | 'extinto'} estado
  */
 

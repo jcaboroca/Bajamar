@@ -133,15 +133,20 @@ export function construirEstado(crudos, opciones = {}) {
   )
   const deBaja = new Set(Object.keys(tratos).filter((id) => tratos[id] === 'baja'))
   const aplazables = new Set(Object.keys(tratos).filter((id) => tratos[id] === 'suelto'))
-  const cobradoresDeBaja = new Set([...deBaja].map((id) => id.split('#')[0]))
 
   const compromisos = deteccion.compromisos.filter((c) => !deBaja.has(c.reciboId))
   const dudosos = deteccion.dudosos.filter((d) => !deBaja.has(d.entidadId))
   const ingresos = ingresosTodos.filter((c) => !deBaja.has(c.reciboId))
+  // Lo que se dio de baja tampoco cuenta como gasto del día a día: era un
+  // compromiso que terminó. Se quitan sus cobros, no todo lo del cobrador, que
+  // bajo el mismo nombre puede seguir cobrando otras cosas.
+  const cobrosDeBaja = new Set(
+    [...deteccion.compromisos, ...ingresosTodos]
+      .filter((c) => deBaja.has(c.reciboId))
+      .flatMap((c) => c.cobros),
+  )
   const ordinarios = gastoOrdinario(
-    // Sólo se borra la historia del cobrador si ya no le queda ningún recibo
-    // vivo; si le queda, sus movimientos ya están fuera del goteo por serlo.
-    cuenta.filter((m) => !(m.entidadId && cobradoresDeBaja.has(m.entidadId))),
+    cuenta.filter((m) => !cobrosDeBaja.has(m.id)),
     compromisos,
     NO_ES_GASTO,
     categorias,

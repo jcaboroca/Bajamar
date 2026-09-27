@@ -111,12 +111,29 @@ function separarPorImporte(lista) {
   const grupos = []
   for (const m of orden) {
     const ultimo = grupos[grupos.length - 1]
-    const referencia = ultimo ? Math.abs(ultimo[ultimo.length - 1].importe) : 0
-    const tolerancia = Math.max(300, referencia * 0.06)
-    if (ultimo && Math.abs(Math.abs(m.importe) - referencia) <= tolerancia) ultimo.push(m)
+    if (ultimo && cabeEnLaSerie(ultimo, m)) ultimo.push(m)
     else grupos.push([m])
   }
   return grupos
+}
+
+/**
+ * Encadenar por cercanía de importe arrastra: con muchos cobros pequeños, cada
+ * uno se pega al anterior y al final todo es un solo grupo. Se mide contra el
+ * primero del grupo, no contra el último, y cuando el importe no es el mismo se
+ * exige además que caiga el mismo día del mes: dos suscripciones de 5 y 7 euros
+ * son dos cosas distintas por mucho que se parezcan en el precio.
+ * @param {Movimiento[]} grupo
+ * @param {Movimiento} m
+ */
+function cabeEnLaSerie(grupo, m) {
+  const ancla = Math.abs(grupo[0].importe)
+  const suyo = Math.abs(m.importe)
+  const distancia = Math.abs(suyo - ancla)
+  if (distancia > Math.max(300, ancla * 0.06)) return false
+  if (distancia <= Math.max(20, ancla * 0.01)) return true
+  const dias = grupo.map((x) => Number(x.fecha.slice(8, 10)))
+  return desviacionDia(Number(m.fecha.slice(8, 10)), mediana(dias)) <= 4
 }
 
 /**
@@ -250,6 +267,7 @@ export function detectarCompromisos(movimientos, nombres, opciones = {}) {
       ultimaVista: ultima,
       proximaPrevista: proxima,
       observaciones: orden.length,
+      cobros: orden.map((m) => m.id),
       estado: muerto ? 'extinto' : retraso > GRACIA[periodicidad] ? 'retrasado' : 'activo',
     }
   }
@@ -278,12 +296,15 @@ export function detectarIngresos(movimientos, nombres, opciones = {}) {
  * @returns {Movimiento[]}
  */
 export function gastoOrdinario(movimientos, compromisos, categoriasFuera, categoriaPorEntidad) {
-  const comprometidas = new Set(compromisos.map((c) => c.entidadId))
+  // Por cobro y no por cobrador: bajo un mismo PayPal conviven dos
+  // suscripciones y cien compras sueltas, y esas compras sí son gasto del día a
+  // día. Dar por comprometido todo lo suyo rebajaría el ritmo sin motivo.
+  const comprometidos = new Set(compromisos.flatMap((c) => c.cobros))
   return movimientos.filter((m) => {
     if (m.importe >= 0 || m.excepcional) return false
     if (m.origen === 'tarjeta' || m.fraccionado) return false
+    if (comprometidos.has(m.id)) return false
     if (!m.entidadId) return true
-    if (comprometidas.has(m.entidadId)) return false
     return !categoriasFuera.has(categoriaPorEntidad.get(m.entidadId) ?? 'otros')
   })
 }
