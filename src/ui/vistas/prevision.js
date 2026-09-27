@@ -229,7 +229,7 @@ function pintarCascada(estado) {
 
   queda += c.diaADia
   const dia = encabezado('Día a día', c.diaADia, queda)
-  dia.append(nodo('p', 'cascada-vacio', 'Compra, gasolina, restaurantes… al ritmo al que vienes gastando.'))
+  dia.append(desgloseDiaADia(estado, c.diaADia))
   filas.push(dia)
 
   escalon('Este mes toca', 'Este mes no cae ningún recibo de los gordos.', c.sumaToca, c.toca)
@@ -319,6 +319,49 @@ function desglose(lista) {
     ul.append(li)
   }
   return ul
+}
+
+/**
+ * De dónde sale el goteo. El total es la mediana de los meses completos, así
+ * que las partes van en esa proporción: si las líneas no sumaran la cifra de
+ * arriba, el desglose no explicaría nada.
+ * @param {Estado} estado
+ * @param {number} total
+ */
+function desgloseDiaADia(estado, total) {
+  const reparto = estado.reparto.filter((r) => r.alMes < 0)
+  const caja = nodo('div', 'cascada-detalle')
+  if (reparto.length === 0) {
+    caja.append(nodo('p', 'cascada-vacio', 'Compra, gasolina, restaurantes… al ritmo al que vienes gastando.'))
+    return caja
+  }
+  const suma = reparto.reduce((t, r) => t + r.alMes, 0)
+  const visibles = reparto.slice(0, 6)
+  const ul = nodo('ul')
+  let mostrado = 0
+  for (const r of visibles) {
+    const parte = Math.round(total * (r.alMes / suma))
+    mostrado += parte
+    const li = nodo('li')
+    li.append(
+      nodo('span', 'cascada-nombre', r.nombre),
+      nodo('span', 'cascada-cuando', `${r.cuantos} apuntes`),
+      nodo('span', 'cifras', formatEuros(parte)),
+    )
+    ul.append(li)
+  }
+  if (reparto.length > visibles.length) {
+    const li = nodo('li')
+    li.append(
+      nodo('span', 'cascada-nombre', `Otras ${reparto.length - visibles.length} categorías`),
+      nodo('span', 'cascada-cuando', ''),
+      nodo('span', 'cifras', formatEuros(total - mostrado)),
+    )
+    ul.append(li)
+  }
+  caja.append(ul, nodo('p', 'cascada-vacio',
+    `Es la mediana de tus últimos ${estado.ritmo.meses} meses: en la mitad gastaste más y en la otra mitad, menos.`))
+  return caja
 }
 
 /** @param {import('../../analisis/cascada.js').Escalon} e */
