@@ -86,6 +86,7 @@ const HORIZONTE_LARGO = 12
  * @param {Record<string, boolean>} [opciones.inversiones] reciboId → es inversión, no gasto
  * @param {number} [opciones.colchon] céntimos por debajo de los cuales avisar
  * @param {number} [opciones.ventanaRitmo] meses que mira el goteo hacia atrás
+ * @param {Record<string, true>} [opciones.saltados] reciboId|mes que este mes no se paga
  * @param {number} [opciones.meses] meses que abarca la proyección de portada
  */
 export function construirEstado(crudos, opciones = {}) {
@@ -225,6 +226,7 @@ export function construirEstado(crudos, opciones = {}) {
   // La liquidación pendiente ya trae la cuota de este mes; las que faltan son
   // las de los meses siguientes, que no están escritas en ninguna parte.
   const plazos = cuotasPendientes(cuenta, cargoTarjeta?.fecha ?? hoy)
+  const saltados = opciones.saltados ?? {}
   const armar = (/** @type {string} */ fin) => eventosDesde({
     compromisos: vivos,
     ingresos,
@@ -233,7 +235,10 @@ export function construirEstado(crudos, opciones = {}) {
     plazos,
     desde: hoy,
     hasta: fin,
-  }).map((e) => ({ ...e, aplazable: e.reciboId ? aplazables.has(e.reciboId) : false }))
+  })
+    // Saltarse un mes no es darse de baja: sólo cae ese cobro, el resto sigue.
+    .filter((e) => !(e.reciboId && saltados[`${e.reciboId}|${e.fecha.slice(0, 7)}`]))
+    .map((e) => ({ ...e, aplazable: e.reciboId ? aplazables.has(e.reciboId) : false }))
 
   const hasta = ultimoDiaDelMes(sumarMeses(hoy, (opciones.meses ?? 2) - 1))
   const finLargo = ultimoDiaDelMes(sumarMeses(hoy, HORIZONTE_LARGO - 1))
@@ -400,6 +405,7 @@ export function construirEstado(crudos, opciones = {}) {
       diaADia: ritmo.porDia * Number(ultimoDiaDelMes(`${mesQuePagaLaNomina(hoy)}-01`).slice(8)),
       inversiones: opciones.inversiones,
       plazos,
+      saltados,
     }),
     plazos,
     inversiones: opciones.inversiones ?? {},

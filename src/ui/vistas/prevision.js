@@ -32,7 +32,7 @@ let mesElegido = null
 /** @type {Estado | null} */
 let ultimo = null
 
-export function montarPrevision({ alCambiarTrato, alApagarCategoria, alMarcarInversion }) {
+export function montarPrevision({ alCambiarTrato, alApagarCategoria, alMarcarInversion, alSaltarCobro }) {
   montarSimulador({ alApagarCategoria })
   for (const caja of ['fijos', 'apartados', 'cascada']) {
     preguntarAlPulsar(requerir(caja), () => ultimo, alCambiarTrato)
@@ -41,6 +41,11 @@ export function montarPrevision({ alCambiarTrato, alApagarCategoria, alMarcarInv
     const casilla = /** @type {HTMLInputElement} */ (ev.target)
     if (!casilla.dataset.inversion) return
     alMarcarInversion(casilla.dataset.inversion, casilla.checked)
+  })
+  requerir('cascada').addEventListener('click', (ev) => {
+    const boton = ev.target instanceof Element ? ev.target.closest('[data-saltar]') : null
+    if (!(boton instanceof HTMLElement) || !boton.dataset.saltar || !boton.dataset.mes) return
+    alSaltarCobro(boton.dataset.saltar, boton.dataset.mes, boton.dataset.puesto !== 'si')
   })
   for (const caja of ['fijos', 'apartados']) {
     preguntarAlPulsar(requerir(caja), () => ultimo, alCambiarTrato)
@@ -309,19 +314,39 @@ function encabezado(titulo, importe, queda, mal = false) {
 function desglose(lista) {
   const ul = nodo('ul', 'cascada-detalle')
   for (const e of lista) {
-    const li = nodo('li')
+    const li = nodo('li', e.saltado ? 'saltado' : '')
     li.append(
       nodo('span', 'cascada-nombre', e.nombre),
-      nodo('span', 'cascada-cuando', e.detalle + (e.aplazable ? ' · te lo puedes saltar' : '')),
+      nodo('span', 'cascada-cuando', e.saltado
+        ? 'este mes no'
+        : e.detalle + (e.aplazable ? ' · te lo puedes saltar' : '')),
       nodo('span', 'cifras', formatEuros(e.importe)),
     )
     marcarPreguntable(li, e.reciboId, rotuloDe(e.reciboId, e.nombre, e.importe), e.categoria)
     // Un traspaso a tu propio bolsillo y la cuota de un préstamo salen por el
     // mismo sitio y son lo contrario: sólo el usuario sabe cuál es cuál.
     if (e.puedeSerInversion) li.append(marcaDeInversion(e))
+    if (e.aplazable || e.saltado) li.append(botonDeSaltar(e))
     ul.append(li)
   }
   return ul
+}
+
+/**
+ * Saltarse un mes no es darse de baja: el que viene vuelve solo. Sin esto, la
+ * única forma de decir "este mes no aporto" era mentirle a la app para siempre.
+ * @param {import('../../analisis/cascada.js').Escalon} e
+ */
+function botonDeSaltar(e) {
+  const boton = document.createElement('button')
+  boton.type = 'button'
+  boton.className = 'cascada-saltar'
+  boton.dataset.saltar = e.reciboId
+  boton.dataset.mes = (e.fecha ?? '').slice(0, 7)
+  boton.dataset.puesto = e.saltado ? 'si' : 'no'
+  boton.textContent = e.saltado ? 'Volver a contarlo' : 'Este mes no'
+  boton.addEventListener('click', (ev) => ev.stopPropagation())
+  return boton
 }
 
 /**

@@ -26,6 +26,7 @@ import {
   nuevoId,
   ponerApunte,
   ponerColchon,
+  ponerSaltado,
   ponerVentanaRitmo,
   ponerObjetivo,
   ponerPresupuesto,
@@ -181,6 +182,11 @@ function montarVistas() {
       await ponerInversion(reciboId, esInversion)
       await refrescar()
     },
+    alSaltarCobro: async (reciboId, mes, saltado) => {
+      await ponerSaltado(reciboId, mes, saltado)
+      await refrescar()
+      decir(saltado ? 'Este mes no cuenta.' : 'Vuelve a contar.')
+    },
   })
 
   montarPatrimonio({
@@ -253,6 +259,7 @@ async function refrescar({ animar = false, local = true } = {}) {
     anuales: preferencias.anuales,
     apagadas: preferencias.apagadas,
     inversiones: preferencias.inversiones,
+    saltados: preferencias.saltados,
     ventanaRitmo: preferencias.ventanaRitmo,
     colchon: preferencias.colchon,
   })

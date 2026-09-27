@@ -573,6 +573,48 @@ test('la categoría del recibo manda sobre la del cobrador', () => {
   assert.equal(descritos.find((f) => f.reciboId === 'paypal#5')?.categoria, 'compras')
 })
 
+describe('saltarse un mes no es darse de baja', () => {
+  const fijo = {
+    entidadId: 'myinvestor',
+    reciboId: 'myinvestor#500',
+    nombre: 'MyInvestor',
+    periodicidad: /** @type {const} */ ('mensual'),
+    importeEsperado: -50000,
+    mensualEquivalente: -50000,
+    variacion: 0,
+    proximaPrevista: '2026-10-28',
+    categoria: 'traspaso',
+    estable: true,
+    estado: /** @type {const} */ ('activo'),
+    aplazable: true,
+  }
+
+  test('lo saltado no suma, pero sigue a la vista para poder deshacerlo', () => {
+    const normal = cascadaDelMes({ mes: '2026-10', fijos: [fijo], ingreso: 282249, diaADia: 0 })
+    assert.equal(normal.sumaInversiones + normal.sumaFijos, -50000)
+
+    const saltada = cascadaDelMes({
+      mes: '2026-10', fijos: [fijo], ingreso: 282249, diaADia: 0,
+      saltados: { 'myinvestor#500|2026-10': true },
+    })
+    assert.equal(saltada.sumaInversiones + saltada.sumaFijos, 0)
+    // Si desapareciera de la lista se olvidaria que se salto.
+    const todos = [...saltada.fijos, ...saltada.inversiones]
+    assert.equal(todos.length, 1)
+    assert.equal(todos[0].saltado, true)
+    assert.equal(saltada.resultado, 282249)
+  })
+
+  test('saltarse octubre no salta noviembre', () => {
+    const noviembre = cascadaDelMes({
+      mes: '2026-11', fijos: [{ ...fijo, proximaPrevista: '2026-11-28' }],
+      ingreso: 282249, diaADia: 0,
+      saltados: { 'myinvestor#500|2026-10': true },
+    })
+    assert.equal(noviembre.sumaInversiones + noviembre.sumaFijos, -50000)
+  })
+})
+
 describe('lo que aplazas vuelve en tres cuotas', () => {
   /** @param {string} fecha @param {number} importe @param {string} concepto */
   const abono = (fecha, importe, concepto) => ({

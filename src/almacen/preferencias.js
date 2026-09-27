@@ -34,6 +34,7 @@ import { VENTANA_POR_DEFECTO } from '../analisis/compromisos.js'
  * @property {Record<string, true>} unicos     entidadId → no va a repetirse
  * @property {Record<string, true>} anuales    entidadId → vuelve cada año
  * @property {Record<string, true>} apagadas   categoría → no toca esta temporada
+ * @property {Record<string, true>} saltados   reciboId|mes → este mes no se paga
  * @property {Record<string, boolean>} inversiones reciboId → es inversión, no gasto
  * @property {import('../dominio/tipos.js').Bulto[]} bultos
  * @property {number} colchon                  céntimos
@@ -42,7 +43,7 @@ import { VENTANA_POR_DEFECTO } from '../analisis/compromisos.js'
 
 /** @returns {Promise<Preferencias>} */
 export async function cargar() {
-  const [retoques, presupuestos, objetivos, patrimonio, reglas, bultos, colchon, ventanaRitmo, tratos, apodos, unicos, anuales, apagadas, inversiones] = await Promise.all([
+  const [retoques, presupuestos, objetivos, patrimonio, reglas, bultos, colchon, ventanaRitmo, tratos, apodos, unicos, anuales, apagadas, saltados, inversiones] = await Promise.all([
     leerTodo('retoques'),
     leerTodo('presupuestos'),
     leerTodo('objetivos'),
@@ -56,6 +57,7 @@ export async function cargar() {
     leerTodo('unicos'),
     leerTodo('anuales'),
     leerTodo('apagadas'),
+    leerTodo('saltados'),
     leerTodo('inversiones'),
   ])
 
@@ -71,6 +73,7 @@ export async function cargar() {
     unicos: Object.fromEntries(unicos.map((/** @type {any} */ u) => [u.id, true])),
     anuales: Object.fromEntries(anuales.map((/** @type {any} */ a) => [a.id, true])),
     apagadas: Object.fromEntries(apagadas.map((/** @type {any} */ a) => [a.id, true])),
+    saltados: Object.fromEntries(saltados.map((/** @type {any} */ s) => [s.id, true])),
     inversiones: Object.fromEntries(inversiones.map((/** @type {any} */ i) => [i.id, i.esInversion])),
     colchon: Number(/** @type {any} */ (colchon)?.valor ?? 0),
     ventanaRitmo: Number(/** @type {any} */ (ventanaRitmo)?.valor ?? VENTANA_POR_DEFECTO),
@@ -197,6 +200,18 @@ export async function ponerColchon(centimos) {
 /** @param {number} meses  0 = mirarlo todo */
 export async function ponerVentanaRitmo(meses) {
   return escribir('ajustes', { id: 'ventanaRitmo', valor: Math.max(0, Math.round(meses)) })
+}
+
+/**
+ * Saltarse un cobro un mes concreto, sin darlo de baja: el mes que viene vuelve.
+ * @param {string} reciboId
+ * @param {string} mes  yyyy-mm
+ * @param {boolean} saltado
+ */
+export async function ponerSaltado(reciboId, mes, saltado) {
+  const id = `${reciboId}|${mes}`
+  if (!saltado) return borrar('saltados', id)
+  return escribir('saltados', { id })
 }
 
 /**

@@ -40,6 +40,8 @@ export const DIA_DE_ADELANTO = 20
  * @property {boolean} inversion
  * @property {boolean} aplazable         el usuario dice que un mes malo se lo salta
  * @property {boolean} puedeSerInversion  la app duda y el usuario puede decidir
+ * @property {string} [fecha]             cuándo cae, para saber de qué mes es
+ * @property {boolean} [saltado]          este mes no se paga: se ve, pero no suma
  */
 
 /**
@@ -77,9 +79,10 @@ export function mesEnCurso(hoy) {
  * @param {number} entrada.diaADia            goteo mensual, céntimos negativos
  * @param {Record<string, boolean>} [entrada.inversiones] reciboId → es inversión
  * @param {import('./fraccionados.js').Cuota[]} [entrada.plazos]
+ * @param {Record<string, true>} [entrada.saltados] reciboId|mes que no se paga
  * @returns {Cascada}
  */
-export function cascadaDelMes({ mes, fijos, ingreso, diaADia, inversiones = {}, plazos = [] }) {
+export function cascadaDelMes({ mes, fijos, ingreso, diaADia, inversiones = {}, plazos = [], saltados = {} }) {
   /** @type {Escalon[]} */
   const listaFijos = []
   /** @type {Escalon[]} */
@@ -103,6 +106,11 @@ export function cascadaDelMes({ mes, fijos, ingreso, diaADia, inversiones = {}, 
         inversion,
         aplazable: fijo.aplazable === true,
         puedeSerInversion,
+        fecha,
+        // La clave es el mes en que CAE el cobro, no el mes de la cascada: un
+        // cobro del 28 de septiembre se enseña en octubre, y si se buscara por
+        // octubre la previsión y la cascada dirían cosas distintas.
+        saltado: saltados[`${fijo.reciboId}|${fecha.slice(0, 7)}`] === true,
       }
       if (inversion) listaInversiones.push(escalon)
       else if (fijo.periodicidad === 'mensual') listaFijos.push(escalon)
@@ -130,7 +138,10 @@ export function cascadaDelMes({ mes, fijos, ingreso, diaADia, inversiones = {}, 
     }))
     .sort(porImporte)
 
-  const suma = (/** @type {Escalon[]} */ lista) => lista.reduce((t, x) => t + x.importe, 0)
+  // Lo saltado sigue en la lista para poder deshacerlo, pero no cuenta: si
+  // desapareciera sin dejar rastro, se olvidaría que se saldó.
+  const suma = (/** @type {Escalon[]} */ lista) =>
+    lista.reduce((t, x) => (x.saltado ? t : t + x.importe), 0)
   const sumaFijos = suma(listaFijos)
   const sumaInversiones = suma(listaInversiones)
   const sumaToca = suma(listaToca)
