@@ -225,6 +225,9 @@ function pintarCascada(estado) {
   }
 
   escalon('Gastos fijos del mes', 'Ninguno.', c.sumaFijos, c.fijos)
+  if (c.plazos.length > 0) {
+    escalon('Lo que aplazaste', '', c.sumaPlazos, c.plazos)
+  }
   escalon('Inversiones', 'Este mes no apartas nada.', c.sumaInversiones, c.inversiones)
 
   queda += c.diaADia

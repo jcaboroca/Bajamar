@@ -11,6 +11,7 @@ import { detectarCompromisos, detectarIngresos, gastoOrdinario, ritmoOrdinario }
 import { eventosDesde, proyectar } from './analisis/bajamar.js'
 import { describirFijos, estructura } from './analisis/fijos.js'
 import { cascadaDelMes, mesEnCurso as mesQuePagaLaNomina } from './analisis/cascada.js'
+import { cuotasPendientes } from './analisis/fraccionados.js'
 import { conGotaDiaria, disponibleReal, porMeses, resumenDeMes } from './analisis/mes.js'
 import { revisarPresupuestos } from './analisis/presupuestos.js'
 import { balance, evolucion } from './analisis/patrimonio.js'
@@ -194,11 +195,15 @@ export function construirEstado(crudos, opciones = {}) {
   }
 
   const vivos = compromisos.filter((c) => c.estado !== 'extinto' && c !== liquidacion)
+  // La liquidación pendiente ya trae la cuota de este mes; las que faltan son
+  // las de los meses siguientes, que no están escritas en ninguna parte.
+  const plazos = cuotasPendientes(cuenta, cargoTarjeta?.fecha ?? hoy)
   const armar = (/** @type {string} */ fin) => eventosDesde({
     compromisos: vivos,
     ingresos,
     bultos: opciones.bultos ?? [],
     tarjeta: cargoTarjeta,
+    plazos,
     desde: hoy,
     hasta: fin,
   }).map((e) => ({ ...e, aplazable: e.reciboId ? aplazables.has(e.reciboId) : false }))
@@ -367,7 +372,9 @@ export function construirEstado(crudos, opciones = {}) {
       // cifras distintas del mismo mes y una de las dos miente.
       diaADia: ritmo.porDia * Number(ultimoDiaDelMes(`${mesQuePagaLaNomina(hoy)}-01`).slice(8)),
       inversiones: opciones.inversiones,
+      plazos,
     }),
+    plazos,
     inversiones: opciones.inversiones ?? {},
     presupuestos,
     mesEnCurso,

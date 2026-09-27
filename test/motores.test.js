@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 
 import { describirFijos, estructura, MESES_DE } from '../src/analisis/fijos.js'
 import { cascadaDelMes, mesEnCurso } from '../src/analisis/cascada.js'
+import { cuotasPendientes } from '../src/analisis/fraccionados.js'
 import { conGotaDiaria, disponibleReal, porMeses, resumenDeMes } from '../src/analisis/mes.js'
 import { revisarPresupuestos } from '../src/analisis/presupuestos.js'
 import { capacidadDeAhorro, progresoDe } from '../src/analisis/objetivos.js'
@@ -570,4 +571,37 @@ test('la categoría del recibo manda sobre la del cobrador', () => {
   const descritos = describirFijos(compromisos, cobros, categorias)
   assert.equal(descritos.find((f) => f.reciboId === 'paypal#7')?.categoria, 'suscripciones')
   assert.equal(descritos.find((f) => f.reciboId === 'paypal#5')?.categoria, 'compras')
+})
+
+describe('lo que aplazas vuelve en tres cuotas', () => {
+  /** @param {string} fecha @param {number} importe @param {string} concepto */
+  const abono = (fecha, importe, concepto) => ({
+    id: `c:${fecha}:${importe}`, fecha, fechaValor: fecha, conceptoRaw: concepto,
+    entidadId: null, importe, saldo: null, origen: 'cuenta',
+    localidad: null, fraccionado: true, excepcional: false,
+  })
+
+  test('tres cuotas a fin de mes, y la última recoge el redondeo', () => {
+    const cuotas = cuotasPendientes([abono('2026-07-01', 33100, 'FRACCIONAMIENTO IMPUESTOS AJ. GAVA')], '2026-06-30')
+    assert.deepEqual(cuotas.map((c) => c.fecha), ['2026-07-31', '2026-08-31', '2026-09-30'])
+    assert.deepEqual(cuotas.map((c) => c.importe), [-11033, -11033, -11034])
+    assert.equal(cuotas.reduce((t, c) => t + c.importe, 0), -33100)
+    assert.equal(cuotas[0].nombre, 'IMPUESTOS AJ. GAVA')
+  })
+
+  test('lo ya cobrado no se proyecta otra vez', () => {
+    const cuotas = cuotasPendientes([abono('2026-09-23', 46800, 'FRACCIONAMIENTO TRANSFERENCIA A MyInvestor')], '2026-09-30')
+    assert.deepEqual(cuotas.map((c) => c.fecha), ['2026-10-31', '2026-11-30'])
+    assert.equal(cuotas[0].plazo, 2)
+    assert.equal(cuotas[0].nombre, 'MyInvestor')
+  })
+
+  test('un cargo normal no es un aplazamiento', () => {
+    assert.deepEqual(cuotasPendientes([abono('2026-07-01', -5000, 'COMPRA TARJ. CONDIS')], '2026-06-30'), [])
+  })
+
+  test('el apunte de la tarjeta no cuenta: ahí sólo está la cuota del mes', () => {
+    const enTarjeta = { ...abono('2026-07-01', 11000, 'FRACCIONAMIENTO IMPUESTOS'), origen: 'tarjeta' }
+    assert.deepEqual(cuotasPendientes([enTarjeta], '2026-06-30'), [])
+  })
 })

@@ -21,7 +21,7 @@ import { diasEntre, sumarMeses, ultimoDiaDelMes } from '../dominio/tipos.js'
  * @property {string} fecha
  * @property {number} importe    céntimos, con signo
  * @property {string} nombre
- * @property {'compromiso' | 'ingreso' | 'bulto' | 'tarjeta'} tipo
+ * @property {'compromiso' | 'ingreso' | 'bulto' | 'tarjeta' | 'plazo'} tipo
  * @property {boolean} seguro    false si es una previsión, true si está confirmado
  * @property {string | null} [entidadId] de quién sale, cuando se puede decir que no vuelva
  * @property {string} [reciboId] qué recibo suyo, cuando el cobrador tiene varios
@@ -113,11 +113,12 @@ export function sumarDias(iso, dias) {
  * @param {Compromiso[]} entrada.ingresos
  * @param {Bulto[]} entrada.bultos
  * @param {{ fecha: string, importe: number } | null} entrada.tarjeta
+ * @param {import('./fraccionados.js').Cuota[]} [entrada.plazos]
  * @param {string} entrada.desde
  * @param {string} entrada.hasta
  * @returns {Evento[]}
  */
-export function eventosDesde({ compromisos, ingresos, bultos, tarjeta, desde, hasta }) {
+export function eventosDesde({ compromisos, ingresos, bultos, tarjeta, plazos = [], desde, hasta }) {
   /** @type {Evento[]} */
   const eventos = []
   const meses = { mensual: 1, bimestral: 2, trimestral: 3, semestral: 6, anual: 12 }
@@ -150,6 +151,11 @@ export function eventosDesde({ compromisos, ingresos, bultos, tarjeta, desde, ha
 
   for (const b of bultos) {
     eventos.push({ fecha: b.fecha, importe: b.importe, nombre: b.nombre, tipo: 'bulto', seguro: true })
+  }
+
+  for (const c of plazos) {
+    if (c.fecha < desde || c.fecha > hasta) continue
+    eventos.push({ fecha: c.fecha, importe: c.importe, nombre: c.nombre, tipo: 'plazo', seguro: true })
   }
 
   if (tarjeta) {

@@ -19,6 +19,8 @@
  */
 
 import { sumarMeses } from '../dominio/tipos.js'
+import { formatEuros } from '../dominio/dinero.js'
+import { PLAZOS } from './fraccionados.js'
 import { MESES_DE } from './fijos.js'
 
 /** @typedef {import('./fijos.js').Fijo} Fijo */
@@ -47,10 +49,12 @@ export const DIA_DE_ADELANTO = 20
  * @property {Escalon[]} fijos         los que se pagan todos los meses
  * @property {Escalon[]} inversiones   sale de la cuenta, pero no se gasta
  * @property {Escalon[]} toca          lo que sólo cae algunos meses, y éste cae
+ * @property {Escalon[]} plazos        cuotas de lo que aplazaste
  * @property {number} sumaFijos
  * @property {number} sumaInversiones
  * @property {number} diaADia
  * @property {number} sumaToca
+ * @property {number} sumaPlazos
  * @property {number} aplazable        lo que darías de margen si te lo saltaras
  * @property {number} resultado        lo que sobra, o falta, al acabar el mes
  */
@@ -72,9 +76,10 @@ export function mesEnCurso(hoy) {
  * @param {number} entrada.ingreso            céntimos positivos
  * @param {number} entrada.diaADia            goteo mensual, céntimos negativos
  * @param {Record<string, boolean>} [entrada.inversiones] reciboId → es inversión
+ * @param {import('./fraccionados.js').Cuota[]} [entrada.plazos]
  * @returns {Cascada}
  */
-export function cascadaDelMes({ mes, fijos, ingreso, diaADia, inversiones = {} }) {
+export function cascadaDelMes({ mes, fijos, ingreso, diaADia, inversiones = {}, plazos = [] }) {
   /** @type {Escalon[]} */
   const listaFijos = []
   /** @type {Escalon[]} */
@@ -110,10 +115,26 @@ export function cascadaDelMes({ mes, fijos, ingreso, diaADia, inversiones = {} }
   listaInversiones.sort(porImporte)
   listaToca.sort(porImporte)
 
+  /** @type {Escalon[]} */
+  const listaPlazos = plazos
+    .filter((c) => c.fecha.slice(0, 7) === mes)
+    .map((c) => ({
+      nombre: c.nombre,
+      importe: c.importe,
+      detalle: `cuota ${c.plazo} de ${PLAZOS} · aplazaste ${formatEuros(c.total)}`,
+      reciboId: '',
+      categoria: 'tarjeta',
+      inversion: false,
+      aplazable: false,
+      puedeSerInversion: false,
+    }))
+    .sort(porImporte)
+
   const suma = (/** @type {Escalon[]} */ lista) => lista.reduce((t, x) => t + x.importe, 0)
   const sumaFijos = suma(listaFijos)
   const sumaInversiones = suma(listaInversiones)
   const sumaToca = suma(listaToca)
+  const sumaPlazos = suma(listaPlazos)
 
   return {
     mes,
@@ -121,13 +142,15 @@ export function cascadaDelMes({ mes, fijos, ingreso, diaADia, inversiones = {} }
     fijos: listaFijos,
     inversiones: listaInversiones,
     toca: listaToca,
+    plazos: listaPlazos,
     sumaFijos,
     sumaInversiones,
     diaADia,
     sumaToca,
+    sumaPlazos,
     aplazable: [...listaFijos, ...listaInversiones, ...listaToca]
       .reduce((t, e) => (e.aplazable ? t + e.importe : t), 0),
-    resultado: ingreso + sumaFijos + sumaInversiones + diaADia + sumaToca,
+    resultado: ingreso + sumaFijos + sumaInversiones + diaADia + sumaToca + sumaPlazos,
   }
 }
 
