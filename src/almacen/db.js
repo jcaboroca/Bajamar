@@ -8,7 +8,7 @@
  */
 
 const NOMBRE = 'bajamar'
-const VERSION = 3
+const VERSION = 4
 
 /**
  * Todo lo que el usuario decide a mano vive separado de los movimientos: si
@@ -19,6 +19,7 @@ export const ALMACENES = [
   'ajustes',
   'reglas',      // entidadId → categoría elegida por el usuario
   'tratos',      // reciboId → si va a volver
+  'apodos',      // reciboId → cómo lo llama el usuario
   'bultos',      // gastos futuros anotados a mano
   'retoques',    // correcciones sobre un movimiento concreto
   'objetivos',

@@ -55,6 +55,7 @@ const HORIZONTE_LARGO = 12
  * @param {import('./analisis/presupuestos.js').Presupuesto[]} [opciones.presupuestos]
  * @param {import('./analisis/patrimonio.js').Apunte[]} [opciones.patrimonio]
  * @param {Record<string, 'fijo' | 'suelto' | 'baja'>} [opciones.tratos] reciboId → cómo preverlo
+ * @param {Record<string, string>} [opciones.apodos] reciboId → cómo lo llama el usuario
  * @param {number} [opciones.colchon] céntimos por debajo de los cuales avisar
  * @param {number} [opciones.meses] meses que abarca la proyección de portada
  */
@@ -125,23 +126,30 @@ export function construirEstado(crudos, opciones = {}) {
    * aportación que uno se salta y la letra de la furgoneta que no.
    */
   const deteccion = detectarCompromisos(cuenta, nombres, { hoy, categorias })
-  const ingresosTodos = detectarIngresos(cuenta, nombres, { hoy, categorias })
+  // El apodo se pone aquí y no en cada vista: así el nombre que puso el usuario
+  // viaja solo hasta los eventos, los avisos y los fijos.
+  const apodos = opciones.apodos ?? {}
+  const apodar = (/** @type {Compromiso} */ c) => (
+    apodos[c.reciboId] ? { ...c, nombre: apodos[c.reciboId] } : c
+  )
+  const compromisosTodos = deteccion.compromisos.map(apodar)
+  const ingresosTodos = detectarIngresos(cuenta, nombres, { hoy, categorias }).map(apodar)
   const tratos = porRecibo(
     opciones.tratos ?? {},
-    [...deteccion.compromisos, ...ingresosTodos],
+    [...compromisosTodos, ...ingresosTodos],
     new Set(deteccion.dudosos.map((d) => d.entidadId)),
   )
   const deBaja = new Set(Object.keys(tratos).filter((id) => tratos[id] === 'baja'))
   const aplazables = new Set(Object.keys(tratos).filter((id) => tratos[id] === 'suelto'))
 
-  const compromisos = deteccion.compromisos.filter((c) => !deBaja.has(c.reciboId))
+  const compromisos = compromisosTodos.filter((c) => !deBaja.has(c.reciboId))
   const dudosos = deteccion.dudosos.filter((d) => !deBaja.has(d.entidadId))
   const ingresos = ingresosTodos.filter((c) => !deBaja.has(c.reciboId))
   // Lo que se dio de baja tampoco cuenta como gasto del día a día: era un
   // compromiso que terminó. Se quitan sus cobros, no todo lo del cobrador, que
   // bajo el mismo nombre puede seguir cobrando otras cosas.
   const cobrosDeBaja = new Set(
-    [...deteccion.compromisos, ...ingresosTodos]
+    [...compromisosTodos, ...ingresosTodos]
       .filter((c) => deBaja.has(c.reciboId))
       .flatMap((c) => c.cobros),
   )
@@ -292,11 +300,12 @@ export function construirEstado(crudos, opciones = {}) {
     dudosos,
     ingresos,
     tratos,
+    apodos,
     // Lo apartado se busca en la detección sin filtrar: es la única que aún
     // sabe cómo se llamaba y cuánto costaba lo que el usuario dio de baja.
     apartados: [
       ...[...deBaja].map((id) => {
-        const recibo = [...deteccion.compromisos, ...ingresosTodos].find((c) => c.reciboId === id)
+        const recibo = [...compromisosTodos, ...ingresosTodos].find((c) => c.reciboId === id)
         return {
           reciboId: id,
           nombre: recibo?.nombre ?? nombres.get(id.split('#')[0]) ?? id,

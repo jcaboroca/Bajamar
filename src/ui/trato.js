@@ -24,13 +24,20 @@ const OPCIONES = /** @type {Array<[string, string]>} */ ([
  * @param {object} p
  * @param {string} p.nombre
  * @param {Trato} [p.actual]
- * @returns {Promise<Trato | null>}  null si se arrepiente
+ * @param {string} [p.apodo]
+ * @returns {Promise<{ trato: Trato, apodo: string } | null>}  null si se arrepiente
  */
-export async function preguntarTrato({ nombre, actual = 'fijo' }) {
+export async function preguntarTrato({ nombre, actual = 'fijo', apodo = '' }) {
   const respuesta = await pedirDatos({
     titulo: nombre,
     aceptar: 'Guardar',
     campos: [{
+      nombre: 'apodo',
+      etiqueta: '¿Qué es?',
+      tipo: 'texto',
+      valor: apodo,
+      pista: 'Déjalo en blanco para el nombre del banco',
+    }, {
       nombre: 'trato',
       etiqueta: '¿Lo vas a seguir pagando?',
       tipo: 'lista',
@@ -41,7 +48,10 @@ export async function preguntarTrato({ nombre, actual = 'fijo' }) {
   })
   if (respuesta === null || respuesta === 'borrar') return null
   const elegido = respuesta.trato
-  return elegido === 'suelto' || elegido === 'baja' ? elegido : 'fijo'
+  return {
+    trato: elegido === 'suelto' || elegido === 'baja' ? elegido : 'fijo',
+    apodo: String(respuesta.apodo ?? ''),
+  }
 }
 
 /**
@@ -75,8 +85,8 @@ export function marcarPreguntable(fila, reciboId, rotulo) {
  * Escucha una lista entera en vez de cada fila: las filas se repintan en cada
  * cambio y sus escuchadores morirían con ellas.
  * @param {HTMLElement} caja
- * @param {() => { nombres: Map<string, string>, tratos: Record<string, Trato> } | null} mirarEstado
- * @param {(reciboId: string, trato: Trato) => unknown} alCambiar
+ * @param {() => { nombres: Map<string, string>, tratos: Record<string, Trato>, apodos: Record<string, string> } | null} mirarEstado
+ * @param {(cambio: { reciboId: string, trato: Trato, apodo: string, cambiaTrato: boolean }) => unknown} alCambiar
  */
 export function preguntarAlPulsar(caja, mirarEstado, alCambiar) {
   const abrir = async (/** @type {Element} */ objetivo) => {
@@ -86,10 +96,12 @@ export function preguntarAlPulsar(caja, mirarEstado, alCambiar) {
     const estado = mirarEstado()
     if (!reciboId || !estado) return
     const actual = estado.tratos[reciboId] ?? 'fijo'
+    const apodo = estado.apodos[reciboId] ?? ''
     const nombre = fila.dataset.rotulo ?? estado.nombres.get(reciboId.split('#')[0]) ?? reciboId
-    const elegido = await preguntarTrato({ nombre, actual })
-    if (elegido === null || elegido === actual) return
-    await alCambiar(reciboId, elegido)
+    const elegido = await preguntarTrato({ nombre, actual, apodo })
+    if (elegido === null) return
+    if (elegido.trato === actual && elegido.apodo === apodo) return
+    await alCambiar({ reciboId, ...elegido, cambiaTrato: elegido.trato !== actual })
   }
 
   caja.addEventListener('click', (e) => {

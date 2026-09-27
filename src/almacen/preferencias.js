@@ -29,13 +29,14 @@ import { borrar, escribir, leer, leerTodo } from './db.js'
  * @property {Apunte[]} patrimonio
  * @property {Record<string, string>} reglas   entidadId → categoría
  * @property {Record<string, Trato>} tratos    reciboId → cómo preverlo
+ * @property {Record<string, string>} apodos   reciboId → cómo lo llama el usuario
  * @property {import('../dominio/tipos.js').Bulto[]} bultos
  * @property {number} colchon                  céntimos
  */
 
 /** @returns {Promise<Preferencias>} */
 export async function cargar() {
-  const [retoques, presupuestos, objetivos, patrimonio, reglas, bultos, colchon, tratos] = await Promise.all([
+  const [retoques, presupuestos, objetivos, patrimonio, reglas, bultos, colchon, tratos, apodos] = await Promise.all([
     leerTodo('retoques'),
     leerTodo('presupuestos'),
     leerTodo('objetivos'),
@@ -44,6 +45,7 @@ export async function cargar() {
     leerTodo('bultos'),
     leer('ajustes', 'colchon'),
     leerTodo('tratos'),
+    leerTodo('apodos'),
   ])
 
   return {
@@ -54,6 +56,7 @@ export async function cargar() {
     bultos,
     reglas: Object.fromEntries(reglas.map((/** @type {any} */ r) => [r.id, r.categoria])),
     tratos: Object.fromEntries(tratos.map((/** @type {any} */ t) => [t.id, t.trato])),
+    apodos: Object.fromEntries(apodos.map((/** @type {any} */ a) => [a.id, a.nombre])),
     colchon: Number(/** @type {any} */ (colchon)?.valor ?? 0),
   }
 }
@@ -143,6 +146,18 @@ export async function ponerColchon(centimos) {
 export async function ponerTrato(reciboId, trato) {
   if (trato === null || trato === 'fijo') return borrar('tratos', reciboId)
   return escribir('tratos', { id: reciboId, trato })
+}
+
+/**
+ * Cómo se llama un recibo. El banco pone «PayPal» a dos suscripciones
+ * distintas y a cien compras; el nombre de verdad sólo lo sabe quien paga.
+ * @param {string} reciboId
+ * @param {string} nombre  vacío lo devuelve al del banco
+ */
+export async function ponerApodo(reciboId, nombre) {
+  const limpio = nombre.trim()
+  if (limpio === '') return borrar('apodos', reciboId)
+  return escribir('apodos', { id: reciboId, nombre: limpio.slice(0, 40) })
 }
 
 /** Identificador corto y único para lo que crea el usuario. */

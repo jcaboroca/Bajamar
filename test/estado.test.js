@@ -178,3 +178,39 @@ test('el saldo automático del patrimonio nunca se fecha por delante de hoy', ()
   const estado = construirEstado(futuro, { hoy: HOY })
   assert.equal(estado.patrimonio.neto, 1000000)
 })
+
+test('el nombre que pone el usuario sustituye al del banco en todas partes', () => {
+  const movimientos = extracto()
+  for (let i = 0; i < 6; i += 1) {
+    const mes = String(3 + i).padStart(2, '0')
+    movimientos.push(fila(`p${i}`, `2026-${mes}-24`, 'ADEUDO RECIBO PayPal', -699, 100000))
+  }
+  const sinNombre = construirEstado(movimientos, { hoy: HOY, meses: 3 })
+  const recibo = sinNombre.fijos.find((f) => /paypal/i.test(f.nombre))
+  assert.ok(recibo, 'la suscripcion se detecta')
+
+  const conNombre = construirEstado(movimientos, {
+    hoy: HOY, meses: 3, apodos: { [recibo.reciboId]: 'Disney+' },
+  })
+  assert.equal(conNombre.fijos.find((f) => f.reciboId === recibo.reciboId)?.nombre, 'Disney+')
+  const evento = conNombre.proyeccion.eventos.find((e) => e.reciboId === recibo.reciboId)
+  assert.equal(evento?.nombre, 'Disney+', 'tambien en lo que viene')
+})
+
+test('un nombre puesto a un recibo no se le pega a los demas del mismo cobrador', () => {
+  const dos = dosDelMismoBanco({})
+  const [uno, otro] = dos.fijos.filter((f) => /MYINVESTOR/i.test(f.nombre))
+  assert.ok(uno && otro, 'son dos recibos distintos')
+
+  const movimientos = extracto()
+  for (let i = 0; i < 6; i += 1) {
+    const mes = String(3 + i).padStart(2, '0')
+    movimientos.push(fila(`a${i}`, `2026-${mes}-05`, 'TRANSFERENCIA MYINVESTOR', -50000, 100000))
+    movimientos.push(fila(`v${i}`, `2026-${mes}-18`, 'TRANSFERENCIA MYINVESTOR', -46800, 100000))
+  }
+  const bautizado = construirEstado(movimientos, {
+    hoy: HOY, meses: 3, apodos: { [uno.reciboId]: 'La furgoneta' },
+  })
+  assert.equal(bautizado.fijos.find((f) => f.reciboId === uno.reciboId)?.nombre, 'La furgoneta')
+  assert.match(bautizado.fijos.find((f) => f.reciboId === otro.reciboId)?.nombre ?? '', /MYINVESTOR/i)
+})

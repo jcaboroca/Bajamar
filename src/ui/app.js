@@ -31,6 +31,7 @@ import {
   ponerRegla,
   ponerRetoque,
   ponerTrato,
+  ponerApodo,
   quitarApunte,
   quitarObjetivo,
   repartirTratosViejos,
@@ -133,10 +134,12 @@ async function arrancar() {
  * manejadores en silencio hasta que un clic hiciera cinco cosas.
  */
 function montarVistas() {
-  /** @param {string} reciboId @param {import('./trato.js').Trato} trato */
-  const alCambiarTrato = async (reciboId, trato) => {
+  /** @param {{ reciboId: string, trato: import('./trato.js').Trato, apodo: string, cambiaTrato: boolean }} cambio */
+  const alCambiarTrato = async ({ reciboId, trato, apodo, cambiaTrato }) => {
+    await ponerApodo(reciboId, apodo)
     await ponerTrato(reciboId, trato)
     await refrescar()
+    if (!cambiaTrato) return decir(apodo === '' ? 'Hecho.' : `Hecho: ahora se llama ${apodo}.`)
     decir(trato === 'baja'
       ? 'Hecho: deja de contar para el futuro.'
       : trato === 'suelto'
@@ -208,6 +211,7 @@ async function refrescar({ animar = false, local = true } = {}) {
     presupuestos: preferencias.presupuestos,
     patrimonio: preferencias.patrimonio,
     tratos: preferencias.tratos,
+    apodos: preferencias.apodos,
     colchon: preferencias.colchon,
   })
 
