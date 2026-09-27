@@ -79,7 +79,7 @@ export function describirFijos(compromisos, movimientos, categorias) {
       mensualEquivalente: Math.round(c.importeEsperado / MESES_DE[c.periodicidad]),
       variacion,
       proximaPrevista: c.proximaPrevista,
-      categoria: categorias.get(c.entidadId) ?? 'otros',
+      categoria: categorias.get(c.reciboId) ?? categorias.get(c.entidadId) ?? 'otros',
       estable: variacion <= UMBRAL_VARIABLE,
       estado: c.estado,
     }

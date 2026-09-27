@@ -516,6 +516,15 @@ describe('el mes empieza con la nómina', () => {
     assert.equal(c.resultado, 282249 - 96800 - 5300 - 121757 - 45987)
   })
 
+  test('lo que puedes saltarte se mide aparte, sin salir de la cuenta', () => {
+    const conSuelto = fijos.map((f) => (f.reciboId === 'fondo' ? { ...f, aplazable: true } : f))
+    const c = cascadaDelMes({ mes: '2026-10', fijos: conSuelto, ingreso: 282249, diaADia: -121757 })
+    assert.equal(c.aplazable, -50000)
+    // Saltárselo es una posibilidad, no un hecho: el resultado no lo descuenta.
+    assert.equal(c.sumaInversiones, -96800)
+    assert.equal(c.resultado, 282249 - 96800 - 5300 - 121757 - 45987)
+  })
+
   test('un mes sin recibos gordos lo dice', () => {
     const c = cascadaDelMes({ mes: '2026-11', fijos, ingreso: 282249, diaADia: -121757 })
     assert.deepEqual(c.toca, [])
@@ -541,4 +550,24 @@ describe('el mes empieza con la nómina', () => {
     // El dinero no se mueve: el saldo del 25 sigue subiendo ese día.
     assert.equal(proyeccion.curva.find((p) => p.fecha === '2026-09-25')?.saldo, 282249)
   })
+})
+
+test('la categoría del recibo manda sobre la del cobrador', () => {
+  // Dos suscripciones cobradas por el mismo PayPal: la regla del cobrador no
+  // puede distinguirlas, la del recibo sí.
+  const cobros = []
+  for (const mes of ['05', '06', '07', '08', '09']) {
+    cobros.push(
+      { id: `d${mes}`, fecha: `2026-${mes}-24`, nombre: 'PayPal', entidadId: 'paypal', importe: -699, saldo: 0, conceptoRaw: 'PAYPAL DISNEY' },
+      { id: `h${mes}`, fecha: `2026-${mes}-03`, nombre: 'PayPal', entidadId: 'paypal', importe: -549, saldo: 0, conceptoRaw: 'PAYPAL HBO' },
+    )
+  }
+  const compromisos = [
+    { entidadId: 'paypal', reciboId: 'paypal#7', nombre: 'PayPal', periodicidad: /** @type {const} */ ('mensual'), importeEsperado: -699, proximaPrevista: '2026-10-24', cobros: ['d09'], estado: /** @type {const} */ ('activo') },
+    { entidadId: 'paypal', reciboId: 'paypal#5', nombre: 'PayPal', periodicidad: /** @type {const} */ ('mensual'), importeEsperado: -549, proximaPrevista: '2026-10-03', cobros: ['h09'], estado: /** @type {const} */ ('activo') },
+  ]
+  const categorias = new Map([['paypal', 'compras'], ['paypal#7', 'suscripciones']])
+  const descritos = describirFijos(compromisos, cobros, categorias)
+  assert.equal(descritos.find((f) => f.reciboId === 'paypal#7')?.categoria, 'suscripciones')
+  assert.equal(descritos.find((f) => f.reciboId === 'paypal#5')?.categoria, 'compras')
 })

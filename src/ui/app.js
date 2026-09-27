@@ -138,10 +138,13 @@ async function arrancar() {
  * manejadores en silencio hasta que un clic hiciera cinco cosas.
  */
 function montarVistas() {
-  /** @param {{ reciboId: string, trato: import('./trato.js').Trato, apodo: string, cambiaTrato: boolean }} cambio */
-  const alCambiarTrato = async ({ reciboId, trato, apodo, cambiaTrato }) => {
+  /** @param {{ reciboId: string, trato: import('./trato.js').Trato, apodo: string, categoria: string, cambiaTrato: boolean }} cambio */
+  const alCambiarTrato = async ({ reciboId, trato, apodo, categoria, cambiaTrato }) => {
     await ponerApodo(reciboId, apodo)
     await ponerTrato(reciboId, trato)
+    // La regla se guarda bajo el recibo, no bajo el cobrador: del mismo PayPal
+    // salen dos suscripciones y una compra suelta.
+    if (categoria) await ponerRegla(reciboId, categoria)
     await refrescar()
     if (!cambiaTrato) return decir(apodo === '' ? 'Hecho.' : `Hecho: ahora se llama ${apodo}.`)
     decir(trato === 'baja'

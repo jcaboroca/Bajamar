@@ -34,7 +34,9 @@ export const DIA_DE_ADELANTO = 20
  * @property {number} importe    céntimos, negativo
  * @property {string} detalle
  * @property {string} reciboId
+ * @property {string} categoria
  * @property {boolean} inversion
+ * @property {boolean} aplazable         el usuario dice que un mes malo se lo salta
  * @property {boolean} puedeSerInversion  la app duda y el usuario puede decidir
  */
 
@@ -49,6 +51,7 @@ export const DIA_DE_ADELANTO = 20
  * @property {number} sumaInversiones
  * @property {number} diaADia
  * @property {number} sumaToca
+ * @property {number} aplazable        lo que darías de margen si te lo saltaras
  * @property {number} resultado        lo que sobra, o falta, al acabar el mes
  */
 
@@ -91,7 +94,9 @@ export function cascadaDelMes({ mes, fijos, ingreso, diaADia, inversiones = {} }
         importe: fijo.importeEsperado,
         detalle: fijo.periodicidad === 'mensual' ? diaDe(fecha) : `${diaDe(fecha)} · ${cada(fijo)}`,
         reciboId: fijo.reciboId,
+        categoria: fijo.categoria,
         inversion,
+        aplazable: fijo.aplazable === true,
         puedeSerInversion,
       }
       if (inversion) listaInversiones.push(escalon)
@@ -120,6 +125,8 @@ export function cascadaDelMes({ mes, fijos, ingreso, diaADia, inversiones = {} }
     sumaInversiones,
     diaADia,
     sumaToca,
+    aplazable: [...listaFijos, ...listaInversiones, ...listaToca]
+      .reduce((t, e) => (e.aplazable ? t + e.importe : t), 0),
     resultado: ingreso + sumaFijos + sumaInversiones + diaADia + sumaToca,
   }
 }

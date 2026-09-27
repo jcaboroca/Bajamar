@@ -10,6 +10,7 @@
  */
 
 import { formatEuros } from '../dominio/dinero.js'
+import { CATEGORIAS } from '../entidades/semillas.js'
 import { pedirDatos } from './hoja.js'
 
 /** @typedef {'fijo' | 'suelto' | 'baja'} Trato */
@@ -25,9 +26,10 @@ const OPCIONES = /** @type {Array<[string, string]>} */ ([
  * @param {string} p.nombre
  * @param {Trato} [p.actual]
  * @param {string} [p.apodo]
- * @returns {Promise<{ trato: Trato, apodo: string } | null>}  null si se arrepiente
+ * @param {string} [p.categoria]
+ * @returns {Promise<{ trato: Trato, apodo: string, categoria: string } | null>}  null si se arrepiente
  */
-export async function preguntarTrato({ nombre, actual = 'fijo', apodo = '' }) {
+export async function preguntarTrato({ nombre, actual = 'fijo', apodo = '', categoria = 'otros' }) {
   const respuesta = await pedirDatos({
     titulo: nombre,
     aceptar: 'Guardar',
@@ -37,6 +39,15 @@ export async function preguntarTrato({ nombre, actual = 'fijo', apodo = '' }) {
       tipo: 'texto',
       valor: apodo,
       pista: 'Déjalo en blanco para el nombre del banco',
+    }, {
+      nombre: 'categoria',
+      etiqueta: '¿De qué tipo?',
+      tipo: 'lista',
+      valor: categoria,
+      opciones: Object.entries(CATEGORIAS),
+      // Va por recibo: del mismo PayPal salen dos suscripciones y una compra
+      // suelta, y no son lo mismo.
+      pista: 'Sólo para este recibo, no para todo lo que cobre el mismo sitio.',
     }, {
       nombre: 'trato',
       etiqueta: '¿Lo vas a seguir pagando?',
@@ -51,6 +62,7 @@ export async function preguntarTrato({ nombre, actual = 'fijo', apodo = '' }) {
   return {
     trato: elegido === 'suelto' || elegido === 'baja' ? elegido : 'fijo',
     apodo: String(respuesta.apodo ?? ''),
+    categoria: String(respuesta.categoria ?? categoria),
   }
 }
 
@@ -73,10 +85,12 @@ export function rotuloDe(reciboId, nombre, importe) {
  * @param {HTMLElement} fila
  * @param {string} reciboId
  * @param {string} [rotulo]
+ * @param {string} [categoria]
  */
-export function marcarPreguntable(fila, reciboId, rotulo) {
+export function marcarPreguntable(fila, reciboId, rotulo, categoria) {
   fila.dataset.recibo = reciboId
   if (rotulo) fila.dataset.rotulo = rotulo
+  if (categoria) fila.dataset.categoria = categoria
   fila.tabIndex = 0
   fila.setAttribute('role', 'button')
 }
@@ -86,7 +100,7 @@ export function marcarPreguntable(fila, reciboId, rotulo) {
  * cambio y sus escuchadores morirían con ellas.
  * @param {HTMLElement} caja
  * @param {() => { nombres: Map<string, string>, tratos: Record<string, Trato>, apodos: Record<string, string> } | null} mirarEstado
- * @param {(cambio: { reciboId: string, trato: Trato, apodo: string, cambiaTrato: boolean }) => unknown} alCambiar
+ * @param {(cambio: { reciboId: string, trato: Trato, apodo: string, categoria: string, cambiaTrato: boolean }) => unknown} alCambiar
  */
 export function preguntarAlPulsar(caja, mirarEstado, alCambiar) {
   const abrir = async (/** @type {Element} */ objetivo) => {
@@ -97,10 +111,11 @@ export function preguntarAlPulsar(caja, mirarEstado, alCambiar) {
     if (!reciboId || !estado) return
     const actual = estado.tratos[reciboId] ?? 'fijo'
     const apodo = estado.apodos[reciboId] ?? ''
+    const categoria = fila.dataset.categoria ?? 'otros'
     const nombre = fila.dataset.rotulo ?? estado.nombres.get(reciboId.split('#')[0]) ?? reciboId
-    const elegido = await preguntarTrato({ nombre, actual, apodo })
+    const elegido = await preguntarTrato({ nombre, actual, apodo, categoria })
     if (elegido === null) return
-    if (elegido.trato === actual && elegido.apodo === apodo) return
+    if (elegido.trato === actual && elegido.apodo === apodo && elegido.categoria === categoria) return
     await alCambiar({ reciboId, ...elegido, cambiaTrato: elegido.trato !== actual })
   }
 

@@ -34,6 +34,9 @@ let ultimo = null
 
 export function montarPrevision({ alCambiarTrato, alApagarCategoria, alMarcarInversion }) {
   montarSimulador({ alApagarCategoria })
+  for (const caja of ['fijos', 'apartados', 'cascada']) {
+    preguntarAlPulsar(requerir(caja), () => ultimo, alCambiarTrato)
+  }
   requerir('cascada').addEventListener('change', (ev) => {
     const casilla = /** @type {HTMLInputElement} */ (ev.target)
     if (!casilla.dataset.inversion) return
@@ -234,9 +237,26 @@ function pintarCascada(estado) {
   filas.push(encabezado(c.resultado < 0 ? 'Te falta' : 'Te sobra', Math.abs(c.resultado), null, c.resultado < 0))
   requerir('cascada').replaceChildren(...filas)
 
-  requerir('cascada-pie').textContent = c.resultado < 0
-    ? 'Con lo que cobras este mes no llegas: la diferencia sale del saldo que ya tienes.'
-    : 'Las inversiones salen de la cuenta pero no se gastan: siguen siendo tuyas.'
+  requerir('cascada-pie').textContent = margen(c)
+}
+
+/**
+ * @param {import('../../analisis/cascada.js').Cascada} c
+ */
+function margen(c) {
+  const base = 'Toca cualquier línea para decirme qué es y si te la puedes saltar.'
+  if (c.aplazable === 0) {
+    return c.resultado < 0
+      ? `Con lo que cobras no llegas: la diferencia sale del saldo que ya tienes. ${base}`
+      : `Las inversiones salen de la cuenta pero no se gastan: siguen siendo tuyas. ${base}`
+  }
+  const conMargen = c.resultado - c.aplazable
+  return c.resultado < 0
+    ? `Si este mes no traspasas lo que puedes saltarte, en vez de faltarte `
+      + `${formatEuros(Math.abs(c.resultado))} te ${conMargen < 0 ? 'faltan' : 'sobran'} `
+      + `${formatEuros(Math.abs(conMargen))}. ${base}`
+    : `Saltarte lo que puedes saltarte te dejaría ${formatEuros(conMargen)} en vez de `
+      + `${formatEuros(c.resultado)}. ${base}`
 }
 
 /**
@@ -264,9 +284,10 @@ function desglose(lista) {
     const li = nodo('li')
     li.append(
       nodo('span', 'cascada-nombre', e.nombre),
-      nodo('span', 'cascada-cuando', e.detalle),
+      nodo('span', 'cascada-cuando', e.detalle + (e.aplazable ? ' · te lo puedes saltar' : '')),
       nodo('span', 'cifras', formatEuros(e.importe)),
     )
+    marcarPreguntable(li, e.reciboId, rotuloDe(e.reciboId, e.nombre, e.importe), e.categoria)
     // Un traspaso a tu propio bolsillo y la cuota de un préstamo salen por el
     // mismo sitio y son lo contrario: sólo el usuario sabe cuál es cuál.
     if (e.puedeSerInversion) li.append(marcaDeInversion(e))
@@ -282,6 +303,8 @@ function marcaDeInversion(e) {
   casilla.type = 'checkbox'
   casilla.checked = e.inversion
   casilla.dataset.inversion = e.reciboId
+  // La fila entera abre la ficha del recibo; la casilla decide otra cosa.
+  label.addEventListener('click', (ev) => ev.stopPropagation())
   label.append(casilla, nodo('span', '', e.inversion ? 'Es ahorro, no gasto' : 'Marcar como ahorro'))
   return label
 }
