@@ -903,3 +903,28 @@ main {
 .cascada-detalle li.saltado .cifras { text-decoration: line-through; opacity: 0.5; }
 .cascada-detalle li.saltado .cascada-cuando { color: var(--acento); }
 @media (prefers-reduced-motion: reduce) { .cascada-saltar:active { transform: none; } }
+
+/* La cifra sobre la que de verdad se decide algo: lo que queda para vivir. */
+.cascada-vivir {
+  border-left: 2px solid var(--bien);
+  padding-left: 0.75rem;
+}
+
+.cascada-vivir.alarma {
+  border-left-color: var(--alarma);
+}
+
+.cascada-vivir .cascada-importe {
+  color: var(--bien);
+  font-size: 1.15rem;
+}
+
+.cascada-vivir.alarma .cascada-importe {
+  color: var(--alarma);
+}
+
+.cascada-vivir-lectura {
+  margin: 0.2rem 0 0;
+  font-size: 0.8rem;
+  color: var(--secundario);
+}

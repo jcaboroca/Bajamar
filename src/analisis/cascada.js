@@ -135,6 +135,7 @@ export function cascadaDelMes({ mes, fijos, ingreso, diaADia, inversiones = {}, 
       inversion: false,
       aplazable: false,
       puedeSerInversion: false,
+      fecha: c.fecha,
     }))
     .sort(porImporte)
 

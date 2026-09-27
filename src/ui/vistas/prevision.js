@@ -229,18 +229,25 @@ function pintarCascada(estado) {
     filas.push(li)
   }
 
-  escalon('Gastos fijos del mes', 'Ninguno.', c.sumaFijos, c.fijos)
-  if (c.plazos.length > 0) {
-    escalon('Lo que aplazaste', '', c.sumaPlazos, c.plazos)
-  }
+  // Todo lo que seguro que sale, junto y por día: los fijos de siempre, las
+  // cuotas de lo aplazado y los recibos gordos que sólo caen este mes. Verlos
+  // en tres montones no ayuda a decidir nada; el total sí.
+  const seguros = [...c.fijos, ...c.plazos, ...c.toca]
+    .sort((a, b) => (a.fecha ?? '').localeCompare(b.fecha ?? ''))
+  escalon(
+    `Gastos fijos de ${nombre.toLowerCase()}`,
+    'Ninguno.',
+    c.sumaFijos + c.sumaPlazos + c.sumaToca,
+    seguros,
+  )
   escalon('Inversiones', 'Este mes no apartas nada.', c.sumaInversiones, c.inversiones)
+
+  filas.push(loQueQuedaParaVivir(queda, c))
 
   queda += c.diaADia
   const dia = encabezado('Día a día', c.diaADia, queda)
   dia.append(desgloseDiaADia(estado, c.diaADia))
   filas.push(dia)
-
-  escalon('Este mes toca', 'Este mes no cae ningún recibo de los gordos.', c.sumaToca, c.toca)
 
   filas.push(encabezado(c.resultado < 0 ? 'Te falta' : 'Te sobra', Math.abs(c.resultado), null, c.resultado < 0))
   requerir('cascada').replaceChildren(...filas)
@@ -290,6 +297,43 @@ function margen(c) {
       + `${formatEuros(Math.abs(conMargen))}. ${base}`
     : `Saltarte lo que puedes saltarte te dejaría ${formatEuros(conMargen)} en vez de `
       + `${formatEuros(c.resultado)}. ${base}`
+}
+
+/**
+ * Lo que queda cuando ya ha salido todo lo que no se puede evitar. Es la única
+ * cifra del mes sobre la que se decide algo, y estaba escondida como un
+ * «quedan…» pequeño debajo de otro escalón.
+ *
+ * Se dice al día porque nadie sabe si 1.300 € es mucho, y todo el mundo sabe si
+ * 42 € al día le dan de comer.
+ *
+ * @param {number} queda
+ * @param {import('../../analisis/cascada.js').Cascada} c
+ */
+function loQueQuedaParaVivir(queda, c) {
+  const dias = Number(ultimoDiaDelMes(`${c.mes}-01`).slice(8))
+  const alDia = Math.round(queda / dias)
+  const ritmo = Math.round(Math.abs(c.diaADia) / dias)
+  const apurado = alDia < ritmo
+
+  const li = nodo('li', `cascada-fila cascada-vivir${queda < 0 || apurado ? ' alarma' : ''}`)
+  const cabeza = nodo('div', 'cascada-cabeza')
+  cabeza.append(
+    nodo('span', 'cascada-titulo', 'Te queda para el día a día'),
+    nodo('span', 'cascada-importe cifras', formatEuros(queda)),
+  )
+  li.append(cabeza)
+
+  if (queda <= 0) {
+    li.append(nodo('p', 'cascada-vivir-lectura', 'No queda nada. Todo lo que gastes sale del colchón.'))
+    return li
+  }
+  li.append(nodo('p', 'cascada-vivir-lectura',
+    `${formatEurosRedondo(alDia)} al día durante ${dias} días. `
+    + (apurado
+      ? `Sueles gastar ${formatEurosRedondo(ritmo)}, así que este mes toca apretar.`
+      : `Sueles gastar ${formatEurosRedondo(ritmo)}, así que vas holgado.`)))
+  return li
 }
 
 /**
