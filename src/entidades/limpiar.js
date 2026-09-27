@@ -59,6 +59,7 @@ export function limpiarConcepto(raw) {
   }
 
   texto = texto.replace(/^\d{2}\.\d{2}\s+/, '') // fecha incrustada tipo "24.06 "
+  texto = texto.replace(/^SUMUP\s+/i, '') // el datáfono, delante del comercio de verdad
 
   /** @type {string | null} */
   let localidad = null

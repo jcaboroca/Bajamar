@@ -19,6 +19,7 @@ import { hoyIso, mesDe, sumarMeses, ultimoDiaDelMes } from './dominio/tipos.js'
 import { limpiarConcepto } from './entidades/limpiar.js'
 import { indicePorAlias, reconciliar } from './entidades/reconciliar.js'
 import { CATEGORIAS } from './entidades/semillas.js'
+import { PISTAS, oficioDe } from './entidades/oficios.js'
 
 /**
  * @typedef {import('./dominio/tipos.js').Movimiento} Movimiento
@@ -78,12 +79,15 @@ export function construirEstado(crudos, opciones = {}) {
   /** @type {Movimiento[]} */
   const movimientos = limpios.map(({ m, nombre, localidad, pista }) => {
     const entidadId = porAlias.get(nombre) ?? null
-    if (entidadId) {
-      const actual = categorias.get(entidadId) ?? 'otros'
-      // La etiqueta que pone el banco gana sobre «sin clasificar», pero no sobre
-      // una regla concreta ni sobre lo que haya dicho el usuario.
-      if (actual === 'otros' && pista && CATEGORIAS[pista]) categorias.set(entidadId, pista)
-      else if (actual === 'otros' && PARECE_CUENTA.test(nombre)) categorias.set(entidadId, 'traspaso')
+    if (entidadId && (categorias.get(entidadId) ?? 'otros') === 'otros') {
+      // Por orden de fiabilidad, y ninguna pisa una semilla ni una regla del
+      // usuario. Lo último es «va a nombre de alguien»: eso lo dice un Bizum,
+      // pero también una transferencia al taller, y el taller se llama taller.
+      const puesta = (pista && CATEGORIAS[pista] ? pista : null)
+        ?? (PARECE_CUENTA.test(nombre) ? 'traspaso' : null)
+        ?? oficioDe(nombre)
+        ?? (pista ? PISTAS[pista] : null)
+      if (puesta) categorias.set(entidadId, puesta)
     }
     const retoque = retoques.get(m.id)
     // Un retoque habla de este apunte y sólo de este. Para que valga también

@@ -38,7 +38,7 @@ export const SEMILLAS = [
   { nombre: 'Adeslas', patron: /^ADESLAS\b/, tipo: 'comercio', categoria: 'seguros' },
 
   // Financiación y ahorro
-  { nombre: 'MyInvestor', patron: /MYINVESTOR|MY INVESTOR/, tipo: 'comercio', categoria: 'traspaso' },
+  { nombre: 'MyInvestor', patron: /MYINVESTO|MY INVESTOR/, tipo: 'comercio', categoria: 'traspaso' },
   { nombre: 'Financiación CaixaBank', patron: /FINANCIERA CAIXABANK/, tipo: 'comercio', categoria: 'financiacion' },
   { nombre: 'Financiación BBVA', patron: /FINANCIERA BANCO BILBAO/, tipo: 'comercio', categoria: 'financiacion' },
   { nombre: 'Liquidación de la VISA', patron: /TARJETA\s+(DE\s+)?CREDITO/, tipo: 'comercio', categoria: 'tarjeta' },
@@ -53,6 +53,19 @@ export const SEMILLAS = [
   { nombre: 'Amazon', patron: /AMAZON|\bAMZN\b/, tipo: 'comercio', categoria: 'compras' },
   { nombre: 'PayPal', patron: /\bPAYPAL\b/, tipo: 'comercio', categoria: 'compras' },
   { nombre: 'Decathlon', patron: /^DECATHLON\b/, tipo: 'comercio', categoria: 'compras' },
+  { nombre: 'AliExpress', patron: /ALIEXPRESS/, tipo: 'comercio', categoria: 'compras' },
+  { nombre: 'Wallapop', patron: /WALLAPOP/, tipo: 'comercio', categoria: 'compras' },
+
+  // Cadenas que escriben un código distinto en cada cobro. Sin esto, cuarenta
+  // pedidos de Glovo son cuarenta comercios que sólo aparecieron una vez.
+  { nombre: 'Glovo', patron: /^GLOVO/, tipo: 'comercio', categoria: 'restaurantes' },
+  { nombre: 'Uber Eats', patron: /UBER ?EATS/, tipo: 'comercio', categoria: 'restaurantes' },
+  { nombre: 'Booking', patron: /BOOKING\.COM/, tipo: 'comercio', categoria: 'viajes' },
+  { nombre: 'Grab', patron: /^GRAB A-/, tipo: 'comercio', categoria: 'viajes' },
+  { nombre: 'Playtomic', patron: /PLAYTOMIC/, tipo: 'comercio', categoria: 'ocio' },
+  { nombre: 'Cedipsa', patron: /\bCEDIPSA\b/, tipo: 'comercio', categoria: 'combustible' },
+  { nombre: 'Octopus Energy', patron: /OCTOPUS ENERGY/, tipo: 'comercio', categoria: 'luz' },
+  { nombre: 'Starlink', patron: /STARLINK/, tipo: 'comercio', categoria: 'telecom' },
 
   // Supermercado
   { nombre: 'Condis', patron: /^CONDIS\b/, tipo: 'comercio', categoria: 'super' },
@@ -122,6 +135,7 @@ export const CATEGORIAS = {
   super: 'Supermercado',
   restaurantes: 'Restaurantes',
   combustible: 'Combustible',
+  peajes: 'Peajes y aparcamiento',
   calefaccion: 'Calefacción',
   riggs: 'Riggs',
   vehiculos: 'Furgoneta y moto',
