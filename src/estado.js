@@ -44,6 +44,19 @@ export const NO_ES_GASTO = new Set(['traspaso', 'banco', 'nomina'])
 const FUERA_DEL_GOTEO = new Set([...NO_ES_GASTO, 'tarjeta'])
 
 /**
+ * Lo que llega con recibo: si su categoría ya tiene una línea prevista con fecha
+ * e importe, sus apuntes sueltos tampoco son goteo. El goteo es para lo que no
+ * se sabe hasta que pasa, y un IBI se sabe.
+ *
+ * Se mira si está previsto de verdad, no se da por hecho: sacar del goteo un
+ * gasto que nadie más prevé no lo ahorra, sólo lo esconde.
+ */
+const CON_RECIBO = new Set([
+  'luz', 'agua', 'gas', 'telecom', 'impuestos', 'seguros', 'financiacion',
+  'suscripciones', 'calefaccion',
+])
+
+/**
  * Cuando el concepto limpio es un número de cuenta, no hay comercio detrás:
  * es dinero que se mueve de un bolsillo propio a otro.
  */
@@ -72,6 +85,7 @@ const HORIZONTE_LARGO = 12
  * @param {Record<string, true>} [opciones.apagadas] categoría → no toca esta temporada
  * @param {Record<string, boolean>} [opciones.inversiones] reciboId → es inversión, no gasto
  * @param {number} [opciones.colchon] céntimos por debajo de los cuales avisar
+ * @param {number} [opciones.ventanaRitmo] meses que mira el goteo hacia atrás
  * @param {number} [opciones.meses] meses que abarca la proyección de portada
  */
 export function construirEstado(crudos, opciones = {}) {
@@ -175,15 +189,21 @@ export function construirEstado(crudos, opciones = {}) {
       .flatMap((c) => c.cobros),
   )
   const apagadas = opciones.apagadas ?? {}
+  const cubiertas = new Set(
+    compromisos
+      .filter((c) => c.estado !== 'extinto')
+      .map((c) => categorias.get(c.reciboId) ?? categorias.get(c.entidadId))
+      .filter((cat) => cat !== undefined && CON_RECIBO.has(cat)),
+  )
   // Se filtra por la misma clave que usa el reparto, no por la entidad, para que
   // las barras y el goteo no puedan discrepar sobre qué se está contando.
   const ordinarios = gastoOrdinario(
     cuenta.filter((m) => !cobrosDeBaja.has(m.id)),
     compromisos,
-    FUERA_DEL_GOTEO,
+    new Set([...FUERA_DEL_GOTEO, ...cubiertas]),
     categorias,
   ).filter((m) => !apagadas[m.categoria ?? 'otros'])
-  const ritmo = ritmoOrdinario(ordinarios)
+  const ritmo = ritmoOrdinario(ordinarios, opciones.ventanaRitmo)
 
   const ultimo = cuenta.reduce(
     (mejor, m) => (m.fecha > mejor.fecha || (m.fecha === mejor.fecha && (m.saldo ?? 0) < (mejor.saldo ?? 0)) ? m : mejor),

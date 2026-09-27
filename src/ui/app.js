@@ -26,6 +26,7 @@ import {
   nuevoId,
   ponerApunte,
   ponerColchon,
+  ponerVentanaRitmo,
   ponerObjetivo,
   ponerPresupuesto,
   ponerRegla,
@@ -208,6 +209,11 @@ function montarVistas() {
       await refrescar()
       decir('Colchón guardado.')
     },
+    alElegirVentana: async (meses) => {
+      await ponerVentanaRitmo(meses)
+      await refrescar()
+      decir(meses === 0 ? 'Miro todo tu historial.' : `Miro tus últimos ${meses} meses.`)
+    },
     alGuardarPresupuesto: async (categoria, centimos) => {
       await ponerPresupuesto(categoria, centimos)
       await refrescar()
@@ -247,6 +253,7 @@ async function refrescar({ animar = false, local = true } = {}) {
     anuales: preferencias.anuales,
     apagadas: preferencias.apagadas,
     inversiones: preferencias.inversiones,
+    ventanaRitmo: preferencias.ventanaRitmo,
     colchon: preferencias.colchon,
   })
 
@@ -258,7 +265,7 @@ async function refrescar({ animar = false, local = true } = {}) {
   pintarMovimientos(estado)
   pintarPrevision(estado)
   pintarPatrimonio(estado, preferencias.objetivos)
-  pintarAjustes(estado, preferencias.colchon)
+  pintarAjustes(estado, preferencias.colchon, preferencias.ventanaRitmo)
 }
 
 /**

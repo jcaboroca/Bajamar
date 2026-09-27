@@ -506,11 +506,18 @@ export function gastoOrdinario(movimientos, compromisos, categoriasFuera, catego
 }
 
 /**
+ * Un año: coge el ciclo entero —verano, navidades, seguros— sin arrastrar a
+ * la persona que eras hace dos. Cero significa mirarlo todo.
+ */
+export const VENTANA_POR_DEFECTO = 12
+
+/**
  * Ritmo diario de gasto ordinario, por mediana de los meses completos.
  * @param {Movimiento[]} ordinarios
- * @returns {{ porDia: number, porMes: number, meses: number }}
+ * @param {number} [ventana] cuántos meses hacia atrás
+ * @returns {{ porDia: number, porMes: number, meses: number, disponibles: number }}
  */
-export function ritmoOrdinario(ordinarios) {
+export function ritmoOrdinario(ordinarios, ventana = VENTANA_POR_DEFECTO) {
   /** @type {Map<string, number>} */
   const porMes = new Map()
   for (const m of ordinarios) {
@@ -520,6 +527,12 @@ export function ritmoOrdinario(ordinarios) {
   const meses = [...porMes.entries()].sort((a, b) => a[0].localeCompare(b[0]))
   // El mes en curso está a medias: contarlo hundiría la mediana.
   const completos = meses.slice(0, -1).map(([, v]) => v)
-  const tipico = mediana(completos)
-  return { porDia: Math.round(tipico / 30.4), porMes: tipico, meses: completos.length }
+  const usados = ventana > 0 ? completos.slice(-ventana) : completos
+  const tipico = mediana(usados)
+  return {
+    porDia: Math.round(tipico / 30.4),
+    porMes: tipico,
+    meses: usados.length,
+    disponibles: completos.length,
+  }
 }

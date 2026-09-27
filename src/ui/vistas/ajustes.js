@@ -11,6 +11,7 @@
  */
 
 import { formatEuros } from '../../dominio/dinero.js'
+import { ritmoOrdinario } from '../../analisis/compromisos.js'
 import { CATEGORIAS } from '../../entidades/semillas.js'
 import { barra, nodo, requerir, vacio } from '../piezas.js'
 
@@ -21,6 +22,7 @@ import { barra, nodo, requerir, vacio } from '../piezas.js'
 /**
  * @type {{
  *   alGuardarColchon: (centimos: number) => Promise<void>,
+ *   alElegirVentana: (meses: number) => Promise<void>,
  *   alGuardarPresupuesto: (categoria: string, centimos: number | null) => Promise<void>,
  *   alClasificar: (entidadId: string, categoria: string) => Promise<void>,
  *   alMarcarUnico: (entidadId: string, esUnico: boolean) => Promise<void>,
@@ -40,6 +42,12 @@ export function montarAjustes(enganches) {
     const campo = requerir('colchon-campo')
     if (!(campo instanceof HTMLInputElement)) return
     await ganchos.alGuardarColchon(Math.max(0, Math.round(Number(campo.value || 0) * 100)))
+  })
+
+  requerir('ventana-ritmo').addEventListener('click', async (e) => {
+    const boton = e.target
+    if (!(boton instanceof HTMLElement) || !boton.dataset.ventana) return
+    await ganchos.alElegirVentana(Number(boton.dataset.ventana))
   })
 
   requerir('presupuestos').addEventListener('change', async (e) => {
@@ -71,8 +79,9 @@ export function montarAjustes(enganches) {
 /**
  * @param {Estado} estado
  * @param {number} colchon
+ * @param {number} ventana
  */
-export function pintarAjustes(estado, colchon) {
+export function pintarAjustes(estado, colchon, ventana) {
   requerir('dato-movimientos').textContent = String(estado.movimientos.length)
   requerir('dato-ritmo').textContent = `${formatEuros(estado.ritmo.porMes)} / mes`
   requerir('dato-saldo').textContent = formatEuros(estado.saldoInicial)
@@ -82,8 +91,34 @@ export function pintarAjustes(estado, colchon) {
     campo.value = colchon > 0 ? String(colchon / 100) : ''
   }
 
+  pintarVentana(estado, ventana)
   pintarSinClasificar(estado)
   pintarPresupuestos(estado)
+}
+
+/**
+ * Cada opción con lo que daría: la diferencia entre mirar un año o tres meses
+ * no se entiende hasta que se ven las dos cifras juntas.
+ * @param {Estado} estado
+ * @param {number} ventana
+ */
+function pintarVentana(estado, ventana) {
+  const caja = requerir('ventana-ritmo')
+  const opciones = [3, 6, 12, 0].filter((n) => n === 0 || n <= estado.ritmo.disponibles)
+  caja.replaceChildren(...opciones.map((n) => {
+    const r = ritmoOrdinario(estado.ordinarios, n)
+    const boton = nodo('button', 'ventana-opcion')
+    if (!(boton instanceof HTMLButtonElement)) return boton
+    boton.type = 'button'
+    boton.dataset.ventana = String(n)
+    if (n === ventana) boton.classList.add('elegida')
+    boton.setAttribute('aria-pressed', String(n === ventana))
+    boton.append(
+      nodo('span', 'ventana-plazo', n === 0 ? `Todo (${r.meses} meses)` : `${n} meses`),
+      nodo('span', 'ventana-cifra cifras', `${formatEuros(r.porMes)} / mes`),
+    )
+    return boton
+  }))
 }
 
 /**

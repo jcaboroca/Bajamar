@@ -9,6 +9,7 @@
  */
 
 import { borrar, escribir, leer, leerTodo } from './db.js'
+import { VENTANA_POR_DEFECTO } from '../analisis/compromisos.js'
 
 /**
  * @typedef {import('../dominio/tipos.js').Retoque} Retoque
@@ -36,11 +37,12 @@ import { borrar, escribir, leer, leerTodo } from './db.js'
  * @property {Record<string, boolean>} inversiones reciboId → es inversión, no gasto
  * @property {import('../dominio/tipos.js').Bulto[]} bultos
  * @property {number} colchon                  céntimos
+ * @property {number} ventanaRitmo             meses que mira el goteo atrás
  */
 
 /** @returns {Promise<Preferencias>} */
 export async function cargar() {
-  const [retoques, presupuestos, objetivos, patrimonio, reglas, bultos, colchon, tratos, apodos, unicos, anuales, apagadas, inversiones] = await Promise.all([
+  const [retoques, presupuestos, objetivos, patrimonio, reglas, bultos, colchon, ventanaRitmo, tratos, apodos, unicos, anuales, apagadas, inversiones] = await Promise.all([
     leerTodo('retoques'),
     leerTodo('presupuestos'),
     leerTodo('objetivos'),
@@ -48,6 +50,7 @@ export async function cargar() {
     leerTodo('reglas'),
     leerTodo('bultos'),
     leer('ajustes', 'colchon'),
+    leer('ajustes', 'ventanaRitmo'),
     leerTodo('tratos'),
     leerTodo('apodos'),
     leerTodo('unicos'),
@@ -70,6 +73,7 @@ export async function cargar() {
     apagadas: Object.fromEntries(apagadas.map((/** @type {any} */ a) => [a.id, true])),
     inversiones: Object.fromEntries(inversiones.map((/** @type {any} */ i) => [i.id, i.esInversion])),
     colchon: Number(/** @type {any} */ (colchon)?.valor ?? 0),
+    ventanaRitmo: Number(/** @type {any} */ (ventanaRitmo)?.valor ?? VENTANA_POR_DEFECTO),
   }
 }
 
@@ -188,6 +192,11 @@ export async function quitarApunte(id) {
 /** @param {number} centimos */
 export async function ponerColchon(centimos) {
   return escribir('ajustes', { id: 'colchon', valor: Math.abs(centimos) })
+}
+
+/** @param {number} meses  0 = mirarlo todo */
+export async function ponerVentanaRitmo(meses) {
+  return escribir('ajustes', { id: 'ventanaRitmo', valor: Math.max(0, Math.round(meses)) })
 }
 
 /**

@@ -869,3 +869,22 @@ main {
    es lo mismo que con 200. Va pegado al resultado, no al pie. */
 .cascada-saldo-linea { margin: 0.375rem 0 0; font-size: 0.875rem; color: var(--secundario); }
 .cascada-saldo-linea.alarma { color: var(--alarma); }
+
+/* Las cuatro cifras juntas: la decisión no se puede tomar viendo una sola. */
+.ventana { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.ventana-opcion {
+  flex: 1 1 7rem; display: flex; flex-direction: column; gap: 0.125rem;
+  padding: 0.625rem 0.75rem; text-align: left; cursor: pointer;
+  background: var(--fondo); color: var(--secundario);
+  border: 1px solid var(--linea); border-radius: 0.5rem;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.ventana-opcion:active { transform: scale(0.97); }
+.ventana-opcion.elegida { border-color: var(--acento); color: var(--texto); }
+.ventana-plazo { font-size: 0.8125rem; }
+.ventana-cifra { font-size: 0.9375rem; color: inherit; }
+.ventana-opcion.elegida .ventana-cifra { color: var(--acento); }
+@media (prefers-reduced-motion: reduce) {
+  .ventana-opcion { transition: none; }
+  .ventana-opcion:active { transform: none; }
+}

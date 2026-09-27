@@ -219,6 +219,42 @@ describe('gasto ordinario', () => {
     assert.deepEqual(ordinarios.map((m) => m.importe), [-4500])
   })
 
+  test('lo que llega con recibo no es goteo: ya tiene su linea', () => {
+    // El IBI o el seguro se preven uno a uno, con su fecha y su importe. Si
+    // ademas engordaran la media diaria, el mismo dinero saldria dos veces.
+    const movimientos = [
+      mov('2026-08-10', -42800, { entidadId: 'ayto' }),
+      mov('2026-08-11', -32200, { entidadId: 'mapfre' }),
+      mov('2026-08-12', -2000, { entidadId: 'super' }),
+    ]
+    const ordinarios = gastoOrdinario(
+      movimientos,
+      /** @type {any} */ ([]),
+      new Set(['impuestos', 'seguros']),
+      new Map([['ayto', 'impuestos'], ['mapfre', 'seguros'], ['super', 'super']]),
+    )
+    assert.deepEqual(ordinarios.map((m) => m.importe), [-2000])
+  })
+
+  test('la ventana recorta el historial: los meses viejos no te describen', () => {
+    // Doce meses caros y tres baratos. Mirarlo todo dice que gastas mucho;
+    // mirar los ultimos tres dice lo que gastas ahora. Las dos son ciertas.
+    const movimientos = []
+    for (let i = 1; i <= 12; i += 1) {
+      movimientos.push(mov(`2025-${String(i).padStart(2, '0')}-05`, -100000))
+    }
+    for (const mes of ['01', '02', '03']) {
+      movimientos.push(mov(`2026-${mes}-05`, -20000))
+    }
+    movimientos.push(mov('2026-04-05', -500))
+
+    assert.equal(ritmoOrdinario(movimientos, 0).porMes, -100000)
+    assert.equal(ritmoOrdinario(movimientos, 3).porMes, -20000)
+    // El mes en curso sigue sin contar aunque se pida una ventana corta.
+    assert.equal(ritmoOrdinario(movimientos, 3).meses, 3)
+    assert.equal(ritmoOrdinario(movimientos, 0).disponibles, 15)
+  })
+
   test('la liquidacion de la tarjeta no es goteo: se proyecta aparte', () => {
     // Las compras ya estan fuera por venir del extracto de la tarjeta. Si
     // ademas contaramos el cargo que las agrupa, el mismo dinero saldria dos
