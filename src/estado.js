@@ -56,12 +56,14 @@ const HORIZONTE_LARGO = 12
  * @param {import('./analisis/patrimonio.js').Apunte[]} [opciones.patrimonio]
  * @param {Record<string, 'fijo' | 'suelto' | 'baja'>} [opciones.tratos] reciboId → cómo preverlo
  * @param {Record<string, string>} [opciones.apodos] reciboId → cómo lo llama el usuario
+ * @param {Record<string, true>} [opciones.unicos] entidadId → pasó una vez y no volverá
  * @param {number} [opciones.colchon] céntimos por debajo de los cuales avisar
  * @param {number} [opciones.meses] meses que abarca la proyección de portada
  */
 export function construirEstado(crudos, opciones = {}) {
   const hoy = opciones.hoy ?? hoyIso()
   const excepcionales = new Set(opciones.excepcionales ?? [])
+  const unicos = opciones.unicos ?? {}
   const retoques = new Map((opciones.retoques ?? []).map((r) => [r.id, r]))
 
   const limpios = crudos.map((m) => ({ m, ...limpiarConcepto(m.conceptoRaw) }))
@@ -96,7 +98,9 @@ export function construirEstado(crudos, opciones = {}) {
       nota: retoque?.nota,
       excluido: retoque?.excluido === true,
       localidad: m.localidad ?? localidad,
-      excepcional: excepcionales.has(m.id) || retoque?.excluido === true,
+      excepcional: excepcionales.has(m.id)
+        || retoque?.excluido === true
+        || (entidadId !== null && unicos[entidadId] === true),
     }
   })
 
@@ -301,6 +305,7 @@ export function construirEstado(crudos, opciones = {}) {
     ingresos,
     tratos,
     apodos,
+    unicos,
     // Lo apartado se busca en la detección sin filtrar: es la única que aún
     // sabe cómo se llamaba y cuánto costaba lo que el usuario dio de baja.
     apartados: [

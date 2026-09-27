@@ -30,13 +30,14 @@ import { borrar, escribir, leer, leerTodo } from './db.js'
  * @property {Record<string, string>} reglas   entidadId → categoría
  * @property {Record<string, Trato>} tratos    reciboId → cómo preverlo
  * @property {Record<string, string>} apodos   reciboId → cómo lo llama el usuario
+ * @property {Record<string, true>} unicos     entidadId → no va a repetirse
  * @property {import('../dominio/tipos.js').Bulto[]} bultos
  * @property {number} colchon                  céntimos
  */
 
 /** @returns {Promise<Preferencias>} */
 export async function cargar() {
-  const [retoques, presupuestos, objetivos, patrimonio, reglas, bultos, colchon, tratos, apodos] = await Promise.all([
+  const [retoques, presupuestos, objetivos, patrimonio, reglas, bultos, colchon, tratos, apodos, unicos] = await Promise.all([
     leerTodo('retoques'),
     leerTodo('presupuestos'),
     leerTodo('objetivos'),
@@ -46,6 +47,7 @@ export async function cargar() {
     leer('ajustes', 'colchon'),
     leerTodo('tratos'),
     leerTodo('apodos'),
+    leerTodo('unicos'),
   ])
 
   return {
@@ -57,6 +59,7 @@ export async function cargar() {
     reglas: Object.fromEntries(reglas.map((/** @type {any} */ r) => [r.id, r.categoria])),
     tratos: Object.fromEntries(tratos.map((/** @type {any} */ t) => [t.id, t.trato])),
     apodos: Object.fromEntries(apodos.map((/** @type {any} */ a) => [a.id, a.nombre])),
+    unicos: Object.fromEntries(unicos.map((/** @type {any} */ u) => [u.id, true])),
     colchon: Number(/** @type {any} */ (colchon)?.valor ?? 0),
   }
 }
@@ -98,6 +101,18 @@ export async function ponerRetoque(retoque) {
 export async function ponerRegla(entidadId, categoria) {
   if (!categoria) return borrar('reglas', entidadId)
   return escribir('reglas', { id: entidadId, categoria })
+}
+
+/**
+ * La batería solar se compra una vez. Sigue estando en el historial y en el
+ * saldo de aquel mes, pero no tiene por qué seguir saliendo del de los que
+ * vienen.
+ * @param {string} entidadId
+ * @param {boolean} esUnico
+ */
+export async function ponerUnico(entidadId, esUnico) {
+  if (!esUnico) return borrar('unicos', entidadId)
+  return escribir('unicos', { id: entidadId })
 }
 
 /**

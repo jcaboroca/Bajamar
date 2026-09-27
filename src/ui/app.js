@@ -29,6 +29,7 @@ import {
   ponerObjetivo,
   ponerPresupuesto,
   ponerRegla,
+  ponerUnico,
   ponerRetoque,
   ponerTrato,
   ponerApodo,
@@ -193,6 +194,10 @@ function montarVistas() {
       await ponerRegla(entidadId, categoria)
       await refrescar()
     },
+    alMarcarUnico: async (entidadId, esUnico) => {
+      await ponerUnico(entidadId, esUnico)
+      await refrescar()
+    },
   })
 }
 
@@ -216,6 +221,7 @@ async function refrescar({ animar = false, local = true } = {}) {
     patrimonio: preferencias.patrimonio,
     tratos: preferencias.tratos,
     apodos: preferencias.apodos,
+    unicos: preferencias.unicos,
     colchon: preferencias.colchon,
   })
 

@@ -23,6 +23,7 @@ import { barra, nodo, requerir, vacio } from '../piezas.js'
  *   alGuardarColchon: (centimos: number) => Promise<void>,
  *   alGuardarPresupuesto: (categoria: string, centimos: number | null) => Promise<void>,
  *   alClasificar: (entidadId: string, categoria: string) => Promise<void>,
+ *   alMarcarUnico: (entidadId: string, esUnico: boolean) => Promise<void>,
  * }}
  */
 let ganchos
@@ -52,6 +53,9 @@ export function montarAjustes(enganches) {
 
   requerir('sin-clasificar').addEventListener('change', async (e) => {
     const campo = e.target
+    if (campo instanceof HTMLInputElement && campo.dataset.unico) {
+      return ganchos.alMarcarUnico(campo.dataset.unico, campo.checked)
+    }
     if (!(campo instanceof HTMLSelectElement)) return
     const entidadId = campo.dataset.entidad
     if (!entidadId || campo.value === '') return
@@ -80,6 +84,26 @@ export function pintarAjustes(estado, colchon) {
 
   pintarSinClasificar(estado)
   pintarPresupuestos(estado)
+}
+
+/**
+ * Una batería solar, un regalo o un viaje del año pasado salieron de la cuenta
+ * pero no dicen nada de lo que viene. Marcarlos aquí los deja en el historial y
+ * los saca de la previsión. Va antes de la categoría a propósito: al elegirla,
+ * la fila deja de estar pendiente y desaparece.
+ * @param {string} entidadId
+ * @param {string} nombre
+ * @param {boolean} marcado
+ */
+function casillaUnaVez(entidadId, nombre, marcado) {
+  const etiqueta = nodo('label', 'clasificar-unico')
+  const casilla = document.createElement('input')
+  casilla.type = 'checkbox'
+  casilla.dataset.unico = entidadId
+  casilla.checked = marcado
+  casilla.setAttribute('aria-label', `${nombre} no va a repetirse`)
+  etiqueta.append(casilla, nodo('span', '', 'Fue una vez, no va a repetirse'))
+  return etiqueta
 }
 
 /**
@@ -119,6 +143,8 @@ function pintarSinClasificar(estado) {
 
     const veces = p.cuantos === 1 ? 'una sola vez' : `${p.cuantos} veces`
     li.append(nodo('p', 'mes-aviso', `${veces}, la última el ${p.ultima}`))
+
+    li.append(casillaUnaVez(p.entidadId, p.nombre, estado.unicos[p.entidadId] === true))
 
     const menu = document.createElement('select')
     menu.className = 'campo'

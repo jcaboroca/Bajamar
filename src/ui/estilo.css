@@ -420,6 +420,14 @@ main {
 
 .clasificar-fila select { margin-top: 0.5rem; width: 100%; }
 
+.clasificar-unico {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--secundario);
+}
 .meses li { cursor: pointer; }
 .meses li.elegido .mes-nombre { color: var(--acento); }
 .meses li:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
