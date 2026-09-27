@@ -363,7 +363,9 @@ export function construirEstado(crudos, opciones = {}) {
       mes: mesQuePagaLaNomina(hoy),
       fijos,
       ingreso: ingresoMensual,
-      diaADia: ritmo.porMes,
+      // Por días y no la media mensual: si no, la cascada y la proyección dan
+      // cifras distintas del mismo mes y una de las dos miente.
+      diaADia: ritmo.porDia * Number(ultimoDiaDelMes(`${mesQuePagaLaNomina(hoy)}-01`).slice(8)),
       inversiones: opciones.inversiones,
     }),
     inversiones: opciones.inversiones ?? {},

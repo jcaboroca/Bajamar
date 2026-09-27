@@ -237,7 +237,32 @@ function pintarCascada(estado) {
   filas.push(encabezado(c.resultado < 0 ? 'Te falta' : 'Te sobra', Math.abs(c.resultado), null, c.resultado < 0))
   requerir('cascada').replaceChildren(...filas)
 
+  pintarSaldoDelMes(estado)
   requerir('cascada-pie').textContent = margen(c)
+}
+
+/**
+ * La cascada es sólo el mes. Que falten 211 € no significa nada sin saber con
+ * cuánto llegas, y ahí es donde vive el punto más bajo.
+ * @param {Estado} estado
+ */
+function pintarSaldoDelMes(estado) {
+  const caja = requerir('cascada-saldo')
+  const fila = estado.meses.find((m) => m.mes === estado.cascada.mes)
+  if (!fila) { caja.replaceChildren(); return }
+
+  // El mes anterior cierra donde éste abre. Si el mes ya ha empezado no hay
+  // cierre que mirar, y lo único cierto es lo que hay en el banco ahora.
+  const anterior = estado.meses.find((m) => m.mes === sumarMeses(`${fila.mes}-01`, -1).slice(0, 7))
+  const partes = [
+    nodo('p', 'cascada-saldo-linea', anterior
+      ? `Llegas con ${formatEurosRedondo(anterior.saldoFinal)} y lo acabarías con ${formatEurosRedondo(fila.saldoFinal)}.`
+      : `Ahora tienes ${formatEurosRedondo(estado.saldoInicial)} y acabarías el mes con ${formatEurosRedondo(fila.saldoFinal)}.`),
+  ]
+  const bajo = nodo('p', `cascada-saldo-linea${fila.suelo.saldo < 0 ? ' alarma' : ''}`)
+  bajo.textContent = `Tu punto más bajo: ${formatEurosRedondo(fila.suelo.saldo)} el ${diaYMes(fila.suelo.fecha)}.`
+  partes.push(bajo)
+  caja.replaceChildren(...partes)
 }
 
 /**
