@@ -219,6 +219,23 @@ describe('gasto ordinario', () => {
     assert.deepEqual(ordinarios.map((m) => m.importe), [-4500])
   })
 
+  test('la liquidacion de la tarjeta no es goteo: se proyecta aparte', () => {
+    // Las compras ya estan fuera por venir del extracto de la tarjeta. Si
+    // ademas contaramos el cargo que las agrupa, el mismo dinero saldria dos
+    // veces: una en el goteo y otra en la liquidacion que se proyecta sola.
+    const movimientos = [
+      mov('2026-08-31', -66400, { entidadId: 'visa' }),
+      mov('2026-09-02', -2000, { entidadId: 'super' }),
+    ]
+    const ordinarios = gastoOrdinario(
+      movimientos,
+      /** @type {any} */ ([]),
+      new Set(['tarjeta']),
+      new Map([['visa', 'tarjeta'], ['super', 'super']]),
+    )
+    assert.deepEqual(ordinarios.map((m) => m.importe), [-2000])
+  })
+
   test('el mes en curso no cuenta para la mediana', () => {
     const movimientos = [
       mov('2026-07-10', -100000), mov('2026-08-10', -120000), mov('2026-09-01', -1000),

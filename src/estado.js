@@ -37,6 +37,13 @@ import { repartirGasto } from './analisis/reparto.js'
 export const NO_ES_GASTO = new Set(['traspaso', 'banco', 'nomina'])
 
 /**
+ * Y para el goteo, tampoco la tarjeta. Sus compras ya están fuera por venir del
+ * extracto, y el cargo que las agrupa se proyecta solo con lo que hay pendiente
+ * y las cuotas de lo aplazado. Contarlo aquí sería la tercera vez.
+ */
+const FUERA_DEL_GOTEO = new Set([...NO_ES_GASTO, 'tarjeta'])
+
+/**
  * Cuando el concepto limpio es un número de cuenta, no hay comercio detrás:
  * es dinero que se mueve de un bolsillo propio a otro.
  */
@@ -173,7 +180,7 @@ export function construirEstado(crudos, opciones = {}) {
   const ordinarios = gastoOrdinario(
     cuenta.filter((m) => !cobrosDeBaja.has(m.id)),
     compromisos,
-    NO_ES_GASTO,
+    FUERA_DEL_GOTEO,
     categorias,
   ).filter((m) => !apagadas[m.categoria ?? 'otros'])
   const ritmo = ritmoOrdinario(ordinarios)
