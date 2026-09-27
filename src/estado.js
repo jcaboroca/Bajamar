@@ -225,7 +225,9 @@ export function construirEstado(crudos, opciones = {}) {
   const vivos = compromisos.filter((c) => c.estado !== 'extinto' && c !== liquidacion)
   // La liquidación pendiente ya trae la cuota de este mes; las que faltan son
   // las de los meses siguientes, que no están escritas en ninguna parte.
-  const plazos = cuotasPendientes(cuenta, cargoTarjeta?.fecha ?? hoy)
+  // Con todos los movimientos, no sólo los de cuenta: la cuota de verdad, con
+  // sus intereses, sólo está escrita en el extracto de la tarjeta.
+  const plazos = cuotasPendientes(movimientos, cargoTarjeta?.fecha ?? hoy)
   const saltados = opciones.saltados ?? {}
   const armar = (/** @type {string} */ fin) => eventosDesde({
     compromisos: vivos,

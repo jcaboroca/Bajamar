@@ -623,6 +623,13 @@ describe('lo que aplazas vuelve en tres cuotas', () => {
     localidad: null, fraccionado: true, excepcional: false,
   })
 
+  /** @param {string} fecha @param {number} importe @param {string} concepto */
+  const cargo = (fecha, importe, concepto) => ({
+    id: `t:${fecha}:${importe}`, fecha, fechaValor: fecha, conceptoRaw: concepto,
+    entidadId: null, importe: -importe, saldo: null, origen: 'tarjeta',
+    localidad: null, fraccionado: true, excepcional: false,
+  })
+
   test('tres cuotas a fin de mes, y la última recoge el redondeo', () => {
     const cuotas = cuotasPendientes([abono('2026-07-01', 33100, 'FRACCIONAMIENTO IMPUESTOS AJ. GAVA')], '2026-06-30')
     assert.deepEqual(cuotas.map((c) => c.fecha), ['2026-07-31', '2026-08-31', '2026-09-30'])
@@ -636,6 +643,36 @@ describe('lo que aplazas vuelve en tres cuotas', () => {
     assert.deepEqual(cuotas.map((c) => c.fecha), ['2026-10-31', '2026-11-30'])
     assert.equal(cuotas[0].plazo, 2)
     assert.equal(cuotas[0].nombre, 'MyInvestor')
+  })
+
+  test('la cuota sale del extracto, con sus intereses dentro', () => {
+    const c = cuotasPendientes([
+      abono('2026-09-23', 46800, 'FRACCIONAMIENTO TRANSFERENCIA A MyInvestor'),
+      cargo('2026-09-22', 16132, 'TRANSFERENCIA A MyInvesto'),
+    ], '2026-09-30')
+    // Dividir 468 entre tres daria 156,00: el banco cobra 161,32.
+    assert.deepEqual(c.map((x) => x.importe), [-16132, -16132])
+    assert.equal(c[0].estimada, false)
+  })
+
+  test('sin extracto se divide entre tres, y se dice que es una estimacion', () => {
+    const c = cuotasPendientes([
+      abono('2026-09-23', 46800, 'FRACCIONAMIENTO TRANSFERENCIA A MyInvestor'),
+    ], '2026-09-30')
+    assert.deepEqual(c.map((x) => x.importe), [-15600, -15600])
+    assert.equal(c[0].estimada, true)
+  })
+
+  test('tres recibos del mismo dia se distinguen por el importe', () => {
+    const cuotas = cuotasPendientes([
+      abono('2026-07-01', 11514, 'FRACCIONAMIENTO IMPUESTOS AJ. GAVA'),
+      abono('2026-07-02', 11050, 'FRACCIONAMIENTO IMPUESTOS AJ. GAVA'),
+      abono('2026-07-03', 33071, 'FRACCIONAMIENTO IMPUESTOS AJ. GAVA'),
+      cargo('2026-07-01', 3838, 'IMPUESTOS AJ. GAVA'),
+      cargo('2026-07-02', 3683, 'IMPUESTOS AJ. GAVA'),
+      cargo('2026-07-03', 11024, 'IMPUESTOS AJ. GAVA'),
+    ], '2026-08-31')
+    assert.deepEqual(cuotas.map((x) => x.importe).sort((a, b) => a - b), [-11024, -3838, -3683])
   })
 
   test('un cargo normal no es un aplazamiento', () => {
