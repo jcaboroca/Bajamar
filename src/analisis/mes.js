@@ -156,6 +156,30 @@ export function disponibleReal({ saldo, eventos, ritmoPorDia, hoy, hasta, reserv
  */
 
 /**
+ * A partir de este día, un ingreso ya no es dinero de este mes: es el dinero
+ * con el que se vive el siguiente. Una nómina del 25 no paga los 25 días que
+ * quedan detrás, paga los 30 que vienen delante.
+ */
+const DIA_DE_ADELANTO = 20
+
+/**
+ * En qué mes cuenta un evento. Los gastos, en el suyo. Los ingresos de final de
+ * mes, en el que abren.
+ *
+ * Esto no mueve el dinero: en la cuenta sigue entrando el 25 y el suelo se
+ * calcula con esa fecha. Sólo cambia a qué mes se le apunta.
+ *
+ * @param {import('./bajamar.js').Evento} evento
+ */
+export function mesContable(evento) {
+  if (evento.tipo !== 'ingreso' || Number(evento.fecha.slice(8)) < DIA_DE_ADELANTO) {
+    return mesDe(evento.fecha)
+  }
+  const [anio, mes] = evento.fecha.split('-').map(Number)
+  return mes === 12 ? `${anio + 1}-01` : `${anio}-${String(mes + 1).padStart(2, '0')}`
+}
+
+/**
  * Descompone una proyección larga en meses.
  *
  * Es la vista que contesta «¿y en marzo?». Cada mes se cierra con su propio
@@ -195,7 +219,7 @@ export function porMeses(proyeccion) {
   }
 
   for (const e of proyeccion.eventos) {
-    const fila = filas.get(mesDe(e.fecha))
+    const fila = filas.get(mesContable(e))
     if (!fila) continue
     if (e.importe > 0) fila.ingresos += e.importe
     else fila.gastos += e.importe

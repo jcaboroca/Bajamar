@@ -2,7 +2,8 @@
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { describirFijos, estructura } from '../src/analisis/fijos.js'
+import { describirFijos, estructura, MESES_DE } from '../src/analisis/fijos.js'
+import { cascadaDelMes, mesEnCurso } from '../src/analisis/cascada.js'
 import { conGotaDiaria, disponibleReal, porMeses, resumenDeMes } from '../src/analisis/mes.js'
 import { revisarPresupuestos } from '../src/analisis/presupuestos.js'
 import { capacidadDeAhorro, progresoDe } from '../src/analisis/objetivos.js'
@@ -451,5 +452,93 @@ describe('un cobro con fecha de hoy', () => {
     assert.equal(p.suelo.saldo, 41763)
     assert.equal(p.saldoFinal, 41763)
     assert.equal(p.curva[0].saldo, 41763)
+  })
+})
+
+describe('el mes empieza con la nómina', () => {
+  /**
+   * @param {string} reciboId
+   * @param {string} nombre
+   * @param {number} importe
+   * @param {'mensual'|'bimestral'|'trimestral'|'semestral'|'anual'} periodicidad
+   * @param {string} proximaPrevista
+   * @param {string} categoria
+   */
+  const fijo = (reciboId, nombre, importe, periodicidad, proximaPrevista, categoria) => ({
+    entidadId: reciboId.split('#')[0],
+    reciboId,
+    nombre,
+    periodicidad,
+    importeEsperado: importe,
+    mensualEquivalente: Math.round(importe / MESES_DE[periodicidad]),
+    variacion: 0,
+    proximaPrevista,
+    categoria,
+    estable: true,
+    estado: /** @type {const} */ ('activo'),
+  })
+
+  const fijos = [
+    fijo('fondo', 'MyInvestor', -50000, 'mensual', '2026-10-28', 'traspaso'),
+    fijo('prestamo', 'Furgoneta', -46800, 'mensual', '2026-10-10', 'traspaso'),
+    fijo('fibra', 'O2 Fibra', -5300, 'mensual', '2026-10-01', 'telecom'),
+    fijo('ibi', 'Ajuntament', -45987, 'anual', '2026-10-01', 'impuestos'),
+    fijo('seguro', 'MAPFRE', -58237, 'anual', '2026-09-27', 'seguros'),
+  ]
+
+  test('cobrar el 25 te pone ya en el mes siguiente', () => {
+    assert.equal(mesEnCurso('2026-09-27'), '2026-10')
+    assert.equal(mesEnCurso('2026-09-19'), '2026-09')
+    assert.equal(mesEnCurso('2026-12-25'), '2027-01')
+  })
+
+  test('la cascada resta de la nómina en orden y cuadra', () => {
+    const c = cascadaDelMes({ mes: '2026-10', fijos, ingreso: 282249, diaADia: -121757 })
+    assert.equal(c.ingreso, 282249)
+    // El fondo y el préstamo salen por el mismo sitio: los dos son traspaso.
+    assert.equal(c.sumaInversiones, -96800)
+    assert.equal(c.sumaFijos, -5300)
+    // MAPFRE es de septiembre, aunque se pague tres días antes de cobrar.
+    assert.deepEqual(c.toca.map((t) => t.nombre), ['Ajuntament'])
+    assert.equal(c.sumaToca, -45987)
+    assert.equal(c.resultado, 282249 - 96800 - 5300 - 121757 - 45987)
+  })
+
+  test('el préstamo se puede sacar de las inversiones', () => {
+    const c = cascadaDelMes({
+      mes: '2026-10', fijos, ingreso: 282249, diaADia: -121757,
+      inversiones: { prestamo: false },
+    })
+    assert.deepEqual(c.inversiones.map((i) => i.nombre), ['MyInvestor'])
+    assert.equal(c.sumaInversiones, -50000)
+    assert.equal(c.sumaFijos, -46800 - 5300)
+    // Cambiar de columna no cambia lo que queda a fin de mes.
+    assert.equal(c.resultado, 282249 - 96800 - 5300 - 121757 - 45987)
+  })
+
+  test('un mes sin recibos gordos lo dice', () => {
+    const c = cascadaDelMes({ mes: '2026-11', fijos, ingreso: 282249, diaADia: -121757 })
+    assert.deepEqual(c.toca, [])
+    assert.equal(c.sumaToca, 0)
+  })
+
+  test('la nómina de fin de mes cuenta en el mes que abre', () => {
+    const proyeccion = proyectar({
+      saldoInicial: 0,
+      desde: '2026-09-01',
+      hasta: '2026-10-31',
+      ritmoPorDia: 0,
+      eventos: [
+        { fecha: '2026-09-25', importe: 282249, nombre: 'Nómina', tipo: 'ingreso', seguro: false },
+        { fecha: '2026-09-27', importe: -58237, nombre: 'MAPFRE', tipo: 'compromiso', seguro: false },
+      ],
+    })
+    const meses = porMeses(proyeccion)
+    const sept = meses.find((m) => m.mes === '2026-09')
+    const oct = meses.find((m) => m.mes === '2026-10')
+    assert.equal(sept?.ingresos, 0)
+    assert.equal(oct?.ingresos, 282249)
+    // El dinero no se mueve: el saldo del 25 sigue subiendo ese día.
+    assert.equal(proyeccion.curva.find((p) => p.fecha === '2026-09-25')?.saldo, 282249)
   })
 })

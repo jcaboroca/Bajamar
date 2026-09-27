@@ -10,6 +10,7 @@
 import { detectarCompromisos, detectarIngresos, gastoOrdinario, ritmoOrdinario } from './analisis/compromisos.js'
 import { eventosDesde, proyectar } from './analisis/bajamar.js'
 import { describirFijos, estructura } from './analisis/fijos.js'
+import { cascadaDelMes, mesEnCurso as mesQuePagaLaNomina } from './analisis/cascada.js'
 import { conGotaDiaria, disponibleReal, porMeses, resumenDeMes } from './analisis/mes.js'
 import { revisarPresupuestos } from './analisis/presupuestos.js'
 import { balance, evolucion } from './analisis/patrimonio.js'
@@ -61,6 +62,7 @@ const HORIZONTE_LARGO = 12
  * @param {Record<string, true>} [opciones.unicos] entidadId → pasó una vez y no volverá
  * @param {Record<string, true>} [opciones.anuales] entidadId → pasó una vez y vuelve cada año
  * @param {Record<string, true>} [opciones.apagadas] categoría → no toca esta temporada
+ * @param {Record<string, boolean>} [opciones.inversiones] reciboId → es inversión, no gasto
  * @param {number} [opciones.colchon] céntimos por debajo de los cuales avisar
  * @param {number} [opciones.meses] meses que abarca la proyección de portada
  */
@@ -357,6 +359,14 @@ export function construirEstado(crudos, opciones = {}) {
     meses,
     fijos,
     costes,
+    cascada: cascadaDelMes({
+      mes: mesQuePagaLaNomina(hoy),
+      fijos,
+      ingreso: ingresoMensual,
+      diaADia: ritmo.porMes,
+      inversiones: opciones.inversiones,
+    }),
+    inversiones: opciones.inversiones ?? {},
     presupuestos,
     mesEnCurso,
     disponible,

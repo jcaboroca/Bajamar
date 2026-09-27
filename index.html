@@ -111,6 +111,13 @@
   <div class="vista" id="vista-prevision" hidden>
 
     <section class="bloque">
+      <p class="rotulo" id="cascada-rotulo">Tu mes</p>
+      <p class="aclaracion" id="cascada-entradilla"></p>
+      <ol id="cascada" class="cascada"></ol>
+      <p class="nota" id="cascada-pie"></p>
+    </section>
+
+    <section class="bloque">
       <p class="rotulo">Hasta dónde miras</p>
       <div class="filtros" id="horizonte" role="group" aria-label="Horizonte">
         <button type="button" class="filtro" data-meses="3" aria-pressed="true">3 meses</button>
@@ -131,13 +138,6 @@
       <p class="aclaracion">Cada línea deja el saldo que quedaría después. Pulsa un
         mes de arriba para mirar otro.</p>
       <ol id="calendario" class="eventos"></ol>
-    </section>
-
-    <section class="bloque">
-      <p class="rotulo">Lo que cuesta tu vida</p>
-      <div id="coste-resumen"></div>
-      <p class="nota">El coste mensual reparte los recibos anuales entre los doce
-        meses. No es lo que pagas cada mes: es lo que te cuesta cada mes.</p>
     </section>
 
     <section class="bloque">

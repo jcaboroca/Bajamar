@@ -17,7 +17,7 @@ import { mesDe, ultimoDiaDelMes, sumarMeses } from '../../dominio/tipos.js'
 import { MESES_DE } from '../../analisis/fijos.js'
 import { dibujarLamina } from '../lamina.js'
 import { montarSimulador, pintarSimulador } from '../simulador.js'
-import { cuentas, diaYMes, linea, nodo, nombreDeMes, requerir, vacio } from '../piezas.js'
+import { diaYMes, linea, nodo, nombreDeMes, requerir, vacio } from '../piezas.js'
 import { marcarPreguntable, preguntarAlPulsar, rotuloDe } from '../trato.js'
 
 /**
@@ -32,8 +32,13 @@ let mesElegido = null
 /** @type {Estado | null} */
 let ultimo = null
 
-export function montarPrevision({ alCambiarTrato, alApagarCategoria }) {
+export function montarPrevision({ alCambiarTrato, alApagarCategoria, alMarcarInversion }) {
   montarSimulador({ alApagarCategoria })
+  requerir('cascada').addEventListener('change', (ev) => {
+    const casilla = /** @type {HTMLInputElement} */ (ev.target)
+    if (!casilla.dataset.inversion) return
+    alMarcarInversion(casilla.dataset.inversion, casilla.checked)
+  })
   for (const caja of ['fijos', 'apartados']) {
     preguntarAlPulsar(requerir(caja), () => ultimo, alCambiarTrato)
   }
@@ -80,7 +85,7 @@ function repintar() {
 
   pintarMeses(meses, estado)
   pintarCalendario(estado, meses)
-  pintarCoste(estado)
+  pintarCascada(estado)
   pintarSimulador(estado)
   pintarFijos(estado)
   pintarApartados(estado)
@@ -183,20 +188,102 @@ function pintarCalendario(estado, meses) {
   lista.replaceChildren(...filas)
 }
 
-/** @param {Estado} estado */
-function pintarCoste(estado) {
-  const c = estado.costes
-  requerir('coste-resumen').replaceChildren(cuentas([
-    ['Fijos, repartidos por meses', formatEuros(c.costeMensual)],
-    ['Gasto del día a día', formatEuros(estado.ritmo.porMes)],
-    ['Reserva para los no mensuales', formatEuros(c.reservaMensual)],
-    ['Total al mes', formatEuros(c.costeMensual + estado.ritmo.porMes), 'destacado'],
-    ...(estado.aplazableAlMes === 0
-      ? []
-      : /** @type {Array<[string, string, string]>} */ ([
-          ['De eso, te puedes saltar', formatEuros(estado.aplazableAlMes), ''],
-        ])),
-  ]))
+/**
+ * El mes de arriba abajo: la nómina entera y de ella van saliendo cosas, en el
+ * orden en que se deciden. Cada escalón deja a la derecha lo que queda, que es
+ * la cifra que contesta «¿y entonces cuánto me sobra?».
+ * @param {Estado} estado
+ */
+function pintarCascada(estado) {
+  const c = estado.cascada
+  const anio = c.mes.slice(0, 4)
+  const nombre = nombreDeMes(c.mes)
+  requerir('cascada-rotulo').textContent = `Tu ${nombre.toLowerCase()}`
+  requerir('cascada-entradilla').textContent = c.ingreso === 0
+    ? 'Todavía no sé lo que cobras, así que esto es sólo lo que sale.'
+    : `Cobras ${formatEuros(c.ingreso)} y con eso pagas del 1 al ${ultimoDiaDelMes(`${c.mes}-01`).slice(8)} `
+      + `de ${nombre.toLowerCase()} de ${anio}.`
+
+  let queda = c.ingreso
+  const filas = [encabezado('Lo que cobras', c.ingreso, queda)]
+
+  /**
+   * @param {string} titulo
+   * @param {string} cuandoNoHay
+   * @param {number} suma
+   * @param {import('../../analisis/cascada.js').Escalon[]} lista
+   */
+  const escalon = (titulo, cuandoNoHay, suma, lista) => {
+    queda += suma
+    const li = encabezado(titulo, suma, queda)
+    if (lista.length === 0) li.append(nodo('p', 'cascada-vacio', cuandoNoHay))
+    else li.append(desglose(lista))
+    filas.push(li)
+  }
+
+  escalon('Gastos fijos del mes', 'Ninguno.', c.sumaFijos, c.fijos)
+  escalon('Inversiones', 'Este mes no apartas nada.', c.sumaInversiones, c.inversiones)
+
+  queda += c.diaADia
+  const dia = encabezado('Día a día', c.diaADia, queda)
+  dia.append(nodo('p', 'cascada-vacio', 'Compra, gasolina, restaurantes… al ritmo al que vienes gastando.'))
+  filas.push(dia)
+
+  escalon('Este mes toca', 'Este mes no cae ningún recibo de los gordos.', c.sumaToca, c.toca)
+
+  filas.push(encabezado(c.resultado < 0 ? 'Te falta' : 'Te sobra', Math.abs(c.resultado), null, c.resultado < 0))
+  requerir('cascada').replaceChildren(...filas)
+
+  requerir('cascada-pie').textContent = c.resultado < 0
+    ? 'Con lo que cobras este mes no llegas: la diferencia sale del saldo que ya tienes.'
+    : 'Las inversiones salen de la cuenta pero no se gastan: siguen siendo tuyas.'
+}
+
+/**
+ * @param {string} titulo
+ * @param {number} importe
+ * @param {number | null} queda
+ * @param {boolean} [mal]
+ */
+function encabezado(titulo, importe, queda, mal = false) {
+  const li = nodo('li', queda === null ? 'cascada-fila cascada-final' : 'cascada-fila')
+  const cabeza = nodo('div', 'cascada-cabeza')
+  cabeza.append(
+    nodo('span', 'cascada-titulo', titulo),
+    nodo('span', `cifras ${mal ? 'alarma' : ''}`.trim(), formatEuros(importe, { signo: queda !== null })),
+  )
+  li.append(cabeza)
+  if (queda !== null) li.append(nodo('p', 'cascada-queda', `quedan ${formatEurosRedondo(queda)}`))
+  return li
+}
+
+/** @param {import('../../analisis/cascada.js').Escalon[]} lista */
+function desglose(lista) {
+  const ul = nodo('ul', 'cascada-detalle')
+  for (const e of lista) {
+    const li = nodo('li')
+    li.append(
+      nodo('span', 'cascada-nombre', e.nombre),
+      nodo('span', 'cascada-cuando', e.detalle),
+      nodo('span', 'cifras', formatEuros(e.importe)),
+    )
+    // Un traspaso a tu propio bolsillo y la cuota de un préstamo salen por el
+    // mismo sitio y son lo contrario: sólo el usuario sabe cuál es cuál.
+    if (e.puedeSerInversion) li.append(marcaDeInversion(e))
+    ul.append(li)
+  }
+  return ul
+}
+
+/** @param {import('../../analisis/cascada.js').Escalon} e */
+function marcaDeInversion(e) {
+  const label = nodo('label', 'cascada-marca')
+  const casilla = document.createElement('input')
+  casilla.type = 'checkbox'
+  casilla.checked = e.inversion
+  casilla.dataset.inversion = e.reciboId
+  label.append(casilla, nodo('span', '', e.inversion ? 'Es ahorro, no gasto' : 'Marcar como ahorro'))
+  return label
 }
 
 /** @param {Estado} estado */

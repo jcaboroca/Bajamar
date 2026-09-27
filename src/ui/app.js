@@ -32,6 +32,7 @@ import {
   ponerUnico,
   ponerAnual,
   ponerApagada,
+  ponerInversion,
   ponerRetoque,
   ponerTrato,
   ponerApodo,
@@ -172,6 +173,10 @@ function montarVistas() {
       await ponerApagada(categoria, apagada)
       await refrescar()
     },
+    alMarcarInversion: async (reciboId, esInversion) => {
+      await ponerInversion(reciboId, esInversion)
+      await refrescar()
+    },
   })
 
   montarPatrimonio({
@@ -238,6 +243,7 @@ async function refrescar({ animar = false, local = true } = {}) {
     unicos: preferencias.unicos,
     anuales: preferencias.anuales,
     apagadas: preferencias.apagadas,
+    inversiones: preferencias.inversiones,
     colchon: preferencias.colchon,
   })
 

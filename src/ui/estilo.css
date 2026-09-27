@@ -834,3 +834,28 @@ main {
   .filtro, .campo, .pestana, .pulsables li[role='button'] { transition: none; }
   .recado { transition: opacity 1ms; transform: translate(-50%, 0); }
 }
+
+/* ── La cascada del mes ───────────────────────────────────────────────── */
+/* Cada escalón resta de lo que quedaba. La sangría de la izquierda es la que
+   cuenta la historia: lo que queda va bajando fila a fila. */
+.cascada { margin: 0; padding: 0; list-style: none; }
+.cascada-fila { padding: 0.75rem 0; border-bottom: 1px solid var(--linea); }
+.cascada-cabeza { display: flex; gap: 1rem; align-items: baseline; justify-content: space-between; }
+.cascada-titulo { font-weight: 600; }
+.cascada-queda { margin: 0.125rem 0 0; font-size: 0.8125rem; color: var(--secundario); text-align: right; }
+.cascada-vacio { margin: 0.25rem 0 0; font-size: 0.8125rem; color: var(--secundario); }
+
+.cascada-detalle { margin: 0.5rem 0 0; padding: 0 0 0 0.75rem; border-left: 2px solid var(--linea); list-style: none; }
+.cascada-detalle li { display: grid; grid-template-columns: 1fr auto; gap: 0 0.75rem; padding: 0.25rem 0; font-size: 0.875rem; }
+.cascada-cuando { grid-column: 1; font-size: 0.75rem; color: var(--secundario); }
+.cascada-detalle .cifras { grid-row: 1; grid-column: 2; color: var(--secundario); }
+
+/* Sólo sale donde la app duda, así que puede permitirse ocupar su línea. */
+.cascada-marca { display: flex; gap: 0.45rem; align-items: center; grid-column: 1 / 3; margin-top: 0.125rem; font-size: 0.75rem; color: var(--secundario); cursor: pointer; }
+.cascada-marca input[type='checkbox'] { width: 0.9rem; height: 0.9rem; flex: none; accent-color: var(--acento); }
+
+/* El resultado no es un escalón más: es la respuesta. */
+.cascada-final { padding-top: 1rem; border-bottom: 0; }
+.cascada-final .cascada-titulo { font-size: 1.0625rem; }
+.cascada-final .cifras { font-size: 1.375rem; color: var(--bien); }
+.cascada-final .cifras.alarma { color: var(--alarma); }

@@ -33,13 +33,14 @@ import { borrar, escribir, leer, leerTodo } from './db.js'
  * @property {Record<string, true>} unicos     entidadId → no va a repetirse
  * @property {Record<string, true>} anuales    entidadId → vuelve cada año
  * @property {Record<string, true>} apagadas   categoría → no toca esta temporada
+ * @property {Record<string, boolean>} inversiones reciboId → es inversión, no gasto
  * @property {import('../dominio/tipos.js').Bulto[]} bultos
  * @property {number} colchon                  céntimos
  */
 
 /** @returns {Promise<Preferencias>} */
 export async function cargar() {
-  const [retoques, presupuestos, objetivos, patrimonio, reglas, bultos, colchon, tratos, apodos, unicos, anuales, apagadas] = await Promise.all([
+  const [retoques, presupuestos, objetivos, patrimonio, reglas, bultos, colchon, tratos, apodos, unicos, anuales, apagadas, inversiones] = await Promise.all([
     leerTodo('retoques'),
     leerTodo('presupuestos'),
     leerTodo('objetivos'),
@@ -52,6 +53,7 @@ export async function cargar() {
     leerTodo('unicos'),
     leerTodo('anuales'),
     leerTodo('apagadas'),
+    leerTodo('inversiones'),
   ])
 
   return {
@@ -66,6 +68,7 @@ export async function cargar() {
     unicos: Object.fromEntries(unicos.map((/** @type {any} */ u) => [u.id, true])),
     anuales: Object.fromEntries(anuales.map((/** @type {any} */ a) => [a.id, true])),
     apagadas: Object.fromEntries(apagadas.map((/** @type {any} */ a) => [a.id, true])),
+    inversiones: Object.fromEntries(inversiones.map((/** @type {any} */ i) => [i.id, i.esInversion])),
     colchon: Number(/** @type {any} */ (colchon)?.valor ?? 0),
   }
 }
@@ -141,6 +144,16 @@ export async function ponerAnual(entidadId, esAnual) {
 export async function ponerApagada(categoria, apagada) {
   if (!apagada) return borrar('apagadas', categoria)
   return escribir('apagadas', { id: categoria })
+}
+
+/**
+ * Se guarda por recibo y no por entidad porque el mismo cobrador puede llevarse
+ * las dos cosas: una aportación al fondo y la cuota de un préstamo.
+ * @param {string} reciboId
+ * @param {boolean} esInversion
+ */
+export async function ponerInversion(reciboId, esInversion) {
+  return escribir('inversiones', { id: reciboId, esInversion })
 }
 
 /**
