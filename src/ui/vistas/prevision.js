@@ -16,6 +16,7 @@ import { formatEuros, formatEurosRedondo } from '../../dominio/dinero.js'
 import { mesDe, ultimoDiaDelMes, sumarMeses } from '../../dominio/tipos.js'
 import { MESES_DE } from '../../analisis/fijos.js'
 import { dibujarLamina } from '../lamina.js'
+import { montarSimulador, pintarSimulador } from '../simulador.js'
 import { cuentas, diaYMes, linea, nodo, nombreDeMes, requerir, vacio } from '../piezas.js'
 import { marcarPreguntable, preguntarAlPulsar, rotuloDe } from '../trato.js'
 
@@ -32,6 +33,7 @@ let mesElegido = null
 let ultimo = null
 
 export function montarPrevision({ alCambiarTrato }) {
+  montarSimulador()
   for (const caja of ['fijos', 'apartados']) {
     preguntarAlPulsar(requerir(caja), () => ultimo, alCambiarTrato)
   }
@@ -79,6 +81,7 @@ function repintar() {
   pintarMeses(meses, estado)
   pintarCalendario(estado, meses)
   pintarCoste(estado)
+  pintarSimulador(estado)
   pintarFijos(estado)
   pintarApartados(estado)
   pintarSuscripciones(estado)

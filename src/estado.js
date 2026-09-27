@@ -20,6 +20,7 @@ import { limpiarConcepto } from './entidades/limpiar.js'
 import { indicePorAlias, reconciliar } from './entidades/reconciliar.js'
 import { CATEGORIAS } from './entidades/semillas.js'
 import { PISTAS, oficioDe } from './entidades/oficios.js'
+import { repartirGasto } from './analisis/reparto.js'
 
 /**
  * @typedef {import('./dominio/tipos.js').Movimiento} Movimiento
@@ -341,6 +342,7 @@ export function construirEstado(crudos, opciones = {}) {
     ingresoMensual,
     ordinarios,
     ritmo,
+    reparto: repartirGasto(ordinarios, ritmo),
     saldoInicial,
     pendienteTarjeta,
     proyeccion,
