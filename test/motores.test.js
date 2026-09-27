@@ -436,3 +436,20 @@ describe('avisos', () => {
     assert.deepEqual(avisos, [])
   })
 })
+
+describe('un cobro con fecha de hoy', () => {
+  test('baja el saldo aunque sea el primer día de la proyección', () => {
+    const p = proyectar({
+      saldoInicial: 100000,
+      desde: '2026-09-27',
+      hasta: '2026-09-30',
+      eventos: [{ fecha: '2026-09-27', nombre: 'MAPFRE', importe: -58237 }],
+      ritmoPorDia: 0,
+    })
+    // El saldo del extracto no lo lleva descontado: aún no ha pasado por el
+    // banco. Si no se aplica, el recibo sale en la lista y no lo paga nadie.
+    assert.equal(p.suelo.saldo, 41763)
+    assert.equal(p.saldoFinal, 41763)
+    assert.equal(p.curva[0].saldo, 41763)
+  })
+})

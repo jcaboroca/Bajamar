@@ -22,11 +22,17 @@ import { marcarPreguntable, preguntarAlPulsar, rotuloDe } from '../trato.js'
 /** @type {Estado | null} */
 let ultimo = null
 
-/** @param {{ alCambiarTrato: (entidadId: string, trato: import('../trato.js').Trato) => unknown }} ganchos */
-export function montarResumen({ alCambiarTrato }) {
+/** @param {{ alCambiarTrato: (entidadId: string, trato: import('../trato.js').Trato) => unknown, alMarcarAnual: (entidadId: string, esAnual: boolean) => Promise<void> }} ganchos */
+export function montarResumen({ alCambiarTrato, alMarcarAnual }) {
   for (const caja of ['eventos', 'avisos']) {
     preguntarAlPulsar(requerir(caja), () => ultimo, alCambiarTrato)
   }
+
+  requerir('preguntas').addEventListener('change', (e) => {
+    const casilla = e.target
+    if (!(casilla instanceof HTMLInputElement) || !casilla.dataset.anual) return
+    alMarcarAnual(casilla.dataset.anual, casilla.checked)
+  })
 }
 
 /**
@@ -173,13 +179,36 @@ function pintarPreguntas(estado) {
   const bloque = requerir('bloque-preguntas')
   bloque.hidden = estado.dudosos.length === 0
   if (estado.dudosos.length === 0) return
-  requerir('preguntas').replaceChildren(...estado.dudosos.map((d) => linea({
-    marca: diaYMes(d.fecha),
-    nombre: d.nombre,
-    detalle: `la última vez hace ${d.meses} meses · ¿vuelve?`,
-    importe: formatEuros(d.importe, { signo: true }),
-    clase: 'previsto',
-  })))
+  requerir('preguntas').replaceChildren(...estado.dudosos.map((d) => {
+    const fila = linea({
+      marca: diaYMes(d.fecha),
+      nombre: d.nombre,
+      detalle: `la última vez hace ${d.meses} meses · ¿vuelve?`,
+      importe: formatEuros(d.importe, { signo: true }),
+      clase: 'previsto',
+    })
+    fila.append(casillaAnual(d.entidadId, d.nombre, estado.anuales[d.entidadId] === true))
+    return fila
+  }))
+}
+
+/**
+ * La app no puede distinguir un seguro anual visto una vez de un pago único, y
+ * ese es justo el dato que el usuario tiene y ella no. Hasta ahora la pregunta
+ * se hacía sin dejar contestarla.
+ * @param {string} entidadId
+ * @param {string} nombre
+ * @param {boolean} marcado
+ */
+function casillaAnual(entidadId, nombre, marcado) {
+  const etiqueta = nodo('label', 'clasificar-unico pregunta-anual')
+  const casilla = document.createElement('input')
+  casilla.type = 'checkbox'
+  casilla.dataset.anual = entidadId
+  casilla.checked = marcado
+  casilla.setAttribute('aria-label', `${nombre} vuelve cada año`)
+  etiqueta.append(casilla, nodo('span', '', 'Sí, vuelve cada año'))
+  return etiqueta
 }
 
 /** @param {Estado} estado */

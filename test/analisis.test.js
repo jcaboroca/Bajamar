@@ -54,13 +54,85 @@ describe('periodicidad', () => {
     assert.deepEqual(compromisos, [])
   })
 
-  test('dos apariciones separadas por un año no bastan para llamarlo anual', () => {
+  test('dos septiembres cobrando lo mismo el mismo día sí son un recibo anual', () => {
+    // Con veinte meses de extractos una tercera vista no existe. Exigirla es
+    // dejar el seguro del coche contado como gasto del día a día para siempre.
     const { compromisos } = detectarCompromisos(
       [mov('2025-09-24', -58237), mov('2026-09-24', -58237)],
       NOMBRES,
       { hoy: '2026-09-28' },
     )
-    assert.deepEqual(compromisos, [])
+    assert.equal(compromisos.length, 1)
+    assert.equal(compromisos[0].periodicidad, 'anual')
+    assert.equal(compromisos[0].importeEsperado, -58237)
+    assert.equal(compromisos[0].proximaPrevista, '2027-09-24')
+  })
+
+  test('dos apariciones a once meses y medio no son un recibo anual', () => {
+    const { compromisos } = detectarCompromisos(
+      [mov('2025-09-24', -58237), mov('2026-09-09', -58237)],
+      NOMBRES,
+      { hoy: '2026-09-28' },
+    )
+    assert.deepEqual(compromisos, [], 'un recibo anual cae casi en el mismo día')
+  })
+
+  test('dos apariciones al año con precios distintos no son un recibo anual', () => {
+    const { compromisos } = detectarCompromisos(
+      [mov('2025-09-24', -58237), mov('2026-09-24', -71000)],
+      NOMBRES,
+      { hoy: '2026-09-28' },
+    )
+    assert.deepEqual(compromisos, [], 'sin una tercera vista, el precio tiene que cuadrar')
+  })
+
+  test('los apuntes del mismo día del ayuntamiento son una factura, no tres', () => {
+    const plazos = [
+      ['2025-10-01', -33071], ['2025-10-01', -4891], ['2025-10-01', -8025],
+      ['2026-10-01', -33071], ['2026-10-01', -4891], ['2026-10-01', -8025],
+    ]
+    const { compromisos } = detectarCompromisos(
+      plazos.map(([f, i]) => mov(/** @type {string} */ (f), Number(i))),
+      NOMBRES,
+      { hoy: '2026-10-15' },
+    )
+    assert.equal(compromisos.length, 1, 'el IBI, la basura y el vado son un recibo')
+    assert.equal(compromisos[0].importeEsperado, -45987)
+    assert.equal(compromisos[0].proximaPrevista, '2027-10-01')
+  })
+
+  test('el plazo del que sólo hay uno cuenta si el cobrador ya probó su calendario', () => {
+    // Marzo y mayo se repiten los dos años: el ayuntamiento cobra en fechas
+    // fijas. Octubre tiene una sola factura porque la segunda aún no ha caído.
+    const plazos = [
+      ['2025-03-03', -7257], ['2026-03-02', -7257],
+      ['2025-05-02', -45987], ['2026-05-04', -45987],
+      ['2025-06-02', -7257], ['2026-06-01', -7257],
+      ['2025-10-01', -45987],
+    ]
+    const { compromisos } = detectarCompromisos(
+      plazos.map(([f, i]) => mov(/** @type {string} */ (f), Number(i))),
+      NOMBRES,
+      { hoy: '2026-09-27' },
+    )
+    const octubre = compromisos.find((c) => c.proximaPrevista === '2026-10-01')
+    assert.ok(octubre, `esperaba el plazo de octubre, tengo ${compromisos.map((c) => c.proximaPrevista)}`)
+    assert.equal(octubre.importeEsperado, -45987)
+  })
+
+  test('una factura suelta cuyo aniversario ya pasó sin repetirse no vuelve', () => {
+    const plazos = [
+      ['2025-03-03', -7257], ['2026-03-02', -7257],
+      ['2025-05-02', -45987], ['2026-05-04', -45987],
+      ['2025-06-02', -7257], ['2026-06-01', -7257],
+      ['2024-11-05', -31000],
+    ]
+    const { compromisos } = detectarCompromisos(
+      plazos.map(([f, i]) => mov(/** @type {string} */ (f), Number(i))),
+      NOMBRES,
+      { hoy: '2026-09-27' },
+    )
+    assert.equal(compromisos.length, 3, 'noviembre de 2024 tuvo su turno en 2025 y no volvió')
   })
 
   test('el importe esperado es la mediana, no la media ni el último', () => {
@@ -368,5 +440,21 @@ describe('lo que costará la próxima vez', () => {
       { hoy: '2026-09-27' },
     )
     assert.deepEqual(compromisos, [], 'una suscripción cuesta lo mismo, no algo parecido')
+  })
+})
+
+describe('un recibo que llega tarde', () => {
+  test('unos días de retraso no lo empujan al año que viene', () => {
+    // El seguro se cobró dos veces un 24 de septiembre y hoy es 27 de
+    // septiembre del año siguiente: lleva tres días de retraso. Sigue siendo el
+    // cobro de este año, a punto de caer, no el del que viene.
+    const { compromisos } = detectarCompromisos(
+      [mov('2024-09-24', -58237), mov('2025-09-24', -58237)],
+      NOMBRES,
+      { hoy: '2026-09-27' },
+    )
+    assert.equal(compromisos.length, 1)
+    assert.equal(compromisos[0].proximaPrevista, '2026-09-27', 'se espera ya, no en 2027')
+    assert.equal(compromisos[0].estado, 'activo')
   })
 })

@@ -62,6 +62,11 @@ export function proyectar({ saldoInicial, desde, hasta, eventos, ritmoPorDia }) 
   }
 
   let saldo = saldoInicial
+  // Lo previsto para hoy todavía no ha pasado por el banco: el saldo inicial es
+  // el del extracto, y un cobro que aún no ha llegado no está descontado. Sin
+  // esto, el bucle empieza en el día siguiente y el recibo de hoy sale en la
+  // lista sin bajarle el saldo a nadie.
+  for (const e of porDia.get(desde) ?? []) saldo += e.importe
   let suelo = { fecha: desde, saldo }
   /** @type {Array<{ fecha: string, saldo: number }>} */
   const curva = [{ fecha: desde, saldo }]

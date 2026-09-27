@@ -429,8 +429,24 @@ main {
   color: var(--secundario);
 }
 
-.palancas { margin: 1.5rem 0 0; padding: 0; list-style: none; }
+/* Las preguntas viven en la rejilla de tres columnas de .eventos, así que la
+   casilla caería en la columna de la fecha y el texto saldría en vertical. Va
+   en una fila entera, alineada con el nombre. */
+.pregunta-anual {
+  grid-column: 2 / 4;
+  margin-top: 0.625rem;
+  padding: 0.25rem 0;
+  cursor: pointer;
+}
 
+.pregunta-anual input[type='checkbox'] {
+  width: 1.15rem;
+  height: 1.15rem;
+  flex: none;
+  accent-color: var(--acento);
+}
+
+.palancas { margin: 1.5rem 0 0; padding: 0; list-style: none; }
 .palanca { padding: 0.9rem 0; border-bottom: 1px solid var(--linea); }
 .palanca:last-child { border-bottom: 0; }
 .palanca-fija { opacity: 0.65; }

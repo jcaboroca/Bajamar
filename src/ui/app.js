@@ -30,6 +30,7 @@ import {
   ponerPresupuesto,
   ponerRegla,
   ponerUnico,
+  ponerAnual,
   ponerRetoque,
   ponerTrato,
   ponerApodo,
@@ -148,7 +149,13 @@ function montarVistas() {
         : 'Hecho: vuelve a la previsión.')
   }
 
-  montarResumen({ alCambiarTrato })
+  montarResumen({
+    alCambiarTrato,
+    alMarcarAnual: async (entidadId, esAnual) => {
+      await ponerAnual(entidadId, esAnual)
+      await refrescar()
+    },
+  })
 
   montarMovimientos({
     alCambiar: async ({ retoque, regla }) => {
@@ -222,6 +229,7 @@ async function refrescar({ animar = false, local = true } = {}) {
     tratos: preferencias.tratos,
     apodos: preferencias.apodos,
     unicos: preferencias.unicos,
+    anuales: preferencias.anuales,
     colchon: preferencias.colchon,
   })
 

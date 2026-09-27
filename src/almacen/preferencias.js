@@ -31,13 +31,14 @@ import { borrar, escribir, leer, leerTodo } from './db.js'
  * @property {Record<string, Trato>} tratos    reciboId → cómo preverlo
  * @property {Record<string, string>} apodos   reciboId → cómo lo llama el usuario
  * @property {Record<string, true>} unicos     entidadId → no va a repetirse
+ * @property {Record<string, true>} anuales    entidadId → vuelve cada año
  * @property {import('../dominio/tipos.js').Bulto[]} bultos
  * @property {number} colchon                  céntimos
  */
 
 /** @returns {Promise<Preferencias>} */
 export async function cargar() {
-  const [retoques, presupuestos, objetivos, patrimonio, reglas, bultos, colchon, tratos, apodos, unicos] = await Promise.all([
+  const [retoques, presupuestos, objetivos, patrimonio, reglas, bultos, colchon, tratos, apodos, unicos, anuales] = await Promise.all([
     leerTodo('retoques'),
     leerTodo('presupuestos'),
     leerTodo('objetivos'),
@@ -48,6 +49,7 @@ export async function cargar() {
     leerTodo('tratos'),
     leerTodo('apodos'),
     leerTodo('unicos'),
+    leerTodo('anuales'),
   ])
 
   return {
@@ -60,6 +62,7 @@ export async function cargar() {
     tratos: Object.fromEntries(tratos.map((/** @type {any} */ t) => [t.id, t.trato])),
     apodos: Object.fromEntries(apodos.map((/** @type {any} */ a) => [a.id, a.nombre])),
     unicos: Object.fromEntries(unicos.map((/** @type {any} */ u) => [u.id, true])),
+    anuales: Object.fromEntries(anuales.map((/** @type {any} */ a) => [a.id, true])),
     colchon: Number(/** @type {any} */ (colchon)?.valor ?? 0),
   }
 }
@@ -113,6 +116,17 @@ export async function ponerRegla(entidadId, categoria) {
 export async function ponerUnico(entidadId, esUnico) {
   if (!esUnico) return borrar('unicos', entidadId)
   return escribir('unicos', { id: entidadId })
+}
+
+/**
+ * El seguro del coche visto una sola vez es indistinguible de un pago único, y
+ * la app no puede saberlo. El usuario sí.
+ * @param {string} entidadId
+ * @param {boolean} esAnual
+ */
+export async function ponerAnual(entidadId, esAnual) {
+  if (!esAnual) return borrar('anuales', entidadId)
+  return escribir('anuales', { id: entidadId })
 }
 
 /**

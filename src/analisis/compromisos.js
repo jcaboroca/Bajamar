@@ -8,8 +8,10 @@
  *    último valor. Con 50 · 55 · 70 la media dice 58 y el último dice 70;
  *    la mediana dice 55, que es lo que de verdad cuesta.
  * 2. Nunca se afirma una tendencia con menos de cuatro observaciones.
- * 3. Con una o dos observaciones no se infiere periodicidad: se pregunta.
- *    Un recibo anual visto una sola vez es indistinguible de un pago único.
+ * 3. Con una sola observación no se infiere periodicidad: se pregunta. Con dos
+ *    tampoco, salvo lo anual, que de otro modo no podría detectarse nunca sin
+ *    tres años de extractos; a cambio se le exige el mismo día del año y el
+ *    mismo precio.
  * 4. Un mismo cobrador puede tener varias series a la vez. El ayuntamiento
  *    cobra el IBI, la basura y el vado por separado; promediarlos da una
  *    cifra que no corresponde a ningún recibo real.
@@ -36,14 +38,22 @@ const PERIODOS = [
 const GRACIA = { mensual: 6, bimestral: 10, trimestral: 12, semestral: 20, anual: 25 }
 
 /**
- * Apariciones mínimas para creerse cada ritmo. Nunca bastan dos: con dos
- * fechas sólo hay un intervalo, y un intervalo de 365 días no distingue un
- * recibo anual de dos visitas al mismo bar con un año de diferencia.
+ * Apariciones mínimas para creerse cada ritmo. Dos nunca bastan para deducir
+ * un ritmo a ciegas: un intervalo de 365 días no distingue un recibo anual de
+ * dos visitas al mismo bar con un año de diferencia. Lo anual tiene su propia
+ * puerta más abajo, con la prueba mucho más exigente.
  */
 const MINIMO_OBSERVACIONES = { mensual: 4, bimestral: 3, trimestral: 3, semestral: 3, anual: 3 }
 
 /** Por debajo de esto no merece seguimiento: es ruido, no un compromiso. */
 const MINIMO_RELEVANTE = 500 // 5,00 €
+
+/**
+ * Y con sólo dos vistas, por debajo de esto no merece el riesgo de acertar a
+ * medias: un recibo anual de treinta euros no mueve una previsión, pero sí la
+ * ensucia si resulta que era una compra que se repitió por casualidad.
+ */
+const MINIMO_ANUAL = 3000 // 30,00 €
 
 /**
  * Categorías en las que una aparición suelta sí plantea una pregunta legítima:
@@ -108,8 +118,13 @@ function periodicidadDe(orden) {
   if (orden.length < MINIMO_OBSERVACIONES[encaja.nombre]) return null
 
   // Todos los intervalos deben caber en el mismo patrón: si uno se dispara,
-  // no es un compromiso periódico sino una coincidencia.
-  const coherentes = intervalos.filter((d) => Math.abs(d - encaja.dias) <= encaja.margen * 2)
+  // no es un compromiso periódico sino una coincidencia. Lo mensual tiene
+  // manga ancha porque un recibo puede irse una semana; lo semestral y lo
+  // anual, no: con el margen doblado, «cada seis meses» se traga cualquier
+  // cosa entre cuatro y ocho, y tres pagos de mayo, octubre y mayo acaban
+  // llamándose semestrales cuando son uno anual y un plazo suelto.
+  const holgura = encaja.meses >= 6 ? encaja.margen : encaja.margen * 2
+  const coherentes = intervalos.filter((d) => Math.abs(d - encaja.dias) <= holgura)
   if (coherentes.length < Math.ceil(intervalos.length * 0.7)) return null
 
   // Un recibo domiciliado cae siempre el mismo día del mes. Una racha de
@@ -193,6 +208,92 @@ function cabeEnLaSerie(grupo, m) {
 }
 
 /**
+ * @typedef {object} Factura
+ * @property {string} fecha
+ * @property {number} total
+ * @property {Movimiento[]} cobros
+ */
+
+/**
+ * Los apuntes del mismo cobrador y del mismo día son una factura, no varias.
+ * El ayuntamiento cobra el IBI, la basura y el vado en tres líneas de la misma
+ * mañana: tres apuntes en el extracto y un solo recibo en la vida real.
+ * @param {Movimiento[]} orden
+ * @returns {Factura[]}
+ */
+function facturasPorDia(orden) {
+  /** @type {Map<string, Movimiento[]>} */
+  const porDia = new Map()
+  for (const m of orden) {
+    const lista = porDia.get(m.fecha)
+    if (lista) lista.push(m)
+    else porDia.set(m.fecha, [m])
+  }
+  return [...porDia.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([fecha, cobros]) => ({ fecha, total: cobros.reduce((t, m) => t + m.importe, 0), cobros }))
+}
+
+/**
+ * La misma factura del año pasado: cae casi en el mismo día y cuesta casi lo
+ * mismo. El margen es mucho más estrecho que el de lo anual con tres vistas
+ * porque aquí no hay una tercera fecha que confirme nada: con dónde cae la
+ * segunda se decide todo. Dos compras de Amazon separadas por once meses y
+ * medio no son una suscripción anual.
+ * @param {Factura} a
+ * @param {Factura} b
+ */
+function esLaDelAnoPasado(a, b) {
+  if (Math.abs(diasEntre(a.fecha, b.fecha) - 365) > 12) return false
+  const mayor = Math.max(Math.abs(a.total), Math.abs(b.total))
+  return Math.abs(a.total - b.total) <= Math.max(100, mayor * 0.04)
+}
+
+/**
+ * Recibos que sólo pasan una vez al año.
+ *
+ * Exigir tres apariciones para creerse lo anual es exigir tres años de
+ * extractos, y con veinte meses eso significa no verlo nunca: el seguro del
+ * coche lleva dos abriles cobrando lo mismo y acaba contado como gasto del día
+ * a día. Dos bastan cuando no dejan lugar a duda —mismo día del año, mismo
+ * precio, un año justo en medio—, que es una prueba bastante más dura que la
+ * que se le pide a lo mensual.
+ *
+ * Y un cobrador que ha demostrado dos veces que factura en fechas fijas del año
+ * factura también en las otras suyas. El ayuntamiento cobró en marzo, mayo y
+ * junio los dos años; el plazo de octubre es el mismo calendario, aunque de
+ * octubre sólo haya una. Se admite sólo mientras su turno no haya pasado: una
+ * factura suelta cuyo aniversario ya vino y no se repitió no era un recibo.
+ * @param {Movimiento[]} orden  ordenados por fecha ascendente
+ * @param {string} hoy
+ * @returns {Factura[][]}  cada grupo es un recibo anual distinto
+ */
+function anualesDeDosVistas(orden, hoy) {
+  const facturas = facturasPorDia(orden).filter((f) => Math.abs(f.total) >= MINIMO_ANUAL)
+  if (facturas.length < 2) return []
+
+  /** @type {Factura[][]} */
+  const cadenas = []
+  const encadenados = new Set()
+  for (let i = 0; i < facturas.length; i += 1) {
+    if (encadenados.has(i)) continue
+    const cadena = [facturas[i]]
+    encadenados.add(i)
+    for (let j = i + 1; j < facturas.length; j += 1) {
+      if (encadenados.has(j)) continue
+      if (!esLaDelAnoPasado(cadena[cadena.length - 1], facturas[j])) continue
+      cadena.push(facturas[j])
+      encadenados.add(j)
+    }
+    cadenas.push(cadena)
+  }
+
+  const confirmadas = cadenas.filter((c) => c.length >= 2)
+  if (confirmadas.length < 2) return confirmadas
+  return cadenas.filter((c) => c.length >= 2 || sumarMeses(c[0].fecha, 12) > hoy)
+}
+
+/**
  * @typedef {object} Deteccion
  * @property {Compromiso[]} compromisos
  * @property {Array<{ entidadId: string, nombre: string, importe: number, fecha: string, meses: number }>} dudosos
@@ -206,12 +307,14 @@ function cabeEnLaSerie(grupo, m) {
  * @param {Set<string>} [opciones.ignorar]            entidades que no son gasto
  * @param {'gasto' | 'ingreso'} [opciones.signo]
  * @param {Map<string, string>} [opciones.categorias] entidadId → categoría
+ * @param {Record<string, true>} [opciones.anuales]   entidadId → el usuario dice que vuelve cada año
  * @returns {Deteccion}
  */
 export function detectarCompromisos(movimientos, nombres, opciones = {}) {
   const hoy = opciones.hoy ?? hoyIso()
   const ignorar = opciones.ignorar ?? new Set()
   const categorias = opciones.categorias ?? new Map()
+  const confirmadosAnuales = opciones.anuales ?? {}
   const buscaIngresos = opciones.signo === 'ingreso'
 
   /** @type {Map<string, Movimiento[]>} */
@@ -264,6 +367,28 @@ export function detectarCompromisos(movimientos, nombres, opciones = {}) {
         encontrada = true
       }
     }
+    if (!encontrada) {
+      // Tercer intento: una factura al año. No se mete antes porque cualquier
+      // ritmo más corto es mejor prueba, y si lo hay ya se ha encontrado.
+      const cadenas = confirmadosAnuales[entidadId] === true
+        ? facturasPorDia(orden).slice(-1).map((f) => [f])
+        : anualesDeDosVistas(orden, hoy)
+      for (const cadena of cadenas) {
+        const cobros = cadena.flatMap((f) => f.cobros)
+        const importeEsperado = mediana(cadena.map((f) => f.total))
+        const mes = cadena[cadena.length - 1].fecha.slice(5, 7)
+        compromisos.push(construir(entidadId, nombre, cadena.map((f) => f.cobros[0]), 'anual', false, {
+          importeEsperado,
+          cobros: cobros.map((m) => m.id),
+          // El mes entra en la identidad: los cuatro plazos del ayuntamiento
+          // valen lo mismo, y sin el mes contestar por uno contestaría por los
+          // cuatro.
+          sufijo: `${Math.round(Math.abs(importeEsperado) / 100)}m${mes}`,
+        }))
+        encontrada = true
+      }
+    }
+
     if (!encontrada) anotarDudoso(entidadId, nombre, orden)
   }
 
@@ -292,39 +417,53 @@ export function detectarCompromisos(movimientos, nombres, opciones = {}) {
    * @param {boolean} [separado] una de varias series del mismo cobrador
    * @returns {Compromiso}
    */
-  function construir(entidadId, nombre, orden, periodicidad, separado = false) {
+  /**
+   * @param {string} entidadId
+   * @param {string} nombre
+   * @param {Movimiento[]} orden
+   * @param {Compromiso['periodicidad']} periodicidad
+   * @param {boolean} [separado]
+   * @param {{ importeEsperado: number, cobros: string[], sufijo: string }} [factura]
+   */
+  function construir(entidadId, nombre, orden, periodicidad, separado = false, factura) {
     const periodo = PERIODOS.find((p) => p.nombre === periodicidad)
     const meses = periodo?.meses ?? 1
     const ultima = orden[orden.length - 1].fecha
     let proxima = sumarMeses(ultima, meses)
     // Si han pasado varios periodos sin aparecer, proyectar al siguiente futuro
-    // para no anunciar un recibo con fecha del pasado.
+    // para no anunciar un recibo con fecha del pasado. Pero unos días de
+    // retraso siguen siendo el cobro de este periodo, no el del siguiente:
+    // rodar un año entero porque el seguro llega tres días tarde esconde justo
+    // el recibo que está a punto de caer.
     let saltos = 0
-    while (proxima < hoy && saltos < 24) {
+    while (proxima < hoy && diasEntre(proxima, hoy) > GRACIA[periodicidad] && saltos < 24) {
       proxima = sumarMeses(proxima, meses)
       saltos += 1
     }
+    if (proxima < hoy) proxima = hoy
     const retraso = diasEntre(sumarMeses(ultima, meses), hoy)
     // Un recibo puede retrasarse; tres seguidos sin pasar no es retraso, es que
     // se acabó. Seguir contándolo hunde la previsión con un gasto que ya no
     // existe, y nadie debería tener que venir a avisar de cada cuota que
     // termina. Si vuelve a pasar, vuelve sola.
     const muerto = retraso > (periodo?.dias ?? 30) * 2 + (periodo?.margen ?? 7)
-    const importeEsperado = importeEsperadoDe(orden)
+    const importeEsperado = factura ? factura.importeEsperado : importeEsperadoDe(orden)
     return {
       entidadId,
       // Dos recibos del mismo cobrador pueden no ser la misma cosa: la
       // aportación que uno puede saltarse y la letra del coche que no. Se
       // distinguen por el importe en euros enteros, que aguanta los céntimos
       // de un mes a otro sin confundir dos préstamos de importe parecido.
-      reciboId: separado ? `${entidadId}#${Math.round(Math.abs(importeEsperado) / 100)}` : entidadId,
+      reciboId: factura
+        ? `${entidadId}#${factura.sufijo}`
+        : separado ? `${entidadId}#${Math.round(Math.abs(importeEsperado) / 100)}` : entidadId,
       nombre,
       periodicidad,
       importeEsperado,
       ultimaVista: ultima,
       proximaPrevista: proxima,
       observaciones: orden.length,
-      cobros: orden.map((m) => m.id),
+      cobros: factura ? factura.cobros : orden.map((m) => m.id),
       estado: muerto ? 'extinto' : retraso > GRACIA[periodicidad] ? 'retrasado' : 'activo',
     }
   }

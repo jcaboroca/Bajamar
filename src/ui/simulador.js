@@ -23,6 +23,13 @@ import { nodo, requerir } from './piezas.js'
 /** Por debajo de esto una barra no decide nada y sólo alarga la lista. */
 const MINIMO_AL_MES = 500
 
+/**
+ * Gasto real que no se recorta decidiéndolo. La liquidación de la tarjeta es la
+ * factura de lo que ya compraste, y lo que compraste ya está repartido en sus
+ * categorías: ponerle barra sería ofrecer recortar dos veces el mismo dinero.
+ */
+const SIN_BARRA = new Set(['tarjeta'])
+
 /** categoría → qué parte se recorta, de 0 a 1 */
 const recortes = new Map()
 
@@ -46,7 +53,9 @@ export function montarSimulador() {
 /** @param {Estado} estado */
 export function pintarSimulador(estado) {
   ultimo = estado
-  const palancas = estado.reparto.filter((t) => Math.abs(t.alMes) >= MINIMO_AL_MES)
+  const palancas = estado.reparto.filter(
+    (t) => Math.abs(t.alMes) >= MINIMO_AL_MES && !SIN_BARRA.has(t.categoria),
+  )
   const lista = requerir('simulador')
 
   if (palancas.length === 0) {
@@ -57,11 +66,13 @@ export function pintarSimulador(estado) {
 
   lista.replaceChildren(fijos(estado), ...palancas.map((t) => palanca(t)))
 
-  const sueltos = estado.reparto.length - palancas.length
+  const sueltos = estado.reparto.filter(
+    (t) => Math.abs(t.alMes) < MINIMO_AL_MES && !SIN_BARRA.has(t.categoria),
+  ).length
+  const base = 'Las barras reparten tu gasto del día a día, no los recibos'
   requerir('simulador-pie').textContent = sueltos === 0
-    ? 'Las barras reparten tu gasto del día a día, no los recibos: suman exactamente lo que gastas.'
-    : `Las barras reparten tu gasto del día a día, no los recibos. Quedan fuera ${sueltos} categorías `
-      + 'que no llegan a 5 € al mes.'
+    ? `${base}: suman exactamente lo que gastas.`
+    : `${base}. Quedan fuera ${sueltos} categorías que no llegan a 5 € al mes.`
 
   refrescarCifras(estado)
 }
