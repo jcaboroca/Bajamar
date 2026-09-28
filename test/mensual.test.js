@@ -203,3 +203,37 @@ describe('la cuenta cuadra con el banco, pase lo que pase', () => {
     assert.equal(residuoDe(septiembre), 100_000 + 280_000 - 98_000)
   })
 })
+
+describe('lo que fraccionas no es un ingreso', () => {
+  // El banco te abona los 468 € que acaba de cobrarte y luego te los cobra en
+  // tres cuotas. Contar ese abono como ingreso hinchaba la nómina del mes.
+  const movs = [
+    mov('2026-08-20', -5_000, 100_000, 'super'),
+    mov('2026-08-25', 280_000, 380_000, 'nomina'),
+    mov('2026-08-28', -46_800, 333_200, 'tarjeta'),   // la liquidación
+    { ...mov('2026-08-28', 46_800, 380_000, 'tarjeta'), fraccionado: true },
+  ]
+  const [septiembre] = detallarPeriodos({
+    periodos: periodosEntre({ cortes: ['2026-08-25'], desde: '2026-08-25', hasta: '2026-09-24' }),
+    movimientos: movs,
+    proyeccion: proyectar({ saldoInicial: 380_000, desde: HOY, hasta: '2026-10-31', ritmoPorDia: 0, eventos: [] }),
+    ordinarios: ordinariosDe(movs),
+    hoy: HOY,
+  })
+
+  test('el abono no engorda los ingresos: sólo cuenta la nómina', () => {
+    assert.equal(septiembre.ingresos.total, 280_000)
+  })
+
+  test('se compensa con la liquidación que deshace', () => {
+    // -468 de la liquidación y +468 del abono: entre los dos, cero.
+    assert.equal(septiembre.compromisos, 0)
+  })
+
+  test('y la cuenta sigue cuadrando con el banco', () => {
+    assert.equal(
+      septiembre.apertura + septiembre.ingresos.total + septiembre.gastos.total,
+      septiembre.saldoFinal,
+    )
+  })
+})

@@ -90,7 +90,13 @@ export function detallarPeriodos({ periodos, movimientos, proyeccion, ordinarios
       // Las compras de la tarjeta ya están en su extracto; lo que cuenta aquí
       // es el cargo con el que el banco las liquida.
       if (m.origen === 'tarjeta') continue
-      if (m.importe > 0) entra += m.importe
+      // El abono de un fraccionamiento no es un ingreso. El banco te devuelve
+      // lo que acaba de cobrarte para volver a cobrártelo en tres cuotas, así
+      // que va con lo que tiene fecha: ahí se compensa con la liquidación de
+      // la tarjeta que deshace, y las dos cuotas que faltan las pone la
+      // previsión. Contarlo como ingreso hinchaba la nómina del mes.
+      if (m.fraccionado) conFecha += m.importe
+      else if (m.importe > 0) entra += m.importe
       else if (ordinarios.has(m.id)) diaADia += m.importe
       else conFecha += m.importe
     }
