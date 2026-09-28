@@ -12,7 +12,7 @@ import { eventosDesde, proyectar } from './analisis/bajamar.js'
 import { describirFijos, estructura } from './analisis/fijos.js'
 import { cascadaDelMes, mesEnCurso as mesQuePagaLaNomina } from './analisis/cascada.js'
 import { cuotasPendientes } from './analisis/fraccionados.js'
-import { conGotaDiaria, disponibleReal, porMeses, resumenDeMes } from './analisis/mes.js'
+import { conGotaDiaria, disponibleReal, mesDeUnMovimiento, porMeses, resumenDeMes } from './analisis/mes.js'
 import { gastoPorCategoriaYMes, revisarPresupuestos } from './analisis/presupuestos.js'
 import { cuadre as cuadrarPlan, residuoDelMes, ritmoDelPlan } from './analisis/plan.js'
 import { detallarMeses, estaAcabado, residuoDe } from './analisis/mensual.js'
@@ -403,6 +403,12 @@ export function construirEstado(crudos, opciones = {}) {
   }).map((m) => ({
     ...m,
     acabado: estaAcabado(m.mes, hoy),
+    // Lo que ya ha entrado y paga este mes. Sin esto, la lista de octubre no
+    // enseñaba de dónde salen sus ingresos —la nómina cayó en septiembre— y
+    // en su lugar enseñaba la del 25 de octubre, que es la que paga noviembre.
+    // Dos cifras iguales en la misma pantalla que son dinero distinto.
+    cobrado: contables.filter((x) => x.origen !== 'tarjeta' && x.importe > 0
+      && mesDeUnMovimiento(x, x.categoria ?? 'otros', ingresosRecurrentes) === m.mes),
     plan: planes[m.mes] ?? null,
     lineas: revisarPresupuestos({
       movimientos: contables,

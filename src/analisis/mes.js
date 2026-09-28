@@ -60,18 +60,7 @@ export function resumenDeMes({ movimientos, categorias, noEsGasto, eventos, mes,
     // compra: si no, el mismo dinero aparece dos veces.
     if (m.origen === 'tarjeta') continue
     const categoria = (m.entidadId && categorias.get(m.entidadId)) || 'otros'
-    // Una nómina cobrada el 25 ya es el dinero del mes que viene, igual que en
-    // la previsión. Los demás cobros —una devolución, un Bizum— se quedan en el
-    // mes natural en que entraron.
-    //
-    // Se reconoce de dos maneras a propósito. Por categoría, que es lo directo
-    // cuando la nómina está identificada; y porque sea un ingreso que se
-    // repite, que es el mismo criterio con el que se desplazan los eventos
-    // previstos. Con sólo lo primero, una nómina que la aplicación no ha
-    // sabido etiquetar dejaba el mes siguiente a cero sin decir por qué.
-    const abreMes = categoria === 'nomina'
-      || (m.importe > 0 && !!m.entidadId && ingresosRecurrentes?.has(m.entidadId) === true)
-    if (mesContableDe(m.fecha, abreMes) !== mes) continue
+    if (mesDeUnMovimiento(m, categoria, ingresosRecurrentes) !== mes) continue
     cuantos += 1
     if (categoria === 'traspaso') {
       if (m.importe < 0) apartado += m.importe
@@ -168,6 +157,33 @@ export function disponibleReal({ saldo, eventos, ritmoPorDia, hoy, hasta, reserv
  * @property {{ fecha: string, saldo: number }} suelo
  * @property {number} saldoFinal
  */
+
+/**
+ * A qué mes se le apunta un apunte del extracto.
+ *
+ * Una nómina cobrada el 25 ya es el dinero del mes que viene, igual que en la
+ * previsión. Los demás cobros —una devolución, un Bizum— se quedan en el mes
+ * natural en que entraron.
+ *
+ * Se reconoce de dos maneras a propósito. Por categoría, que es lo directo
+ * cuando la nómina está identificada; y porque sea un ingreso que se repite,
+ * que es el mismo criterio con el que se desplazan los eventos previstos. Con
+ * sólo lo primero, una nómina que la aplicación no ha sabido etiquetar dejaba
+ * el mes siguiente a cero sin decir por qué.
+ *
+ * Vive aquí y se exporta porque hace falta en dos sitios: al sumar el mes y al
+ * listar qué lo paga. Copiarla sería volver a tener dos reglas que se
+ * contradicen, que es de donde venía todo esto.
+ *
+ * @param {Movimiento} m
+ * @param {string} categoria
+ * @param {Set<string>} [ingresosRecurrentes]
+ */
+export function mesDeUnMovimiento(m, categoria, ingresosRecurrentes) {
+  const abreMes = categoria === 'nomina'
+    || (m.importe > 0 && !!m.entidadId && ingresosRecurrentes?.has(m.entidadId) === true)
+  return mesContableDe(m.fecha, abreMes)
+}
 
 /**
  * En qué mes cuenta un evento. Los gastos, en el suyo. Los ingresos de final de

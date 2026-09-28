@@ -19,6 +19,7 @@
 
 import { formatEuros, formatEurosRedondo } from '../../dominio/dinero.js'
 import { diasEntre, fechaLarga, mesDe } from '../../dominio/tipos.js'
+import { mesContable } from '../../analisis/mes.js'
 import { residuoDe } from '../../analisis/mensual.js'
 import { dibujarLamina } from '../lamina.js'
 import { barra, cuentas, diaYMes, linea, nodo, nombreDeMes, requerir, titular, vacio } from '../piezas.js'
@@ -280,10 +281,13 @@ function pintarMes(mes) {
  * @param {Mes} mes
  */
 function detalleDe(reparto, mes) {
-  if (mes.estado === 'futuro') return 'todo previsión'
-  if (reparto.previsto === 0) return 'todo confirmado'
-  if (reparto.real === 0) return 'nada todavía'
-  return `${formatEuros(reparto.real)} hasta hoy · ${formatEuros(reparto.previsto)} previsto`
+  // Nunca «todo previsión» por el hecho de que el mes no haya empezado: a
+  // octubre lo paga una nómina que ya está en el banco, y llamarla previsión
+  // es decir que no ha pasado algo que sí ha pasado.
+  if (reparto.total === 0) return 'nada'
+  if (reparto.real === 0) return 'todo previsión'
+  if (reparto.previsto === 0) return 'ya está todo'
+  return `${formatEuros(reparto.real)} ya · ${formatEuros(reparto.previsto)} previsto`
 }
 
 /**
@@ -291,17 +295,37 @@ function detalleDe(reparto, mes) {
  * @param {Mes} mes
  */
 function pintarEventos(estado, mes) {
-  requerir('eventos-rotulo').textContent = mes.estado === 'enCurso'
-    ? 'Lo que queda por pasar'
-    : `Lo previsto en ${comoSeLlama(mes, estado)}`
+  // Ni «lo que viene» ni «lo que queda por pasar»: en esta lista hay cobros
+  // que ya han entrado, porque son los que pagan el mes. El rótulo tiene que
+  // caber en las dos cosas.
+  requerir('eventos-rotulo').textContent = `El dinero de ${comoSeLlama(mes, estado)}`
 
-  const delMes = estado.proyeccionLarga.eventos.filter((e) => mesDe(e.fecha) === mes.mes)
+  /*
+   * Lo que paga este mes, no lo que cae dentro de sus días. Son cosas
+   * distintas: la nómina del 25 de octubre paga noviembre, y si saliera en la
+   * lista de octubre habría un total de 2.800 y una línea de 2.800 que son
+   * dinero diferente. Se suman y no cuadra.
+   *
+   * Por eso los eventos se filtran igual que se suman, y por eso delante van
+   * los cobros que ya han entrado: en un mes que aún no ha empezado, esos son
+   * justamente de dónde sale su dinero.
+   */
+  const previstos = estado.proyeccionLarga.eventos.filter((e) => mesContable(e) === mes.mes)
   const lista = requerir('eventos')
-  if (delMes.length === 0) {
+  if (previstos.length === 0 && mes.cobrado.length === 0) {
     lista.replaceChildren(vacio('No hay nada previsto en este mes.'))
     return
   }
-  lista.replaceChildren(...delMes.map((e) => {
+
+  const yaEstan = mes.cobrado.map((m) => linea({
+    marca: diaYMes(m.fecha),
+    nombre: m.nombre ?? m.conceptoRaw,
+    detalle: 'ya cobrada · paga este mes',
+    importe: formatEuros(m.importe, { signo: true }),
+    clase: 'confirmado',
+  }))
+
+  lista.replaceChildren(...yaEstan, ...previstos.map((e) => {
     const clase = [e.seguro ? 'confirmado' : 'previsto']
     // Ámbar sólo para lo que cae en los próximos tres días: si se pintara
     // todo lo llamativo, no quedaría forma de llamar la atención.
