@@ -3,9 +3,10 @@ import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
 
 import { describirFijos, estructura, MESES_DE } from '../src/analisis/fijos.js'
-import { cascadaDelMes, mesEnCurso } from '../src/analisis/cascada.js'
+import { cascadaDelPeriodo } from '../src/analisis/cascada.js'
+import { periodosEntre } from '../src/analisis/periodos.js'
 import { cuotasPendientes } from '../src/analisis/fraccionados.js'
-import { conGotaDiaria, disponibleReal, porMeses, resumenDeMes } from '../src/analisis/mes.js'
+import { disponibleReal } from '../src/analisis/mes.js'
 import { revisarPresupuestos } from '../src/analisis/presupuestos.js'
 import { capacidadDeAhorro, progresoDe } from '../src/analisis/objetivos.js'
 import { balance, evolucion, variacion, vigentes } from '../src/analisis/patrimonio.js'
@@ -130,130 +131,6 @@ describe('estructura de gasto', () => {
   })
 })
 
-describe('el mes en dos mitades', () => {
-  const movimientos = [
-    mov('2026-09-01', 280_000, { entidadId: 'n' }),
-    mov('2026-09-03', -75_000, { entidadId: 'a' }),
-    mov('2026-09-05', -12_000, { entidadId: 'a' }),
-    mov('2026-09-06', -50_000, { entidadId: 't' }), // traspaso al ahorro
-    mov('2026-08-30', -99_999, { entidadId: 'a' }), // otro mes
-  ]
-  const categorias = new Map([['n', 'nomina'], ['a', 'super'], ['t', 'traspaso']])
-
-  /** @type {import('../src/analisis/bajamar.js').Evento[]} */
-  const eventos = [
-    { fecha: '2026-09-25', importe: -20_000, nombre: 'Luz', tipo: 'compromiso', seguro: false },
-    { fecha: '2026-09-28', importe: 10_000, nombre: 'Devolución', tipo: 'bulto', seguro: true },
-    { fecha: '2026-09-05', importe: -1, nombre: 'Ya pasó', tipo: 'compromiso', seguro: false },
-  ]
-
-  const r = resumenDeMes({ movimientos, categorias, noEsGasto: NO_ES_GASTO, eventos, mes: '2026-09', hoy: '2026-09-15' })
-
-  test('no se cuela el mes anterior', () => {
-    assert.equal(r.gastos.real, -87_000)
-  })
-
-  test('el traspaso al ahorro no es gasto pero se anota', () => {
-    assert.equal(r.apartado, -50_000)
-  })
-
-  test('lo ya ocurrido no se vuelve a prever', () => {
-    assert.equal(r.gastos.previsto, -20_000)
-    assert.equal(r.ingresos.previsto, 10_000)
-  })
-
-  test('el ahorro es lo que queda al final', () => {
-    assert.equal(r.ahorro, (280_000 + 10_000) + (-87_000 - 20_000))
-  })
-
-  test('el goteo diario se reparte sólo por los días que faltan', () => {
-    const con = conGotaDiaria(r, -1000, '2026-09-15')
-    assert.equal(con.gastos.previsto, -20_000 - 15_000) // del 15 al 30
-    assert.equal(con.gastos.real, r.gastos.real)
-  })
-})
-
-describe('las dos vistas apuntan la nómina al mismo mes', () => {
-  // La nómina del 25 de septiembre no paga septiembre: paga octubre. El resumen
-  // del mes y la previsión mes a mes tienen que decir lo mismo, o la aplicación
-  // se contradice a sí misma en dos pantallas.
-  const categorias = new Map([['n', 'nomina'], ['a', 'super'], ['d', 'otros']])
-  // Quién abre mes se decide fuera y se pasa hecho: sólo la nómina.
-  const abrenMes = new Set(['n'])
-
-  test('cobrada, cuenta en el mes que abre y no en el que cae', () => {
-    const movimientos = [mov('2026-09-25', 280_000, { entidadId: 'n' })]
-    const septiembre = resumenDeMes({
-      movimientos, categorias, noEsGasto: NO_ES_GASTO, eventos: [], mes: '2026-09', hoy: '2026-09-30', abrenMes,
-    })
-    const octubre = resumenDeMes({
-      movimientos, categorias, noEsGasto: NO_ES_GASTO, eventos: [], mes: '2026-10', hoy: '2026-09-30', abrenMes,
-    })
-    assert.equal(septiembre.ingresos.real, 0)
-    assert.equal(octubre.ingresos.real, 280_000)
-  })
-
-  test('prevista, el resumen coincide con la previsión', () => {
-    /** @type {import('../src/analisis/bajamar.js').Evento[]} */
-    const eventos = [
-      { fecha: '2026-10-25', importe: 280_000, nombre: 'Nómina', tipo: 'ingreso', seguro: false },
-    ]
-    const octubre = resumenDeMes({
-      movimientos: [], categorias, noEsGasto: NO_ES_GASTO, eventos, mes: '2026-10', hoy: '2026-10-01',
-    })
-    const noviembre = resumenDeMes({
-      movimientos: [], categorias, noEsGasto: NO_ES_GASTO, eventos, mes: '2026-11', hoy: '2026-10-01',
-    })
-    assert.equal(octubre.ingresos.previsto, 0)
-    assert.equal(noviembre.ingresos.previsto, 280_000)
-
-    // Y la previsión mes a mes, que ya usaba mesContable, dice lo mismo.
-    const filas = porMeses(proyectar({
-      saldoInicial: 0, desde: '2026-10-01', hasta: '2026-11-30', ritmoPorDia: 0, eventos,
-    }))
-    assert.equal(filas.find((f) => f.mes === '2026-10')?.ingresos, 0)
-    assert.equal(filas.find((f) => f.mes === '2026-11')?.ingresos, 280_000)
-  })
-
-  test('un ingreso que se repite pero no es la nómina no mueve de mes', () => {
-    // Una bonificación del banco de 60 € el día 24 vuelve todos los meses,
-    // igual que la nómina. Pero no financia octubre: paga septiembre. Sin
-    // esto, cualquier cobro recurrente de final de mes se iba al siguiente.
-    const movimientos = [
-      mov('2026-09-24', 6_000, { entidadId: 'b' }),
-      mov('2026-09-25', 280_000, { entidadId: 'n' }),
-    ]
-    const conBanco = new Map([...categorias, ['b', 'banco']])
-    const septiembre = resumenDeMes({
-      movimientos, categorias: conBanco, noEsGasto: NO_ES_GASTO, eventos: [],
-      mes: '2026-09', hoy: '2026-09-30', abrenMes,
-    })
-    const octubre = resumenDeMes({
-      movimientos, categorias: conBanco, noEsGasto: NO_ES_GASTO, eventos: [],
-      mes: '2026-10', hoy: '2026-09-30', abrenMes,
-    })
-    assert.equal(septiembre.ingresos.real, 6_000)
-    assert.equal(octubre.ingresos.real, 280_000)
-  })
-
-  test('un cobro suelto de final de mes se queda donde cae', () => {
-    // Sólo se mueve la nómina. Una devolución el 28 es dinero de septiembre.
-    const movimientos = [mov('2026-09-28', 10_000, { entidadId: 'd' })]
-    const septiembre = resumenDeMes({
-      movimientos, categorias, noEsGasto: NO_ES_GASTO, eventos: [], mes: '2026-09', hoy: '2026-09-30',
-    })
-    assert.equal(septiembre.ingresos.real, 10_000)
-  })
-
-  test('un gasto de final de mes nunca se mueve', () => {
-    const movimientos = [mov('2026-09-28', -30_000, { entidadId: 'a' })]
-    const septiembre = resumenDeMes({
-      movimientos, categorias, noEsGasto: NO_ES_GASTO, eventos: [], mes: '2026-09', hoy: '2026-09-30',
-    })
-    assert.equal(septiembre.gastos.real, -30_000)
-  })
-})
-
 describe('disponible real', () => {
   /** @type {import('../src/analisis/bajamar.js').Evento[]} */
   const eventos = [
@@ -276,86 +153,72 @@ describe('disponible real', () => {
   })
 })
 
-describe('la previsión mes a mes', () => {
-  const proyeccion = proyectar({
-    saldoInicial: 300_000,
-    desde: '2026-09-26',
-    hasta: '2026-11-30',
-    ritmoPorDia: -1000,
-    eventos: [
-      { fecha: '2026-10-01', importe: 280_000, nombre: 'Nómina', tipo: 'ingreso', seguro: false },
-      { fecha: '2026-10-05', importe: -75_000, nombre: 'Alquiler', tipo: 'compromiso', seguro: false },
-      { fecha: '2026-11-01', importe: 280_000, nombre: 'Nómina', tipo: 'ingreso', seguro: false },
+describe('presupuestos', () => {
+  /**
+   * Cuatro periodos cerrados con 200 € de restaurantes y uno en curso con 240.
+   * Los periodos vienen ya detallados porque la costumbre se mide sobre ellos:
+   * medirla sobre meses naturales daría una referencia que no se parece a
+   * nada de lo que se enseña.
+   * @param {string} id
+   * @param {'cerrado' | 'enCurso'} estado
+   * @param {number} importe
+   */
+  const periodo = (id, estado, importe) => ({
+    id, estado, completo: true,
+    movimientos: [
+      { ...mov(`${id}-10`, -importe, { entidadId: 'r' }), categoria: 'restaurantes' },
+      { ...mov(`${id}-11`, -50_000, { entidadId: 't' }), categoria: 'traspaso' },
     ],
   })
-  const filas = porMeses(proyeccion)
-
-  test('sale un mes por cada mes tocado', () => {
-    assert.deepEqual(filas.map((f) => f.mes), ['2026-09', '2026-10', '2026-11'])
-  })
-
-  test('cada mes lleva sus ingresos y sus gastos', () => {
-    const octubre = filas[1]
-    assert.equal(octubre.ingresos, 280_000)
-    assert.equal(octubre.gastos, -75_000 + -1000 * 31)
-    assert.equal(octubre.ahorro, octubre.ingresos + octubre.gastos)
-  })
-
-  test('el suelo de cada mes es suyo, no el del año', () => {
-    assert.equal(filas[0].suelo.saldo < 300_000, true)
-    for (const fila of filas) assert.equal(fila.suelo.saldo <= fila.saldoFinal + 1, true)
-  })
-
-  test('el saldo de partida no cuenta como día vivido', () => {
-    // Del 26 al 30 de septiembre hay cuatro días de goteo, no cinco.
-    assert.equal(filas[0].gastos, -4000)
-  })
-})
-
-describe('presupuestos', () => {
-  const movimientos = [
-    ...['2026-06', '2026-07', '2026-08'].flatMap((m) => [mov(`${m}-10`, -20_000, { entidadId: 'r' })]),
-    mov('2026-09-05', -24_000, { entidadId: 'r' }),
-    mov('2026-09-05', -50_000, { entidadId: 't' }),
+  const periodos = [
+    periodo('2026-06', 'cerrado', 20_000),
+    periodo('2026-07', 'cerrado', 20_000),
+    periodo('2026-08', 'cerrado', 20_000),
+    periodo('2026-09', 'enCurso', 24_000),
   ]
-  const categorias = new Map([['r', 'restaurantes'], ['t', 'traspaso']])
+  const enCurso = periodos[periodos.length - 1]
 
   const lineas = revisarPresupuestos({
-    movimientos,
-    categorias,
+    periodos,
+    periodo: enCurso,
     noEsGasto: NO_ES_GASTO,
     asignado: { restaurantes: 30_000 },
-    hoy: '2026-09-20',
   })
 
   test('el traspaso no genera presupuesto', () => {
     assert.equal(lineas.some((l) => l.id === 'traspaso'), false)
   })
 
-  test('el gastado es el del mes en curso', () => {
+  test('el gastado es el del periodo que se mira', () => {
     const r = lineas.find((l) => l.id === 'restaurantes')
     assert.equal(r?.gastado, 24_000)
     assert.equal(r?.disponible, 6000)
     assert.equal(r?.porcentaje, 80)
   })
 
-  test('lo habitual sale de meses cerrados, no del actual', () => {
+  test('lo habitual sale de periodos cerrados, no del que corre', () => {
     const r = lineas.find((l) => l.id === 'restaurantes')
     assert.equal(r?.habitual, 20_000)
     assert.equal(Math.round((r?.desvio ?? 0) * 100), 20)
     assert.equal(r?.propuesto, false)
   })
 
-  test('sin presupuesto fijado se propone lo habitual', () => {
+  test('sin repartir se propone lo habitual', () => {
     const [linea] = revisarPresupuestos({
-      movimientos,
-      categorias,
-      noEsGasto: NO_ES_GASTO,
-      asignado: {},
-      hoy: '2026-09-20',
+      periodos, periodo: enCurso, noEsGasto: NO_ES_GASTO, asignado: {},
     })
     assert.equal(linea.propuesto, true)
     assert.equal(linea.presupuesto, 20_000)
+  })
+
+  test('un periodo incompleto no cuenta para medir la costumbre', () => {
+    // El primero del extracto está cortado: diría que ese mes gastaste la mitad.
+    const conCortado = [{ ...periodos[0], completo: false }, ...periodos.slice(1)]
+    const [linea] = revisarPresupuestos({
+      periodos: conCortado, periodo: enCurso, noEsGasto: NO_ES_GASTO, asignado: {},
+    })
+    // Quedan dos cerrados completos, que siguen bastando para una mediana.
+    assert.equal(linea.habitual, 20_000)
   })
 })
 
@@ -561,76 +424,83 @@ describe('el mes empieza con la nómina', () => {
   })
 
   const fijos = [
-    fijo('fondo', 'MyInvestor', -50000, 'mensual', '2026-10-28', 'traspaso'),
+    fijo('fondo', 'MyInvestor', -50000, 'mensual', '2026-10-20', 'traspaso'),
     fijo('prestamo', 'Furgoneta', -46800, 'mensual', '2026-10-10', 'traspaso'),
     fijo('fibra', 'O2 Fibra', -5300, 'mensual', '2026-10-01', 'telecom'),
     fijo('ibi', 'Ajuntament', -45987, 'anual', '2026-10-01', 'impuestos'),
     fijo('seguro', 'MAPFRE', -58237, 'anual', '2026-09-27', 'seguros'),
   ]
 
-  test('cobrar el 25 te pone ya en el mes siguiente', () => {
-    assert.equal(mesEnCurso('2026-09-27'), '2026-10')
-    assert.equal(mesEnCurso('2026-09-19'), '2026-09')
-    assert.equal(mesEnCurso('2026-12-25'), '2027-01')
+  // Octubre es el periodo que abre la nómina del 25 de septiembre.
+  const [, octubre] = periodosEntre({
+    cortes: ['2026-08-25', '2026-09-25', '2026-10-25'],
+    desde: '2026-08-25',
+    hasta: '2026-11-30',
+  })
+
+  test('octubre empieza el día que entra la nómina', () => {
+    assert.equal(octubre.id, '2026-10')
+    assert.equal(octubre.desde, '2026-09-25')
+    assert.equal(octubre.hasta, '2026-10-24')
   })
 
   test('la cascada resta de la nómina en orden y cuadra', () => {
-    const c = cascadaDelMes({ mes: '2026-10', fijos, ingreso: 282249, diaADia: -121757 })
+    const c = cascadaDelPeriodo({ periodo: octubre, fijos, ingreso: 282249, diaADia: -121757 })
     assert.equal(c.ingreso, 282249)
     // El fondo y el préstamo salen por el mismo sitio: los dos son traspaso.
     assert.equal(c.sumaInversiones, -96800)
     assert.equal(c.sumaFijos, -5300)
-    // MAPFRE es de septiembre, aunque se pague tres días antes de cobrar.
-    assert.deepEqual(c.toca.map((t) => t.nombre), ['Ajuntament'])
-    assert.equal(c.sumaToca, -45987)
-    assert.equal(c.resultado, 282249 - 96800 - 5300 - 121757 - 45987)
+    // MAPFRE se paga el 27 de septiembre, dos días después de cobrar: lo paga
+    // esta nómina, así que es de octubre. Con meses naturales caía en
+    // septiembre y el recibo aparecía en el mes que no lo pagaba.
+    assert.deepEqual(c.toca.map((x) => x.nombre).sort(), ['Ajuntament', 'MAPFRE'])
+    assert.equal(c.sumaToca, -45987 - 58237)
+    assert.equal(c.resultado, 282249 - 96800 - 5300 - 121757 - 45987 - 58237)
   })
 
   test('el préstamo se puede sacar de las inversiones', () => {
-    const c = cascadaDelMes({
-      mes: '2026-10', fijos, ingreso: 282249, diaADia: -121757,
+    const c = cascadaDelPeriodo({
+      periodo: octubre, fijos, ingreso: 282249, diaADia: -121757,
       inversiones: { prestamo: false },
     })
     assert.deepEqual(c.inversiones.map((i) => i.nombre), ['MyInvestor'])
     assert.equal(c.sumaInversiones, -50000)
     assert.equal(c.sumaFijos, -46800 - 5300)
     // Cambiar de columna no cambia lo que queda a fin de mes.
-    assert.equal(c.resultado, 282249 - 96800 - 5300 - 121757 - 45987)
+    assert.equal(c.resultado, 282249 - 96800 - 5300 - 121757 - 45987 - 58237)
   })
 
   test('lo que puedes saltarte se mide aparte, sin salir de la cuenta', () => {
     const conSuelto = fijos.map((f) => (f.reciboId === 'fondo' ? { ...f, aplazable: true } : f))
-    const c = cascadaDelMes({ mes: '2026-10', fijos: conSuelto, ingreso: 282249, diaADia: -121757 })
+    const c = cascadaDelPeriodo({ periodo: octubre, fijos: conSuelto, ingreso: 282249, diaADia: -121757 })
     assert.equal(c.aplazable, -50000)
     // Saltárselo es una posibilidad, no un hecho: el resultado no lo descuenta.
     assert.equal(c.sumaInversiones, -96800)
-    assert.equal(c.resultado, 282249 - 96800 - 5300 - 121757 - 45987)
+    assert.equal(c.resultado, 282249 - 96800 - 5300 - 121757 - 45987 - 58237)
   })
 
   test('un mes sin recibos gordos lo dice', () => {
-    const c = cascadaDelMes({ mes: '2026-11', fijos, ingreso: 282249, diaADia: -121757 })
+    const [, , noviembre] = periodosEntre({
+      cortes: ['2026-08-25', '2026-09-25', '2026-10-25', '2026-11-25'],
+      desde: '2026-08-25', hasta: '2026-12-31',
+    })
+    const c = cascadaDelPeriodo({ periodo: noviembre, fijos, ingreso: 282249, diaADia: -121757 })
     assert.deepEqual(c.toca, [])
     assert.equal(c.sumaToca, 0)
   })
 
-  test('la nómina de fin de mes cuenta en el mes que abre', () => {
-    const proyeccion = proyectar({
-      saldoInicial: 0,
-      desde: '2026-09-01',
-      hasta: '2026-10-31',
-      ritmoPorDia: 0,
-      eventos: [
-        { fecha: '2026-09-25', importe: 282249, nombre: 'Nómina', tipo: 'ingreso', seguro: false },
-        { fecha: '2026-09-27', importe: -58237, nombre: 'MAPFRE', tipo: 'compromiso', seguro: false },
-      ],
+  test('un recibo de dos días después de cobrar lo paga esa nómina', () => {
+    // Antes esto necesitaba un desplazamiento: el mes era del 1 al 30 y había
+    // que apuntar el cobro del 25 al mes siguiente a mano. Ahora el periodo
+    // empieza el 25 y el recibo del 27 cae dentro sin que nadie lo mueva.
+    const [, octubreSolo] = periodosEntre({
+      cortes: ['2026-08-25', '2026-09-25', '2026-10-25'],
+      desde: '2026-08-25', hasta: '2026-11-30',
     })
-    const meses = porMeses(proyeccion)
-    const sept = meses.find((m) => m.mes === '2026-09')
-    const oct = meses.find((m) => m.mes === '2026-10')
-    assert.equal(sept?.ingresos, 0)
-    assert.equal(oct?.ingresos, 282249)
-    // El dinero no se mueve: el saldo del 25 sigue subiendo ese día.
-    assert.equal(proyeccion.curva.find((p) => p.fecha === '2026-09-25')?.saldo, 282249)
+    const seguro = fijo('mapfre', 'MAPFRE', -58237, 'anual', '2026-09-27', 'seguros')
+    const c = cascadaDelPeriodo({ periodo: octubreSolo, fijos: [seguro], ingreso: 282249, diaADia: 0 })
+    assert.deepEqual(c.toca.map((x) => x.fecha), ['2026-09-27'])
+    assert.equal(c.resultado, 282249 - 58237)
   })
 })
 
@@ -663,19 +533,28 @@ describe('saltarse un mes no es darse de baja', () => {
     importeEsperado: -50000,
     mensualEquivalente: -50000,
     variacion: 0,
-    proximaPrevista: '2026-10-28',
+    proximaPrevista: '2026-10-20',
     categoria: 'traspaso',
     estable: true,
     estado: /** @type {const} */ ('activo'),
     aplazable: true,
   }
 
+  const [, octubre] = periodosEntre({
+    cortes: ['2026-08-25', '2026-09-25', '2026-10-25'],
+    desde: '2026-08-25', hasta: '2026-11-30',
+  })
+  const [, , noviembre] = periodosEntre({
+    cortes: ['2026-08-25', '2026-09-25', '2026-10-25', '2026-11-25'],
+    desde: '2026-08-25', hasta: '2026-12-31',
+  })
+
   test('lo saltado no suma, pero sigue a la vista para poder deshacerlo', () => {
-    const normal = cascadaDelMes({ mes: '2026-10', fijos: [fijo], ingreso: 282249, diaADia: 0 })
+    const normal = cascadaDelPeriodo({ periodo: octubre, fijos: [fijo], ingreso: 282249, diaADia: 0 })
     assert.equal(normal.sumaInversiones + normal.sumaFijos, -50000)
 
-    const saltada = cascadaDelMes({
-      mes: '2026-10', fijos: [fijo], ingreso: 282249, diaADia: 0,
+    const saltada = cascadaDelPeriodo({
+      periodo: octubre, fijos: [fijo], ingreso: 282249, diaADia: 0,
       saltados: { 'myinvestor#500|2026-10': true },
     })
     assert.equal(saltada.sumaInversiones + saltada.sumaFijos, 0)
@@ -690,11 +569,11 @@ describe('saltarse un mes no es darse de baja', () => {
     // El pie de la cascada dice «saltarte lo que puedes saltarte te dejaría X».
     // Si lo saltado siguiera contando ahí, ofrecería por segunda vez los mismos
     // 500 € que ya has decidido no invertir, y la cifra saldría inflada.
-    const normal = cascadaDelMes({ mes: '2026-10', fijos: [fijo], ingreso: 282249, diaADia: 0 })
+    const normal = cascadaDelPeriodo({ periodo: octubre, fijos: [fijo], ingreso: 282249, diaADia: 0 })
     assert.equal(normal.aplazable, -50000)
 
-    const saltada = cascadaDelMes({
-      mes: '2026-10', fijos: [fijo], ingreso: 282249, diaADia: 0,
+    const saltada = cascadaDelPeriodo({
+      periodo: octubre, fijos: [fijo], ingreso: 282249, diaADia: 0,
       saltados: { 'myinvestor#500|2026-10': true },
     })
     assert.equal(saltada.aplazable, 0)
@@ -703,12 +582,12 @@ describe('saltarse un mes no es darse de baja', () => {
   })
 
   test('saltarse octubre no salta noviembre', () => {
-    const noviembre = cascadaDelMes({
-      mes: '2026-11', fijos: [{ ...fijo, proximaPrevista: '2026-11-28' }],
+    const siguiente = cascadaDelPeriodo({
+      periodo: noviembre, fijos: [{ ...fijo, proximaPrevista: '2026-11-20' }],
       ingreso: 282249, diaADia: 0,
       saltados: { 'myinvestor#500|2026-10': true },
     })
-    assert.equal(noviembre.sumaInversiones + noviembre.sumaFijos, -50000)
+    assert.equal(siguiente.sumaInversiones + siguiente.sumaFijos, -50000)
   })
 })
 

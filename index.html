@@ -42,50 +42,24 @@
     </nav>
     <p class="aclaracion" id="mes-estado"></p>
 
-    <section class="bloque portada">
-      <p class="rotulo" id="suelo-rotulo">La bajamar · el punto más bajo</p>
+    <section class="bloque portada" aria-labelledby="suelo-rotulo">
+      <p class="rotulo" id="suelo-rotulo">La bajamar</p>
       <p class="titular"><span id="suelo-cifra" class="cifras">—</span></p>
       <p class="pie" id="suelo-pie"></p>
       <p class="pie pie-margen" id="suelo-margen" hidden></p>
-    </section>
-
-    <section class="bloque" aria-labelledby="lamina-rotulo">
-      <p class="rotulo" id="lamina-rotulo">Cómo llegas hasta ahí</p>
       <div id="lamina"></div>
     </section>
 
     <section class="bloque">
-      <p class="rotulo" id="disponible-rotulo">Cuánto puedes gastar</p>
-      <div id="disponible"></div>
-      <p class="nota" id="disponible-nota"></p>
+      <p class="rotulo" id="vivir-rotulo">Para el día a día</p>
+      <div id="vivir"></div>
+      <p class="nota" id="vivir-nota"></p>
     </section>
 
     <section class="bloque">
-      <p class="rotulo" id="mes-resumen-rotulo">El mes</p>
-      <div id="mes-resumen"></div>
-    </section>
-
-    <section class="bloque">
-      <p class="rotulo" id="eventos-rotulo">Lo que viene</p>
-      <ol id="eventos" class="eventos pulsables"></ol>
-    </section>
-
-    <section class="bloque" id="bloque-preguntas" hidden>
-      <p class="rotulo">No lo sé</p>
-      <p class="aclaracion">Esto ha pasado una o dos veces. No son suficientes para
-        saber cada cuánto vuelve, así que no lo doy por hecho.</p>
-      <ol id="preguntas" class="eventos"></ol>
-    </section>
-
-    <section class="bloque">
-      <p class="rotulo" id="categorias-rotulo">En qué se va</p>
-      <p class="aclaracion" id="categorias-nota"></p>
+      <p class="rotulo" id="reparto-rotulo">Cómo vas</p>
+      <p class="aclaracion" id="reparto-nota"></p>
       <ol id="categorias" class="categorias"></ol>
-    </section>
-
-    <section class="bloque">
-      <p class="rotulo" id="ahorro-rotulo">Lo que ahorras</p>
-      <div id="capacidad"></div>
     </section>
 
   </div>
@@ -160,6 +134,13 @@
         <button type="button" id="simulador-reset" class="boton boton-sobrio" hidden>Volver a como estás</button>
       </div>
       <p class="nota" id="simulador-pie"></p>
+    </section>
+
+    <section class="bloque" id="bloque-preguntas" hidden>
+      <p class="rotulo">No lo sé</p>
+      <p class="aclaracion">Esto ha pasado una o dos veces. No son suficientes para
+        saber cada cuánto vuelve, así que no lo doy por hecho.</p>
+      <ol id="preguntas" class="eventos"></ol>
     </section>
 
     <section class="bloque">

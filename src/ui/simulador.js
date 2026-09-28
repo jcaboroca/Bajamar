@@ -85,7 +85,7 @@ export function montarSimulador({ alApagarCategoria, alAsignar, alRecuadrar }) {
     if (!ultimo) return
     await alRecuadrar(proponerAsignado(ultimo.ordinarios, {
       habitualPorMes: ultimo.ritmo.porMes,
-      residuo: ultimo.planificando.residuo,
+      residuo: ultimo.residuo,
     }))
   })
 }
@@ -101,14 +101,14 @@ export function pintarSimulador(estado) {
 
   if (conBarra.length === 0) {
     lista.replaceChildren(cabeceraDelCuadre(estado), ...apagadas)
-    requerir('simulador-pie').textContent = estado.planificando.residuo <= 0
+    requerir('simulador-pie').textContent = estado.residuo <= 0
       ? 'Este mes no queda nada que repartir para el día a día.'
       : 'Aún no hay meses cerrados suficientes para proponerte un reparto.'
     refrescarCifras(estado)
     return
   }
 
-  const sinRepartir = estado.planificando.residuo - repartido()
+  const sinRepartir = estado.residuo - repartido()
   lista.replaceChildren(
     cabeceraDelCuadre(estado),
     fijos(estado),
@@ -116,7 +116,7 @@ export function pintarSimulador(estado) {
     ...apagadas,
   )
 
-  requerir('simulador-pie').textContent = estado.planificando.plan
+  requerir('simulador-pie').textContent = estado.plan
     ? 'Las barras reparten lo que te queda para el día a día, no los recibos. '
       + 'Lo que dejes sin repartir no te lo gastas: sube tu punto más bajo.'
     : 'Esto es una propuesta hecha con lo que sueles gastar. En cuanto muevas '
@@ -131,11 +131,11 @@ export function pintarSimulador(estado) {
  * @param {Estado} estado
  */
 function repartoDePartida(estado) {
-  const crudo = estado.planificando.plan
-    ? { ...estado.planificando.plan.asignado }
+  const crudo = estado.plan
+    ? { ...estado.plan.asignado }
     : proponerAsignado(estado.ordinarios, {
       habitualPorMes: estado.ritmo.porMes,
-      residuo: estado.planificando.residuo,
+      residuo: estado.residuo,
     })
 
   /** @type {Record<string, number>} */
@@ -143,7 +143,7 @@ function repartoDePartida(estado) {
   for (const [categoria, importe] of Object.entries(crudo)) {
     if (SIN_BARRA.has(categoria)) continue
     if (estado.apagadas.includes(categoria)) continue
-    if (importe < MINIMO_AL_MES && !estado.planificando.plan) continue
+    if (importe < MINIMO_AL_MES && !estado.plan) continue
     limpio[categoria] = importe
   }
   return limpio
@@ -165,8 +165,8 @@ function cabeceraDelCuadre(estado) {
   // Con el nombre del mes delante, porque no siempre es el que estás
   // viviendo: en cuanto entra la nómina se reparte el que abre.
   cabecera.append(nodo('span', 'mes-nombre',
-    `Para el día a día de ${nombreDeMes(estado.planificando.mes).toLowerCase()}`))
-  const cifra = nodo('span', 'cifras', formatEuros(estado.planificando.residuo))
+    `Para el día a día de ${nombreDeMes(estado.periodoActual?.id ?? '').toLowerCase()}`))
+  const cifra = nodo('span', 'cifras', formatEuros(estado.residuo))
   cifra.dataset.cifra = ':residuo'
   cabecera.append(cifra)
   li.append(cabecera)
@@ -177,17 +177,17 @@ function cabeceraDelCuadre(estado) {
 
   // El desajuste no se corrige solo: se enseña y decides tú. Si el residuo ha
   // cambiado desde que repartiste, es porque ha pasado algo que merece mirarse.
-  if (estado.planificando.plan && estado.planificando.cuadre.desajuste !== 0) {
+  if (estado.plan && estado.cuadre.desajuste !== 0) {
     const aviso = nodo('p', 'mes-aviso')
-    const signo = estado.planificando.cuadre.desajuste < 0 ? 'bajado' : 'subido'
-    aviso.textContent = `Lo que te queda ha ${signo} ${formatEuros(Math.abs(estado.planificando.cuadre.desajuste))} `
+    const signo = estado.cuadre.desajuste < 0 ? 'bajado' : 'subido'
+    aviso.textContent = `Lo que te queda ha ${signo} ${formatEuros(Math.abs(estado.cuadre.desajuste))} `
       + 'desde que repartiste. Tus cifras siguen como las dejaste.'
     const boton = document.createElement('button')
     boton.type = 'button'
     boton.className = 'boton boton-sobrio'
     boton.textContent = 'Recuadrar en proporción'
     boton.addEventListener('click', async () => {
-      if (ultimo?.planificando.plan && ganchos) await ganchos.alRecuadrar(null)
+      if (ultimo?.plan && ganchos) await ganchos.alRecuadrar(null)
     })
     li.append(aviso, boton)
   }
@@ -302,7 +302,7 @@ function palanca(categoria, sinRepartir) {
  */
 function refrescarCifras(estado) {
   const lista = requerir('simulador')
-  const sinRepartir = estado.planificando.residuo - repartido()
+  const sinRepartir = estado.residuo - repartido()
 
   for (const [categoria, importe] of Object.entries(borrador)) {
     const cifra = lista.querySelector(`[data-cifra="${categoria}"]`)
@@ -320,15 +320,15 @@ function refrescarCifras(estado) {
       : `Sin repartir: ${formatEuros(sinRepartir)}. Lo que dejes aquí no te lo gastas.`
   }
 
-  const delMes = estado.detalleMensual.find((m) => m.mes === estado.planificando.mes)
+  const delMes = estado.periodoActual
   const gastado = Object.fromEntries((delMes?.lineas ?? []).map((l) => [l.id, l.gastado]))
-  const mes = estado.planificando.mes
-  const finDeMes = ultimoDiaDelMes(estado.hoy)
+  const mes = estado.periodoActual?.id ?? ''
+  const finDeMes = estado.periodoActual?.hasta ?? ultimoDiaDelMes(estado.hoy)
   const ritmo = ritmoDelPlan({
-    plan: { mes, asignado: borrador, residuo: estado.planificando.residuo, sello: estado.hoy },
+    plan: { mes, asignado: borrador, residuo: estado.residuo, sello: estado.hoy },
     gastado,
     hoy: estado.hoy,
-    hasta: finDeMes,
+    hasta: estado.periodoActual?.hasta ?? finDeMes,
   })
 
   const nueva = proyectar({

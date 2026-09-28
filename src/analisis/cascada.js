@@ -11,11 +11,9 @@
  * Verlas sumadas en una sola cifra esconde justo eso. Aquí van en cascada, cada
  * una restando de lo que quedaba, para ver en qué escalón se acaba el dinero.
  *
- * El mes es el natural, del 1 al 31. Lo único que se mueve es la nómina: la que
- * se cobra a final de mes no paga los días que quedan detrás, paga los que
- * vienen delante, así que cuenta en el mes que abre. El dinero no se toca —en
- * la cuenta sigue entrando el 25 y el suelo se calcula con esa fecha—, sólo
- * cambia a qué mes se le apunta.
+ * El mes es el periodo entre dos nóminas (ver `periodos.js`), así que aquí no
+ * se desplaza nada: la nómina que abre el periodo ya está dentro de él y todo
+ * lo que cae entre sus dos bordes es suyo.
  */
 
 import { sumarMeses } from '../dominio/tipos.js'
@@ -24,11 +22,6 @@ import { PLAZOS } from './fraccionados.js'
 import { MESES_DE } from './fijos.js'
 
 /** @typedef {import('./fijos.js').Fijo} Fijo */
-
-/**
- * A partir de este día, un ingreso ya es el dinero del mes siguiente.
- */
-export const DIA_DE_ADELANTO = 20
 
 /**
  * @typedef {object} Escalon
@@ -62,33 +55,8 @@ export const DIA_DE_ADELANTO = 20
  */
 
 /**
- * A qué mes se le apunta algo. Los gastos, al mes en que caen. Los ingresos
- * que abren mes, al siguiente.
- *
- * Es la única copia de esta regla. Vivía aquí y otra vez en mes.js, y había un
- * tercer sitio que no la aplicaba, así que la misma nómina contaba en
- * septiembre en una pantalla y en octubre en otra.
- *
- * @param {string} fecha         ISO
- * @param {boolean} abreMes      si ese ingreso paga los días que vienen delante
- */
-export function mesContableDe(fecha, abreMes) {
-  if (!abreMes || Number(fecha.slice(8)) < DIA_DE_ADELANTO) return fecha.slice(0, 7)
-  return sumarMeses(`${fecha.slice(0, 8)}01`, 1).slice(0, 7)
-}
-
-/**
- * El mes que paga la última nómina cobrada: pasado el día 20 ya se vive del
- * dinero del mes siguiente.
- * @param {string} hoy
- */
-export function mesEnCurso(hoy) {
-  return mesContableDe(hoy, true)
-}
-
-/**
  * @param {object} entrada
- * @param {string} entrada.mes                'yyyy-mm'
+ * @param {import('./periodos.js').Periodo} entrada.periodo
  * @param {Fijo[]} entrada.fijos              ya descritos
  * @param {number} entrada.ingreso            céntimos positivos
  * @param {number} entrada.diaADia            goteo mensual, céntimos negativos
@@ -97,7 +65,7 @@ export function mesEnCurso(hoy) {
  * @param {Record<string, true>} [entrada.saltados] reciboId|mes que no se paga
  * @returns {Cascada}
  */
-export function cascadaDelMes({ mes, fijos, ingreso, diaADia, inversiones = {}, plazos = [], saltados = {} }) {
+export function cascadaDelPeriodo({ periodo, fijos, ingreso, diaADia, inversiones = {}, plazos = [], saltados = {} }) {
   /** @type {Escalon[]} */
   const listaFijos = []
   /** @type {Escalon[]} */
@@ -111,7 +79,7 @@ export function cascadaDelMes({ mes, fijos, ingreso, diaADia, inversiones = {}, 
     // El interruptor sólo aparece donde hay duda: un traspaso a tu propio
     // bolsillo puede ser una aportación o la cuota de un préstamo.
     const puedeSerInversion = fijo.categoria === 'traspaso' || fijo.reciboId in inversiones
-    for (const fecha of vecesEn(fijo, mes)) {
+    for (const fecha of vecesEn(fijo, periodo)) {
       const escalon = {
         nombre: fijo.nombre,
         importe: fijo.importeEsperado,
@@ -140,7 +108,7 @@ export function cascadaDelMes({ mes, fijos, ingreso, diaADia, inversiones = {}, 
 
   /** @type {Escalon[]} */
   const listaPlazos = plazos
-    .filter((c) => c.fecha.slice(0, 7) === mes)
+    .filter((c) => c.fecha >= periodo.desde && c.fecha <= periodo.hasta)
     .map((c) => ({
       nombre: c.nombre,
       importe: c.importe,
@@ -164,7 +132,9 @@ export function cascadaDelMes({ mes, fijos, ingreso, diaADia, inversiones = {}, 
   const sumaPlazos = suma(listaPlazos)
 
   return {
-    mes,
+    mes: periodo.id,
+    desde: periodo.desde,
+    hasta: periodo.hasta,
     ingreso,
     fijos: listaFijos,
     inversiones: listaInversiones,
@@ -197,27 +167,27 @@ export function esInversion(fijo, inversiones) {
 }
 
 /**
- * Qué días de este mes toca pagar un recibo. Se retrocede desde la próxima
- * prevista y luego se avanza, para que el mes pedido pueda estar por detrás o
- * por delante de ella.
+ * Qué días de este periodo toca pagar un recibo. Se retrocede desde la próxima
+ * prevista y luego se avanza, para que el periodo pedido pueda estar por
+ * detrás o por delante de ella.
  * @param {Fijo} fijo
- * @param {string} mes  'yyyy-mm'
+ * @param {import('./periodos.js').Periodo} periodo
  * @returns {string[]}
  */
-function vecesEn(fijo, mes) {
+function vecesEn(fijo, periodo) {
   const paso = MESES_DE[fijo.periodicidad]
   const fechas = []
   let fecha = fijo.proximaPrevista
   let vueltas = 0
-  while (fecha.slice(0, 7) > mes && vueltas < 200) {
+  while (fecha > periodo.hasta && vueltas < 200) {
     fecha = sumarMeses(fecha, -paso)
     vueltas += 1
   }
-  while (fecha.slice(0, 7) < mes && vueltas < 400) {
+  while (fecha < periodo.desde && vueltas < 400) {
     fecha = sumarMeses(fecha, paso)
     vueltas += 1
   }
-  while (fecha.slice(0, 7) === mes) {
+  while (fecha >= periodo.desde && fecha <= periodo.hasta) {
     fechas.push(fecha)
     fecha = sumarMeses(fecha, paso)
   }

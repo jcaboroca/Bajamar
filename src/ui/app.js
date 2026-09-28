@@ -165,13 +165,7 @@ function montarVistas() {
         : 'Hecho: vuelve a la previsión.')
   }
 
-  montarResumen({
-    alCambiarTrato,
-    alMarcarAnual: async (entidadId, esAnual) => {
-      await ponerAnual(entidadId, esAnual)
-      await refrescar()
-    },
-  })
+  montarResumen({ alCambiarTrato })
 
   montarMovimientos({
     alCambiar: async ({ retoque, regla }) => {
@@ -183,6 +177,10 @@ function montarVistas() {
 
   montarPrevision({
     alCambiarTrato,
+    alMarcarAnual: async (entidadId, esAnual) => {
+      await ponerAnual(entidadId, esAnual)
+      await refrescar()
+    },
     alApagarCategoria: async (categoria, apagada) => {
       await ponerApagada(categoria, apagada)
       await refrescar()
@@ -198,7 +196,7 @@ function montarVistas() {
       if (!ultimoEstado) return
       const contexto = contextoDelPlan()
       const nuevo = asignado
-        ?? (ultimoEstado.planificando.plan ? recuadrar(ultimoEstado.planificando.plan, contexto.residuo) : {})
+        ?? (ultimoEstado.plan ? recuadrar(ultimoEstado.plan, contexto.residuo) : {})
       await ponerPlan(sellar({ ...contexto, asignado: nuevo }))
       await refrescar()
     },
@@ -271,8 +269,8 @@ let ultimoEstado = null
 /** Contra qué mes y qué residuo se está cuadrando el plan ahora mismo. */
 function contextoDelPlan() {
   return {
-    mes: ultimoEstado?.planificando.mes ?? hoyIso().slice(0, 7),
-    residuo: ultimoEstado?.planificando.residuo ?? 0,
+    mes: ultimoEstado?.periodoActual?.id ?? hoyIso().slice(0, 7),
+    residuo: ultimoEstado?.residuo ?? 0,
     hoy: hoyIso(),
   }
 }

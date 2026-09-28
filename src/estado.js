@@ -10,12 +10,13 @@
 import { detectarCompromisos, detectarIngresos, gastoOrdinario, ritmoOrdinario } from './analisis/compromisos.js'
 import { eventosDesde, proyectar } from './analisis/bajamar.js'
 import { describirFijos, estructura } from './analisis/fijos.js'
-import { cascadaDelMes, mesEnCurso as mesQuePagaLaNomina } from './analisis/cascada.js'
+import { cascadaDelPeriodo } from './analisis/cascada.js'
 import { cuotasPendientes } from './analisis/fraccionados.js'
-import { conGotaDiaria, disponibleReal, mesContable, mesDeUnMovimiento, porMeses, resumenDeMes } from './analisis/mes.js'
-import { gastoPorCategoriaYMes, revisarPresupuestos } from './analisis/presupuestos.js'
-import { cuadre as cuadrarPlan, residuoDelMes, ritmoDelPlan } from './analisis/plan.js'
-import { curvaDelMes, detallarMeses, estaAcabado, residuoDe } from './analisis/mensual.js'
+import { disponibleReal } from './analisis/mes.js'
+import { gastoPorCategoria, revisarPresupuestos } from './analisis/presupuestos.js'
+import { cuadre as cuadrarPlan, ritmoDelPlan } from './analisis/plan.js'
+import { detallarPeriodos, residuoDe } from './analisis/mensual.js'
+import { cortesDeNomina, periodoDe, periodosEntre } from './analisis/periodos.js'
 import { balance, evolucion } from './analisis/patrimonio.js'
 import { capacidadDeAhorro } from './analisis/objetivos.js'
 import { revisar } from './analisis/alertas.js'
@@ -66,6 +67,30 @@ const PARECE_CUENTA = /^\d{4}[- ]?\d{6,}$/
 
 /** El banco liquida la tarjeta con un apunte propio en la cuenta. */
 const LIQUIDACION_TARJETA = /TARJETA\s+(DE\s+)?CREDITO/i
+
+/**
+ * Las fechas en que va a entrar un ingreso recurrente, de aquí a un límite.
+ *
+ * Se sacan del compromiso y no de la proyección porque los periodos hacen
+ * falta antes de proyectar: es el plan del periodo en curso el que decide el
+ * ritmo con el que se proyecta.
+ *
+ * @param {{ proximaPrevista: string, periodicidad: string }} compromiso
+ * @param {string} hasta
+ */
+function fechasPrevistas(compromiso, hasta) {
+  const meses = { mensual: 1, bimestral: 2, trimestral: 3, semestral: 6, anual: 12 }
+  const paso = meses[compromiso.periodicidad] ?? 1
+  const fechas = []
+  let fecha = compromiso.proximaPrevista
+  let vueltas = 0
+  while (fecha <= hasta && vueltas < 24) {
+    fechas.push({ fecha })
+    fecha = sumarMeses(fecha, paso)
+    vueltas += 1
+  }
+  return fechas
+}
 
 /** Hasta dónde mira la previsión larga. Un año es lo que tarda en volver un recibo anual. */
 const HORIZONTE_LARGO = 12
@@ -248,33 +273,50 @@ export function construirEstado(crudos, opciones = {}) {
   const finLargo = ultimoDiaDelMes(sumarMeses(hoy, HORIZONTE_LARGO - 1))
 
   /*
-   * El día a día deja de ser una medida y pasa a ser una decisión. Si hay plan
-   * para el mes natural en curso, el ritmo sale de él; si no, del histórico
-   * como hasta ahora, que sigue siendo la respuesta correcta mientras no hayas
-   * decidido nada.
-   *
-   * El residuo es `disponibleReal` sin el goteo. Tenía que ser exactamente el
-   * mismo número que sale en portada, o habría dos respuestas para «cuánto me
-   * queda». Y como lo ya gastado está dentro del saldo del banco, no hay que
-   * descontarlo: recortar el día 15 se recalcula solo sobre los días que faltan.
+   * Quién corta el mes: la nómina. Un mes va de una nómina a la siguiente, así
+   * que no hay nada que desplazar ni que reasignar —lo que cae entre sus dos
+   * bordes es suyo—. Si no hay nada etiquetado como nómina se toma el mayor
+   * ingreso que vuelva, y si no hay ninguno se cuenta por meses naturales.
    */
-  const finDeMes = ultimoDiaDelMes(hoy)
-  const residuo = residuoDelMes({ saldo: saldoInicial, eventos: armar(finDeMes), hoy, hasta: finDeMes })
-  const planes = opciones.planes ?? {}
-  const plan = planes[mesDe(hoy)] ?? null
-  const gastadoPorCategoria = Object.fromEntries(
-    [...gastoPorCategoriaYMes(contables, categorias, NO_ES_GASTO)]
-      .map(([id, meses]) => [id, Math.abs(meses.get(mesDe(hoy)) ?? 0)]),
+  const nominas = ingresos.filter((i) => categorias.get(i.entidadId ?? '') === 'nomina')
+  const mayorIngreso = ingresos.reduce(
+    (mejor, i) => (Math.abs(i.importeEsperado) > Math.abs(mejor?.importeEsperado ?? 0) ? i : mejor),
+    /** @type {typeof ingresos[number] | null} */ (null),
   )
-  const ritmoEfectivo = ritmoDelPlan({ plan, gastado: gastadoPorCategoria, hoy, hasta: finDeMes }) ?? ritmo
-  const cuadre = cuadrarPlan({ plan, residuo })
+  const cortan = nominas.length > 0 ? nominas : mayorIngreso ? [mayorIngreso] : []
+  const idsQueCortan = new Set(cortan.map((i) => i.entidadId).filter((id) => typeof id === 'string'))
 
-  // El plan manda dentro de su mes y ni un día más. Su ritmo es «lo que queda
-  // entre los días que quedan», así que extenderlo a doce meses daría cifras
-  // absurdas: un día 30 sería el presupuesto entero repartido en un solo día.
-  // A partir de fin de mes vuelve a mandar lo que sueles gastar.
+  const periodos = periodosEntre({
+    cortes: cortesDeNomina({
+      cobradas: cuenta.filter((m) => m.importe > 0 && m.entidadId && idsQueCortan.has(m.entidadId)),
+      previstas: cortan.flatMap((i) => fechasPrevistas(i, finLargo)),
+    }),
+    desde: cuenta[0]?.fecha ?? hoy,
+    hasta: finLargo,
+  })
+  const enCurso = periodoDe(periodos, hoy) ?? periodos[periodos.length - 1]
+
+  /*
+   * El día a día deja de ser una medida y pasa a ser una decisión. Si hay plan
+   * para el periodo en curso, el ritmo sale de él; si no, del histórico, que
+   * sigue siendo la respuesta correcta mientras no hayas decidido nada.
+   */
+  const planes = opciones.planes ?? {}
+  const plan = planes[enCurso?.id ?? ''] ?? null
+  const gastadoPorCategoria = Object.fromEntries(
+    [...gastoPorCategoria(
+      { movimientos: cuenta.filter((m) => enCurso && m.fecha >= enCurso.desde && m.fecha <= enCurso.hasta) },
+      NO_ES_GASTO,
+    )],
+  )
+  const finDelPeriodo = enCurso?.hasta ?? ultimoDiaDelMes(hoy)
+  const ritmoEfectivo = ritmoDelPlan({ plan, gastado: gastadoPorCategoria, hoy, hasta: finDelPeriodo }) ?? ritmo
+
+  // El plan manda dentro de su periodo y ni un día más. Su ritmo es «lo que
+  // queda entre los días que quedan», así que extenderlo a doce meses daría
+  // cifras absurdas: el último día sería el presupuesto entero en una jornada.
   const gota = (/** @type {string} */ fecha) =>
-    (fecha <= finDeMes ? ritmoEfectivo.porDia : ritmo.porDia)
+    (fecha <= finDelPeriodo ? ritmoEfectivo.porDia : ritmo.porDia)
 
   const proyeccion = proyectar({ saldoInicial, desde: hoy, hasta, eventos: armar(hasta), ritmoPorDia: gota })
   const proyeccionLarga = proyectar({ saldoInicial, desde: hoy, hasta: finLargo, eventos: armar(finLargo), ritmoPorDia: gota })
@@ -298,213 +340,45 @@ export function construirEstado(crudos, opciones = {}) {
   const costes = estructura(fijos)
   const aplazableAlMes = fijos.reduce((t, f) => (f.aplazable ? t + f.mensualEquivalente : t), 0)
 
-  const presupuestos = revisarPresupuestos({
-    movimientos: contables,
-    categorias,
+  /*
+   * Cada periodo, contado entero: lo vivido del extracto, lo que falta de la
+   * previsión, y su plan al lado para poder comparar lo que decidiste con lo
+   * que llevas gastado.
+   */
+  const detalleCrudo = detallarPeriodos({
+    periodos,
+    movimientos: cuenta,
+    proyeccion: proyeccionLarga,
     noEsGasto: NO_ES_GASTO,
-    asignado: plan?.asignado ?? {},
     hoy,
   })
-
-  /*
-   * Quién abre mes: la nómina, y nada más.
-   *
-   * No vale con «es un ingreso que se repite». Una bonificación del banco de
-   * 60 € el día 24 se repite todos los meses igual que la nómina, y sin
-   * embargo paga el mes en que cae, no el siguiente. Lo que abre un mes es lo
-   * que lo financia entero.
-   *
-   * Y si no hay nada etiquetado como nómina, se toma el mayor ingreso que
-   * vuelva. Es la red: sin ella, un cobro que la aplicación no ha sabido
-   * etiquetar dejaba el mes siguiente sin ingresos y sin decir por qué.
-   */
-  const nominas = ingresos.filter((i) => categorias.get(i.entidadId ?? '') === 'nomina')
-  const mayorIngreso = ingresos.reduce(
-    (mejor, i) => (Math.abs(i.importeEsperado) > Math.abs(mejor?.importeEsperado ?? 0) ? i : mejor),
-    /** @type {typeof ingresos[number] | null} */ (null),
-  )
-  const abrenMes = new Set(
-    (nominas.length > 0 ? nominas : mayorIngreso ? [mayorIngreso] : [])
-      .map((i) => i.entidadId)
-      .filter((id) => typeof id === 'string'),
-  )
-
-  const mesEnCurso = conGotaDiaria(
-    resumenDeMes({
-      movimientos: contables,
-      categorias,
+  const detalleMensual = detalleCrudo.map((p) => ({
+    ...p,
+    plan: planes[p.id] ?? null,
+    lineas: revisarPresupuestos({
+      periodos: detalleCrudo,
+      periodo: p,
       noEsGasto: NO_ES_GASTO,
-      eventos: proyeccion.eventos,
-      mes: mesDe(hoy),
-      hoy,
-      abrenMes,
+      asignado: planes[p.id]?.asignado ?? {},
     }),
-    ritmoEfectivo.porDia,
-    hoy,
-  )
+  }))
 
+  // Lo que queda libre de aquí a que acabe el periodo. El saldo del banco ya
+  // incluye todo lo pasado, así que se le suma sólo lo que falta por pasar.
   const disponible = disponibleReal({
     saldo: saldoInicial,
     eventos: proyeccion.eventos,
     ritmoPorDia: ritmoEfectivo.porDia,
     hoy,
-    hasta: ultimoDiaDelMes(hoy),
+    hasta: finDelPeriodo,
   })
 
-  /*
-   * La proyección empieza hoy, así que del mes en curso sólo contiene los días
-   * que quedan. Enseñar eso como si fuera el mes entero es mentir por omisión:
-   * un día 28 la nómina ya cobrada desaparecería y el mes parecería ruinoso.
-   * Los totales del primer mes salen de lo que de verdad ha pasado más lo que
-   * queda; el suelo y el saldo final sí vienen de la proyección, porque mirar
-   * hacia atrás buscando un mínimo no sirve de nada.
-   */
-  const meses = porMeses(proyeccionLarga, abrenMes)
-
-  /*
-   * Y la misma tabla sin mover nada: la cuenta tal cual, con cada cobro en el
-   * mes en que cae. El desplazamiento de la nómina sirve para leer un mes por
-   * dentro —cuánto tengo para vivir octubre— pero estorba para mirar la cuenta
-   * de lejos, donde lo que se quiere ver es cuándo entra y sale el dinero de
-   * verdad. Son dos preguntas y necesitan dos respuestas.
-   */
-  const SIN_DESPLAZAR = new Set()
-  const mesesDeCuenta = porMeses(proyeccionLarga, SIN_DESPLAZAR)
-  // El mes en curso, igual que arriba: la proyección sólo trae lo que falta,
-  // así que sus totales salen del extracto más lo que queda por pasar.
-  const enCursoDeCuenta = conGotaDiaria(
-    resumenDeMes({
-      movimientos: contables,
-      categorias,
-      noEsGasto: NO_ES_GASTO,
-      eventos: proyeccion.eventos,
-      mes: mesDe(hoy),
-      hoy,
-      abrenMes: SIN_DESPLAZAR,
-    }),
-    ritmoEfectivo.porDia,
-    hoy,
-  )
-  if (mesesDeCuenta[0] && mesesDeCuenta[0].mes === mesDe(hoy)) {
-    mesesDeCuenta[0] = {
-      ...mesesDeCuenta[0],
-      ingresos: enCursoDeCuenta.ingresos.total,
-      gastos: enCursoDeCuenta.gastos.total,
-      ahorro: enCursoDeCuenta.ahorro,
-    }
-  }
-  if (meses[0] && meses[0].mes === mesDe(hoy)) {
-    meses[0] = {
-      ...meses[0],
-      ingresos: mesEnCurso.ingresos.total,
-      gastos: mesEnCurso.gastos.total,
-      ahorro: mesEnCurso.ahorro,
-    }
-  }
-
-  /*
-   * Al mes que viene lo paga una nómina que ya ha entrado. La regla de que un
-   * cobro del 25 cuenta en el mes que abre sí se aplica en porMeses, pero esa
-   * nómina no llega hasta allí: cayó antes de que empezara la proyección, así
-   * que no es un evento futuro, está dentro del saldo. Sin esto, el mes que
-   * viene sale con cero ingresos y la tabla dice «se va más de lo que entra»
-   * todos los meses del año, para el mismo mes y por el mismo motivo.
-   *
-   * Sólo le pasa al siguiente. Los demás cobran su nómina dentro del horizonte,
-   * así que su parte ya cobrada es cero y sumarla no cambiaría nada.
-   */
-  const mesQueViene = sumarMeses(`${mesDe(hoy)}-01`, 1).slice(0, 7)
-  const fila = meses.find((f) => f.mes === mesQueViene)
-  if (fila) {
-    const yaCobrado = resumenDeMes({
-      movimientos: contables,
-      categorias,
-      noEsGasto: NO_ES_GASTO,
-      eventos: [],
-      mes: mesQueViene,
-      hoy,
-      abrenMes,
-    })
-    fila.ingresos += yaCobrado.ingresos.real
-    fila.gastos += yaCobrado.gastos.real
-    fila.ahorro = fila.ingresos + fila.gastos
-  }
-
-  /*
-   * El resumen, mes a mes. Deja de haber un «este mes» que quiere decir una
-   * cosa aquí y otra allí: cada mes se cuenta entero, del 1 al último, sabe si
-   * está cerrado, en curso o por venir, y lleva su plan al lado para poder
-   * comparar lo que decidiste con lo que llevas gastado.
-   */
-  const detalleMensual = detallarMeses({
-    meses,
-    proyeccion: proyeccionLarga,
-    // Sin eventos: aquí sólo interesa lo que ya ha pasado de verdad. Lo
-    // previsto se deduce restándoselo al total, que sale de la proyección.
-    resumenDe: (mesPedido) => resumenDeMes({
-      movimientos: contables,
-      categorias,
-      noEsGasto: NO_ES_GASTO,
-      eventos: [],
-      mes: mesPedido,
-      hoy,
-      abrenMes,
-    }),
-    hoy,
-  }).map((m) => ({
-    ...m,
-    acabado: estaAcabado(m.mes, hoy),
-    // Lo que ya ha entrado y paga este mes. Sin esto, la lista de octubre no
-    // enseñaba de dónde salen sus ingresos —la nómina cayó en septiembre— y
-    // en su lugar enseñaba la del 25 de octubre, que es la que paga noviembre.
-    // Dos cifras iguales en la misma pantalla que son dinero distinto.
-    cobrado: contables.filter((x) => x.origen !== 'tarjeta' && x.importe > 0
-      && mesDeUnMovimiento(x, abrenMes) === m.mes),
-    ...curvaDelMes({
-      mes: m.mes,
-      movimientos: cuenta,
-      proyeccion: proyeccionLarga,
-      hoy,
-      // Lo que entra en este mes pero paga el siguiente: la nómina del 25. Se
-      // enseña en la línea del banco, porque está en la cuenta, pero no cuenta
-      // para saber hasta dónde bajó el dinero de este mes.
-      desplazados: [
-        ...cuenta.filter((x) => x.importe > 0 && x.fecha.slice(0, 7) === m.mes
-          && mesDeUnMovimiento(x, abrenMes) !== m.mes),
-        ...proyeccionLarga.eventos.filter((ev) => ev.importe > 0
-          && ev.fecha.slice(0, 7) === m.mes && mesContable(ev, abrenMes) !== m.mes),
-      ],
-    }),
-    plan: planes[m.mes] ?? null,
-    lineas: revisarPresupuestos({
-      movimientos: contables,
-      categorias,
-      noEsGasto: NO_ES_GASTO,
-      asignado: planes[m.mes]?.asignado ?? {},
-      mes: m.mes,
-      hoy,
-    }),
-  }))
-
-  /*
-   * Qué mes se está planificando, que no es el mismo que se está viviendo. En
-   * cuanto entra la nómina pasas a repartir el mes que abre: el que corre ya
-   * lo repartiste el mes pasado y ahora sólo se compara con lo que va saliendo.
-   *
-   * Es el mes de la cascada. Antes esto apuntaba al mes natural, y del día 20
-   * en adelante te hacía repartir un mes al que le quedaban dos días: como no
-   * quedaba nada por pagar, el residuo salía siendo la cuenta entera.
-   */
-  const mesAPlanificar = mesQuePagaLaNomina(hoy)
-  const aPlanificar = detalleMensual.find((m) => m.mes === mesAPlanificar) ?? null
-  const planificando = {
-    mes: mesAPlanificar,
-    plan: planes[mesAPlanificar] ?? null,
-    residuo: aPlanificar === null || aPlanificar.estado === 'enCurso'
-      ? residuo
-      : residuoDe(aPlanificar, opciones.colchon ?? 0),
-  }
-  const cuadrePlanificado = cuadrarPlan({ plan: planificando.plan, residuo: planificando.residuo })
+  const periodoActual = detalleMensual.find((p) => p.id === enCurso?.id)
+    ?? detalleMensual[detalleMensual.length - 1]
+  // Lo que queda para el día a día del periodo entero. Es la cifra con la que
+  // se reparte, y se decide al empezar el periodo, no día a día.
+  const residuo = periodoActual ? residuoDe(periodoActual) : 0
+  const cuadre = cuadrarPlan({ plan, residuo })
 
   const ingresoMensual = ingresos
     .filter((i) => i.periodicidad === 'mensual')
@@ -589,45 +463,34 @@ export function construirEstado(crudos, opciones = {}) {
     residuo,
     cuadre,
     detalleMensual,
-    mesesDeCuenta,
-    abrenMes,
-    planificando: { ...planificando, cuadre: cuadrePlanificado },
+    periodos,
+    periodoActual,
     reparto: repartirGasto(ordinarios, ritmo),
     apagadas: Object.keys(apagadas).sort(),
     saldoInicial,
     pendienteTarjeta,
     proyeccion,
     proyeccionLarga,
-    meses,
     fijos,
     costes,
-    cascada: cascadaDelMes({
-      mes: mesQuePagaLaNomina(hoy),
+    cascada: cascadaDelPeriodo({
+      periodo: enCurso ?? { id: mesDe(hoy), desde: hoy, hasta: finDelPeriodo, completo: false, natural: true },
       fijos,
       ingreso: ingresoMensual,
-      /*
-       * El día a día del mes de la cascada, que es un mes entero.
-       *
-       * Si lo has repartido, es lo que repartiste. Si no, el goteo medido por
-       * días, que es como lo cuenta la proyección y así las dos dicen lo mismo.
-       *
-       * Lo que no puede ser es multiplicar el ritmo del plan por los días de
-       * este mes: ese ritmo es «lo que queda entre los días que quedan» del mes
-       * en curso, y un día 28 vale sesenta y cuatro euros al día. Por treinta y
-       * un días daba mil novecientos, y la cascada cerraba en rojo un mes que
-       * la portada daba por ahorrado.
-       */
-      diaADia: planificando.plan
-        ? -Object.values(planificando.plan.asignado).reduce((t, x) => t + x, 0)
-        : ritmo.porDia * Number(ultimoDiaDelMes(`${mesQuePagaLaNomina(hoy)}-01`).slice(8)),
+      // El día a día del periodo entero: lo que repartiste si lo hiciste, y si
+      // no, el goteo medido por sus días. Nunca el ritmo del plan multiplicado
+      // por los días del periodo: ese ritmo es «lo que queda entre los días
+      // que quedan», y estirarlo daba cifras que cerraban el mes en rojo.
+      diaADia: plan
+        ? -Object.values(plan.asignado).reduce((t, x) => t + x, 0)
+        : ritmo.porDia * (periodoActual?.dias ?? 30),
       inversiones: opciones.inversiones,
       plazos,
       saltados,
     }),
     plazos,
     inversiones: opciones.inversiones ?? {},
-    presupuestos,
-    mesEnCurso,
+    presupuestos: periodoActual?.lineas ?? [],
     disponible,
     capacidad,
     patrimonio: balance(apuntes, hoy),
@@ -638,7 +501,7 @@ export function construirEstado(crudos, opciones = {}) {
       ingresos,
       movimientos: contables,
       nombres,
-      presupuestos,
+      presupuestos: periodoActual?.lineas ?? [],
       colchon: opciones.colchon ?? 0,
       hoy,
     }),

@@ -5,7 +5,7 @@
  * programa, que es lo único que hace falta descargar.
  */
 
-const CAU = 'bajamar-v40'
+const CAU = 'bajamar-v41'
 
 const PROGRAMA = [
   './',
@@ -39,6 +39,7 @@ const PROGRAMA = [
   './src/analisis/fijos.js',
   './src/analisis/fraccionados.js',
   './src/analisis/mensual.js',
+  './src/analisis/periodos.js',
   './src/analisis/mes.js',
   './src/analisis/plan.js',
   './src/analisis/reparto.js',

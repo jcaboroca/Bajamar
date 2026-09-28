@@ -1,29 +1,24 @@
 // @ts-check
 /**
- * El resumen, mes a mes.
+ * Cada periodo, contado entero.
  *
- * «Este mes» no quería decir lo mismo en toda la aplicación. En el resumen era
- * el mes natural y en la cascada el que paga la última nómina, así que un día
- * 28 una pantalla hablaba de septiembre y la otra de octubre sin avisar. La
- * salida no es elegir uno: es dejar de decir «este mes» y decir el nombre del
- * mes, y que se pueda pasar de uno a otro.
+ * Un periodo va de una nómina a la siguiente (ver `periodos.js`), así que aquí
+ * no hay nada que desplazar ni que reasignar: lo que cae entre sus dos bordes
+ * es suyo y ya está. Todo lo que antes necesitaba saber «¿de qué mes es este
+ * cobro?» ahora es una comparación de fechas.
  *
- * Cada mes se cuenta entero, del día 1 al último, y sabe en qué estado está:
- * cerrado es historia, en curso es mitad hecho y mitad previsto, y futuro es
- * previsión entera hasta que cargues el extracto que lo convierta en real.
- *
- * Los totales salen de la proyección, que es la única que sabe sumar goteo y
- * eventos en el orden correcto. Lo real sale del extracto. Y lo previsto no se
- * calcula por su cuenta: es la resta de los dos, para que no puedan
- * contradecirse.
+ * De cada periodo hay una parte vivida y otra por vivir, y no se presentan con
+ * el mismo aplomo. Lo vivido sale del extracto; lo que falta, de la previsión.
+ * Y lo previsto no se calcula por su cuenta en ninguna parte: es el total menos
+ * lo real, para que las dos mitades no puedan contradecir al total.
  */
 
-import { mesDe, ultimoDiaDelMes } from '../dominio/tipos.js'
+import { diasEntre } from '../dominio/tipos.js'
 
 /**
  * @typedef {import('./bajamar.js').Proyeccion} Proyeccion
- * @typedef {import('./mes.js').FilaMes} FilaMes
- * @typedef {import('./mes.js').ResumenMes} ResumenMes
+ * @typedef {import('./periodos.js').Periodo} Periodo
+ * @typedef {import('../dominio/tipos.js').Movimiento} Movimiento
  */
 
 /**
@@ -34,61 +29,146 @@ import { mesDe, ultimoDiaDelMes } from '../dominio/tipos.js'
  */
 
 /**
- * @typedef {'cerrado' | 'enCurso' | 'futuro'} Estado
+ * @typedef {object} Punto
+ * @property {string} fecha
+ * @property {number} saldo
  */
 
 /**
- * @typedef {object} MesDetallado
- * @property {string} mes            'yyyy-mm'
- * @property {Estado} estado
+ * @typedef {object} Detalle
+ * @property {string} id
+ * @property {string} desde
+ * @property {string} hasta
+ * @property {boolean} completo
+ * @property {boolean} natural
+ * @property {'cerrado' | 'enCurso' | 'futuro'} estado
+ * @property {number} dias
  * @property {Reparto} ingresos
  * @property {Reparto} gastos        en negativo
- * @property {number} ahorro         ingresos.total + gastos.total
+ * @property {number} ahorro
  * @property {{ fecha: string, saldo: number }} suelo
- * @property {number} apertura       con cuánto se entra en el mes
+ * @property {Punto[]} curva
+ * @property {number} apertura       con cuánto se entra
  * @property {number} saldoFinal
  * @property {number} goteo          la parte del gasto que es día a día
  * @property {number} compromisos    el resto: recibos, cuotas, lo que toca
+ * @property {Movimiento[]} movimientos  los apuntes reales del periodo
  */
 
 /**
  * @param {object} entrada
- * @param {FilaMes[]} entrada.meses            de porMeses, ya con sus totales
- * @param {Proyeccion} entrada.proyeccion      la larga, de donde sale la curva
- * @param {(mes: string) => ResumenMes} entrada.resumenDe  lo real de un mes
+ * @param {Periodo[]} entrada.periodos
+ * @param {Movimiento[]} entrada.movimientos  los de cuenta, con saldo
+ * @param {Proyeccion} entrada.proyeccion     la larga
+ * @param {Set<string>} entrada.noEsGasto
  * @param {string} entrada.hoy
- * @returns {MesDetallado[]}
+ * @returns {Detalle[]}
  */
-export function detallarMeses({ meses, proyeccion, resumenDe, hoy }) {
-  const enCurso = mesDe(hoy)
-  const goteos = goteoPorMes(proyeccion)
-  const aperturas = aperturaPorMes(proyeccion)
+export function detallarPeriodos({ periodos, movimientos, proyeccion, noEsGasto, hoy }) {
+  const ordenados = [...movimientos].sort((a, b) => a.fecha.localeCompare(b.fecha))
+  const saldoPrevisto = new Map(proyeccion.curva.map((p) => [p.fecha, p.saldo]))
+  const gotaPorDia = new Map(proyeccion.curva.map((p) => [p.fecha, p.gota]))
 
-  return meses.map((fila) => {
-    const real = resumenDe(fila.mes)
-    const goteo = goteos.get(fila.mes) ?? 0
+  return periodos.map((periodo) => {
+    const dentro = ordenados.filter((m) => m.fecha >= periodo.desde && m.fecha <= periodo.hasta)
+    const real = realesDe(dentro, noEsGasto)
+    const futuros = proyeccion.eventos.filter(
+      (e) => e.fecha > hoy && e.fecha >= periodo.desde && e.fecha <= periodo.hasta,
+    )
+
+    const curva = curvaEntre({ periodo, ordenados, saldoPrevisto, hoy })
+    let goteo = 0
+    for (const p of curva) if (p.fecha > hoy) goteo += gotaPorDia.get(p.fecha) ?? 0
+
+    const ingresos = repartir(real.ingresos + suma(futuros, (i) => i > 0), real.ingresos)
+    const gastos = repartir(real.gastos + suma(futuros, (i) => i < 0) + goteo, real.gastos)
+
     return {
-      mes: fila.mes,
-      estado: fila.mes < enCurso ? 'cerrado' : fila.mes === enCurso ? 'enCurso' : 'futuro',
-      ingresos: repartir(fila.ingresos, real.ingresos.real),
-      gastos: repartir(fila.gastos, real.gastos.real),
-      ahorro: fila.ahorro,
-      suelo: fila.suelo,
-      apertura: aperturas.get(fila.mes) ?? proyeccion.saldoInicial,
-      saldoFinal: fila.saldoFinal,
+      id: periodo.id,
+      desde: periodo.desde,
+      hasta: periodo.hasta,
+      completo: periodo.completo,
+      natural: periodo.natural,
+      estado: periodo.hasta < hoy ? 'cerrado' : periodo.desde > hoy ? 'futuro' : 'enCurso',
+      dias: diasEntre(periodo.desde, periodo.hasta) + 1,
+      ingresos,
+      gastos,
+      ahorro: ingresos.total + gastos.total,
+      curva,
+      suelo: curva.reduce(
+        (bajo, p) => (p.saldo < bajo.saldo ? { fecha: p.fecha, saldo: p.saldo } : bajo),
+        { fecha: curva[0]?.fecha ?? periodo.desde, saldo: curva[0]?.saldo ?? 0 },
+      ),
+      apertura: curva[0]?.saldo ?? 0,
+      saldoFinal: curva[curva.length - 1]?.saldo ?? 0,
       goteo,
-      compromisos: fila.gastos - goteo,
+      compromisos: gastos.total - goteo,
+      movimientos: dentro,
     }
   })
 }
 
 /**
- * Lo previsto es lo que falta, no una cuenta aparte.
+ * Lo que de verdad ha pasado en un periodo.
  *
- * Calcularlo por su cuenta abriría la puerta a que la suma de las dos mitades
- * no diera el total, y entonces habría que explicar cuál de las tres cifras es
- * la buena.
+ * La tarjeta se cuenta el día que el banco la liquida, no el de cada compra:
+ * sus apuntes ya están en el extracto de la tarjeta y contarlos aquí sería el
+ * mismo dinero dos veces.
  *
+ * @param {Movimiento[]} movimientos
+ * @param {Set<string>} noEsGasto
+ */
+function realesDe(movimientos, noEsGasto) {
+  let ingresos = 0
+  let gastos = 0
+  for (const m of movimientos) {
+    if (m.origen === 'tarjeta') continue
+    const categoria = m.categoria ?? 'otros'
+    if (categoria === 'traspaso') continue
+    if (m.importe > 0) ingresos += m.importe
+    else if (!noEsGasto.has(categoria)) gastos += m.importe
+  }
+  return { ingresos, gastos }
+}
+
+/**
+ * La curva de un periodo, día a día, de su primer día a su último.
+ *
+ * Los días vividos salen del extracto —cada apunte trae el saldo que dejó, y
+ * un día sin movimientos arrastra el del anterior—; los que faltan, de la
+ * previsión. La gráfica empezaba en hoy y por eso «la bajamar de septiembre»
+ * acababa siendo el mínimo de los tres días que quedaban de septiembre.
+ *
+ * @param {object} entrada
+ * @param {Periodo} entrada.periodo
+ * @param {Movimiento[]} entrada.ordenados
+ * @param {Map<string, number>} entrada.saldoPrevisto
+ * @param {string} entrada.hoy
+ * @returns {Punto[]}
+ */
+function curvaEntre({ periodo, ordenados, saldoPrevisto, hoy }) {
+  let arrastre = 0
+  /** @type {Map<string, number>} */
+  const realPorDia = new Map()
+  for (const m of ordenados) {
+    if (m.saldo === null || m.saldo === undefined) continue
+    if (m.fecha < periodo.desde) arrastre = m.saldo
+    else if (m.fecha <= periodo.hasta) realPorDia.set(m.fecha, m.saldo)
+  }
+
+  /** @type {Punto[]} */
+  const curva = []
+  for (let fecha = periodo.desde; fecha <= periodo.hasta; fecha = siguienteDia(fecha)) {
+    arrastre = (fecha <= hoy ? realPorDia.get(fecha) : saldoPrevisto.get(fecha)) ?? arrastre
+    curva.push({ fecha, saldo: arrastre })
+  }
+  return curva
+}
+
+/**
+ * Lo previsto es lo que falta, no una cuenta aparte. Calcularlo por su cuenta
+ * abriría la puerta a que las dos mitades no dieran el total, y entonces habría
+ * que explicar cuál de las tres cifras es la buena.
  * @param {number} total
  * @param {number} real
  * @returns {Reparto}
@@ -98,141 +178,11 @@ function repartir(total, real) {
 }
 
 /**
- * Cuánto goteó cada mes, sumando lo que de verdad se aplicó cada día.
- * @param {Proyeccion} proyeccion
+ * @param {Array<{ importe: number }>} lista
+ * @param {(importe: number) => boolean} filtro
  */
-function goteoPorMes(proyeccion) {
-  /** @type {Map<string, number>} */
-  const porMes = new Map()
-  for (const punto of proyeccion.curva) {
-    const mes = mesDe(punto.fecha)
-    porMes.set(mes, (porMes.get(mes) ?? 0) + punto.gota)
-  }
-  return porMes
-}
-
-/**
- * Con cuánto se entra en cada mes: el saldo del último día del anterior.
- *
- * El primero de la proyección no empieza el día 1 sino hoy, así que su apertura
- * es el saldo de hoy. Decir otra cosa sería inventarse un pasado que la
- * proyección no ha recorrido.
- *
- * @param {Proyeccion} proyeccion
- */
-function aperturaPorMes(proyeccion) {
-  /** @type {Map<string, number>} */
-  const porMes = new Map()
-  let anterior = null
-  for (const punto of proyeccion.curva) {
-    const mes = mesDe(punto.fecha)
-    // Con cuánto se entra es con lo que se cerró el día anterior, no con el
-    // saldo del día 1: ese ya lleva aplicado lo que pasó ese mismo día.
-    if (!porMes.has(mes)) porMes.set(mes, anterior === null ? punto.saldo : anterior.saldo)
-    anterior = punto
-  }
-  return porMes
-}
-
-/**
- * Lo que queda para el día a día de un mes entero: lo que cobras menos lo que
- * ya está comprometido.
- *
- * Con cuánto entras al mes no se suma aquí a propósito, aunque se enseñe al
- * lado. Sumarlo diría que puedes gastarte los ahorros este mes, y con doce mil
- * euros en la cuenta la cifra saldría siendo doce mil: cierta y para nada útil.
- * Es la misma cuenta que hace la cascada, y tiene que dar lo mismo o habría dos
- * respuestas a «cuánto me queda para vivir este mes».
- *
- * Para el mes en curso no sirve: ahí se cuenta desde hoy, porque lo de antes ya
- * está gastado y vive dentro del saldo.
- *
- * @param {MesDetallado} mes
- * @param {number} [colchon]  céntimos que no quieres tocar
- */
-export function residuoDe(mes, colchon = 0) {
-  return mes.ingresos.total + mes.compromisos - Math.abs(colchon)
-}
-
-/** El último día de un mes, para saber si ya se ha cerrado. */
-export function estaAcabado(mes, hoy) {
-  return hoy >= ultimoDiaDelMes(`${mes}-01`)
-}
-
-/**
- * @typedef {object} Punto
- * @property {string} fecha
- * @property {number} saldo   lo que dice el banco
- * @property {number} propio  lo mismo, sin el dinero que paga el mes siguiente
- */
-
-/**
- * La curva de un mes entero, del día 1 al último.
- *
- * Hasta ahora la gráfica empezaba en hoy, porque salía de la proyección y la
- * proyección no mira atrás. Eso hacía que «la bajamar de septiembre» fuese en
- * realidad el mínimo de los días que quedaban de septiembre: un día 28, tres
- * días. El punto más bajo del mes, que es el titular de la aplicación, se
- * quedaba fuera por haber pasado ya.
- *
- * Los días vividos salen del extracto, que trae el saldo en cada apunte, y los
- * que faltan de la proyección. Un día sin movimientos no tiene saldo propio:
- * arrastra el del último que hubo.
- *
- * Y va una segunda lectura encima. La nómina del 25 está en la cuenta pero es
- * el dinero de octubre, así que para saber hasta dónde bajó **lo de
- * septiembre** hay que quitarla. Las dos líneas son la misma hasta que ese
- * cobro entra, y a partir de ahí se separan justo por su importe: esa
- * separación es la explicación, sin tener que escribirla.
- *
- * @param {object} entrada
- * @param {string} entrada.mes
- * @param {Array<{ fecha: string, saldo: number | null, importe: number }>} entrada.movimientos
- * @param {Proyeccion} entrada.proyeccion
- * @param {string} entrada.hoy
- * @param {Array<{ fecha: string, importe: number }>} entrada.desplazados lo que cobra este mes y paga el siguiente
- * @returns {{ curva: Punto[], suelo: { fecha: string, saldo: number } }}
- */
-export function curvaDelMes({ mes, movimientos, proyeccion, hoy, desplazados }) {
-  const primero = `${mes}-01`
-  const ultimo = ultimoDiaDelMes(primero)
-
-  // Con cuánto se entra: el saldo del último apunte anterior al día 1. Si no
-  // hay extracto tan atrás, se empieza por el primero que haya dentro del mes.
-  const conSaldo = movimientos.filter((m) => m.saldo !== null && m.saldo !== undefined)
-    .slice().sort((a, b) => a.fecha.localeCompare(b.fecha))
-  let arrastre = 0
-  for (const m of conSaldo) {
-    if (m.fecha >= primero) break
-    arrastre = /** @type {number} */ (m.saldo)
-  }
-
-  /** @type {Map<string, number>} */
-  const realPorDia = new Map()
-  for (const m of conSaldo) {
-    if (m.fecha < primero || m.fecha > ultimo) continue
-    realPorDia.set(m.fecha, /** @type {number} */ (m.saldo))
-  }
-
-  const previstoPorDia = new Map(proyeccion.curva.map((p) => [p.fecha, p.saldo]))
-
-  /** @type {Punto[]} */
-  const curva = []
-  let quitado = 0
-  for (let fecha = primero; fecha <= ultimo; fecha = siguienteDia(fecha)) {
-    if (fecha <= hoy) arrastre = realPorDia.get(fecha) ?? arrastre
-    else arrastre = previstoPorDia.get(fecha) ?? arrastre
-
-    // Lo que entró hoy y es del mes que viene deja de contar desde hoy mismo.
-    for (const d of desplazados) if (d.fecha === fecha) quitado += d.importe
-    curva.push({ fecha, saldo: arrastre, propio: arrastre - quitado })
-  }
-
-  const suelo = curva.reduce(
-    (bajo, p) => (p.propio < bajo.saldo ? { fecha: p.fecha, saldo: p.propio } : bajo),
-    { fecha: curva[0].fecha, saldo: curva[0].propio },
-  )
-  return { curva, suelo }
+function suma(lista, filtro) {
+  return lista.reduce((t, x) => (filtro(x.importe) ? t + x.importe : t), 0)
 }
 
 /** @param {string} iso */
@@ -240,4 +190,19 @@ function siguienteDia(iso) {
   const [a, m, d] = iso.split('-').map(Number)
   const t = new Date(Date.UTC(a, m - 1, d + 1))
   return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}-${String(t.getUTCDate()).padStart(2, '0')}`
+}
+
+/**
+ * Lo que queda para el día a día de un periodo entero: lo que cobras menos lo
+ * que ya está comprometido.
+ *
+ * Con cuánto entras no se suma, aunque se enseñe al lado. Sumarlo diría que
+ * puedes gastarte los ahorros este mes, y con doce mil euros en la cuenta la
+ * cifra saldría siendo doce mil: cierta y para nada útil.
+ *
+ * @param {Detalle} periodo
+ * @param {number} [colchon]
+ */
+export function residuoDe(periodo, colchon = 0) {
+  return periodo.ingresos.total + periodo.compromisos - Math.abs(colchon)
 }

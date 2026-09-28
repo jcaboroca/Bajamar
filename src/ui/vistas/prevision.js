@@ -32,7 +32,15 @@ let mesElegido = null
 /** @type {Estado | null} */
 let ultimo = null
 
-export function montarPrevision({ alCambiarTrato, alApagarCategoria, alMarcarInversion, alSaltarCobro, alAsignar, alRecuadrar }) {
+export function montarPrevision({ alCambiarTrato, alApagarCategoria, alMarcarInversion, alSaltarCobro, alAsignar, alRecuadrar, alMarcarAnual }) {
+  // «No lo sé» vive aquí, con los fijos y los apartados: es la misma familia
+  // de preguntas sobre recibos, y en el Resumen era una bandeja de tareas
+  // disfrazada de resumen.
+  requerir('preguntas').addEventListener('change', (e) => {
+    const casilla = e.target
+    if (!(casilla instanceof HTMLInputElement) || !casilla.dataset.anual) return
+    alMarcarAnual(casilla.dataset.anual, casilla.checked)
+  })
   montarSimulador({ alApagarCategoria, alAsignar, alRecuadrar })
   for (const caja of ['fijos', 'apartados', 'cascada']) {
     preguntarAlPulsar(requerir(caja), () => ultimo, alCambiarTrato)
@@ -83,7 +91,7 @@ function repintar() {
   const hasta = ultimoDiaDelMes(sumarMeses(estado.hoy, horizonte - 1))
   const proyeccion = recortar(estado.proyeccionLarga, hasta)
   // La vista de cuenta no mueve la nómina: cada cobro en el mes en que cae.
-  const meses = estado.mesesDeCuenta.filter((f) => f.mes <= mesDe(hasta))
+  const meses = estado.detalleMensual.filter((f) => f.desde <= hasta)
 
   requerir('lamina-larga').replaceChildren(dibujarLamina(proyeccion, { marca: 'largo' }))
 
@@ -99,6 +107,7 @@ function repintar() {
   pintarFijos(estado)
   pintarApartados(estado)
   pintarSuscripciones(estado)
+  pintarPreguntas(estado)
 }
 
 /**
@@ -126,30 +135,30 @@ function recortar(proyeccion, hasta) {
  */
 function pintarMeses(meses, estado) {
   const lista = requerir('meses-tabla')
-  const actual = mesElegido ?? mesDe(estado.hoy)
+  const actual = mesElegido ?? estado.periodoActual?.id
 
   lista.replaceChildren(...meses.map((f) => {
-    const li = nodo('li', `mes${f.mes === actual ? ' elegido' : ''}${f.ahorro < 0 ? ' apretado' : ''}`)
-    li.dataset.mes = f.mes
+    const li = nodo('li', `mes${f.id === actual ? ' elegido' : ''}${f.ahorro < 0 ? ' apretado' : ''}`)
+    li.dataset.mes = f.id
     li.tabIndex = 0
     li.setAttribute('role', 'button')
 
     const cabecera = nodo('div', 'mes-cabecera')
     cabecera.append(
-      nodo('span', 'mes-nombre', nombreDeMes(f.mes)),
+      nodo('span', 'mes-nombre', nombreDeMes(f.id)),
       nodo('span', `mes-ahorro cifras${f.ahorro < 0 ? ' en-rojo' : ''}`, formatEuros(f.ahorro, { signo: true })),
     )
 
     const detalle = nodo('div', 'mes-detalle')
     detalle.append(
-      nodo('span', '', `entra ${formatEurosRedondo(f.ingresos)}`),
-      nodo('span', '', `sale ${formatEurosRedondo(Math.abs(f.gastos))}`),
+      nodo('span', '', `entra ${formatEurosRedondo(f.ingresos.total)}`),
+      nodo('span', '', `sale ${formatEurosRedondo(Math.abs(f.gastos.total))}`),
       nodo('span', f.suelo.saldo < 0 ? 'en-rojo' : '', `suelo ${formatEurosRedondo(f.suelo.saldo)}`),
     )
 
     li.append(cabecera, detalle)
     if (f.ahorro < 0) {
-      li.append(nodo('p', 'mes-aviso', `En ${nombreDeMes(f.mes).toLowerCase()} se va más de lo que entra.`))
+      li.append(nodo('p', 'mes-aviso', `En ${nombreDeMes(f.id).toLowerCase()} se va más de lo que entra.`))
     }
     li.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') {
@@ -167,7 +176,7 @@ function pintarMeses(meses, estado) {
  * @param {import('../../analisis/mes.js').FilaMes[]} meses
  */
 function pintarCalendario(estado, meses) {
-  const mes = mesElegido ?? meses[0]?.mes ?? mesDe(estado.hoy)
+  const mes = mesElegido ?? meses[0]?.id ?? mesDe(estado.hoy)
   requerir('calendario-rotulo').textContent = `Día a día · ${nombreDeMes(mes)}`
 
   const saldos = new Map(estado.proyeccionLarga.curva.map((p) => [p.fecha, p.saldo]))
@@ -264,12 +273,14 @@ function pintarCascada(estado) {
  */
 function pintarSaldoDelMes(estado) {
   const caja = requerir('cascada-saldo')
-  const fila = estado.meses.find((m) => m.mes === estado.cascada.mes)
+  const lista = estado.detalleMensual
+  const i = lista.findIndex((m) => m.id === estado.cascada.mes)
+  const fila = lista[i]
   if (!fila) { caja.replaceChildren(); return }
 
-  // El mes anterior cierra donde éste abre. Si el mes ya ha empezado no hay
+  // El periodo anterior cierra donde éste abre. Si ya ha empezado no hay
   // cierre que mirar, y lo único cierto es lo que hay en el banco ahora.
-  const anterior = estado.meses.find((m) => m.mes === sumarMeses(`${fila.mes}-01`, -1).slice(0, 7))
+  const anterior = i > 0 ? lista[i - 1] : null
   const partes = [
     nodo('p', 'cascada-saldo-linea', anterior
       ? `Llegas con ${formatEurosRedondo(anterior.saldoFinal)} y lo acabarías con ${formatEurosRedondo(fila.saldoFinal)}.`
@@ -539,4 +550,40 @@ function pintarSuscripciones(estado) {
   requerir('suscripciones-pie').textContent =
     `Entre todas, ${formatEuros(estado.costes.suscripcionesMes)} al mes. `
     + `Al año son ${formatEurosRedondo(estado.costes.suscripcionesAnio)}.`
+}
+
+/** @param {Estado} estado */
+function pintarPreguntas(estado) {
+  const bloque = requerir('bloque-preguntas')
+  bloque.hidden = estado.dudosos.length === 0
+  if (estado.dudosos.length === 0) return
+  requerir('preguntas').replaceChildren(...estado.dudosos.map((d) => {
+    const fila = linea({
+      marca: diaYMes(d.fecha),
+      nombre: d.nombre,
+      detalle: `la última vez hace ${d.meses} meses · ¿vuelve?`,
+      importe: formatEuros(d.importe, { signo: true }),
+      clase: 'previsto',
+    })
+    fila.append(casillaAnual(d.entidadId, d.nombre, estado.anuales[d.entidadId] === true))
+    return fila
+  }))
+}
+
+/**
+ * La app no puede distinguir un seguro anual visto una vez de un pago único, y
+ * ese es justo el dato que el usuario tiene y ella no.
+ * @param {string} entidadId
+ * @param {string} nombre
+ * @param {boolean} marcado
+ */
+function casillaAnual(entidadId, nombre, marcado) {
+  const etiqueta = nodo('label', 'clasificar-unico pregunta-anual')
+  const casilla = document.createElement('input')
+  casilla.type = 'checkbox'
+  casilla.dataset.anual = entidadId
+  casilla.checked = marcado
+  casilla.setAttribute('aria-label', `${nombre} vuelve cada año`)
+  etiqueta.append(casilla, nodo('span', '', 'Sí, vuelve cada año'))
+  return etiqueta
 }

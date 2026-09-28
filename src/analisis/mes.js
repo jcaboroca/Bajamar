@@ -1,126 +1,25 @@
 // @ts-check
 /**
- * El mes, contado en dos mitades que no se pueden mezclar.
+ * Cuánto se puede gastar de aquí a una fecha.
  *
- * De cualquier mes hay una parte que ya ha ocurrido y otra que todavía no. La
- * primera es un hecho y la segunda una previsión, y la aplicación no debe
- * presentarlas con el mismo aplomo. Aquí se calculan por separado y se suman
- * al final, para que la interfaz pueda enseñar las dos.
+ * Este módulo era el que sabía de meses: los partía en dos mitades, los
+ * descomponía desde la proyección y decidía a cuál se apuntaba cada cobro. Nada
+ * de eso hace falta desde que el mes es el periodo entre dos nóminas: lo que
+ * cae entre sus dos bordes es suyo, y de contarlo se encarga `mensual.js`.
  *
- * El saldo del banco ya incorpora todo lo ocurrido. Por eso el dinero
- * realmente disponible se obtiene sumándole sólo lo que falta por pasar: meter
- * también lo ya cobrado sería contar el mismo euro dos veces.
+ * Lo único que sobrevive es la pregunta que no es de ningún mes: con el saldo
+ * de hoy delante, cuánto queda libre hasta una fecha. El saldo del banco ya
+ * incorpora todo lo ocurrido, así que se le suma sólo lo que falta por pasar:
+ * meter también lo ya cobrado sería contar el mismo euro dos veces.
  */
 
-import { diasEntre, mesDe, ultimoDiaDelMes } from '../dominio/tipos.js'
-import { mesContableDe } from './cascada.js'
+import { diasEntre } from '../dominio/tipos.js'
 
 /**
- * @typedef {import('../dominio/tipos.js').Movimiento} Movimiento
  * @typedef {import('./bajamar.js').Evento} Evento
- * @typedef {import('./bajamar.js').Proyeccion} Proyeccion
  */
 
 /**
- * @typedef {object} Mitad
- * @property {number} real       lo que ya ha pasado, en céntimos
- * @property {number} previsto   lo que falta por pasar
- * @property {number} total
- */
-
-/**
- * @typedef {object} ResumenMes
- * @property {string} mes            "2026-09"
- * @property {Mitad} ingresos
- * @property {Mitad} gastos          en negativo
- * @property {number} ahorro         ingresos + gastos
- * @property {number} apartado       lo movido a cuentas propias de ahorro
- * @property {number} movimientos    cuántos apuntes reales lleva el mes
- */
-
-/**
- * @param {object} entrada
- * @param {Movimiento[]} entrada.movimientos
- * @param {Map<string, string>} entrada.categorias
- * @param {Set<string>} entrada.noEsGasto
- * @param {Evento[]} entrada.eventos
- * @param {string} entrada.mes
- * @param {string} entrada.hoy
- * @param {Set<string>} [entrada.abrenMes] entidadId de los cobros que pagan el mes siguiente
- * @returns {ResumenMes}
- */
-export function resumenDeMes({ movimientos, categorias, noEsGasto, eventos, mes, hoy, abrenMes }) {
-  let ingresoReal = 0
-  let gastoReal = 0
-  let apartado = 0
-  let cuantos = 0
-
-  for (const m of movimientos) {
-    // La tarjeta se cuenta el día que el banco la liquida, no el día de cada
-    // compra: si no, el mismo dinero aparece dos veces.
-    if (m.origen === 'tarjeta') continue
-    const categoria = (m.entidadId && categorias.get(m.entidadId)) || 'otros'
-    if (mesDeUnMovimiento(m, abrenMes) !== mes) continue
-    cuantos += 1
-    if (categoria === 'traspaso') {
-      if (m.importe < 0) apartado += m.importe
-      continue
-    }
-    if (m.importe > 0) ingresoReal += m.importe
-    else if (!noEsGasto.has(categoria)) gastoReal += m.importe
-  }
-
-  let ingresoPrevisto = 0
-  let gastoPrevisto = 0
-  for (const e of eventos) {
-    if (mesContable(e, abrenMes) !== mes || e.fecha <= hoy) continue
-    if (e.importe > 0) ingresoPrevisto += e.importe
-    else gastoPrevisto += e.importe
-  }
-
-  // El gasto del día a día no tiene fecha: es un goteo. Se reparte por los
-  // días del mes que aún no han llegado.
-  const ingresos = mitad(ingresoReal, ingresoPrevisto)
-  const gastos = mitad(gastoReal, gastoPrevisto)
-
-  return {
-    mes,
-    ingresos,
-    gastos,
-    ahorro: ingresos.total + gastos.total,
-    apartado,
-    movimientos: cuantos,
-  }
-}
-
-/**
- * @param {number} real
- * @param {number} previsto
- * @returns {Mitad}
- */
-function mitad(real, previsto) {
-  return { real, previsto, total: real + previsto }
-}
-
-/**
- * Añade al resumen el goteo del gasto ordinario que queda por venir.
- * @param {ResumenMes} resumen
- * @param {number} ritmoPorDia   céntimos negativos
- * @param {string} hoy
- * @returns {ResumenMes}
- */
-export function conGotaDiaria(resumen, ritmoPorDia, hoy) {
-  const fin = ultimoDiaDelMes(`${resumen.mes}-01`)
-  const desde = hoy > `${resumen.mes}-01` ? hoy : `${resumen.mes}-01`
-  const dias = Math.max(diasEntre(desde, fin), 0)
-  const goteo = ritmoPorDia * dias
-  const gastos = mitad(resumen.gastos.real, resumen.gastos.previsto + goteo)
-  return { ...resumen, gastos, ahorro: resumen.ingresos.total + gastos.total }
-}
-
-/**
- * Dinero del que se puede disponer de verdad hasta una fecha.
- *
  * @param {object} entrada
  * @param {number} entrada.saldo         lo que dice el banco hoy
  * @param {Evento[]} entrada.eventos
@@ -146,97 +45,4 @@ export function disponibleReal({ saldo, eventos, ritmoPorDia, hoy, hasta, reserv
     reserva: -Math.abs(reserva),
     total: saldo + porCobrar + porPagar + goteo - Math.abs(reserva),
   }
-}
-
-/**
- * @typedef {object} FilaMes
- * @property {string} mes
- * @property {number} ingresos
- * @property {number} gastos
- * @property {number} ahorro
- * @property {{ fecha: string, saldo: number }} suelo
- * @property {number} saldoFinal
- */
-
-/**
- * A qué mes se le apunta un apunte del extracto.
- *
- * Una nómina cobrada el 25 ya es el dinero del mes que viene. El resto de
- * cobros de final de mes NO: una bonificación del banco de 60 € el día 24 se
- * repite todos los meses igual que la nómina, pero no paga octubre, paga
- * septiembre. Por eso no vale con «es un ingreso que vuelve»: quién abre mes
- * se decide fuera y se pasa hecho.
- *
- * @param {Movimiento} m
- * @param {Set<string>} [abrenMes] entidadId de los cobros que pagan el mes siguiente
- */
-export function mesDeUnMovimiento(m, abrenMes) {
-  return mesContableDe(m.fecha, m.importe > 0 && !!m.entidadId && abrenMes?.has(m.entidadId) === true)
-}
-
-/**
- * En qué mes cuenta un evento. Los gastos, en el suyo. Los ingresos de final de
- * mes, en el que abren.
- *
- * Esto no mueve el dinero: en la cuenta sigue entrando el 25 y el suelo se
- * calcula con esa fecha. Sólo cambia a qué mes se le apunta.
- *
- * La regla vive en cascada.js, que es de donde sale el concepto de mes.
- *
- * @param {import('./bajamar.js').Evento} evento
- */
-export function mesContable(evento, abrenMes) {
-  const abre = evento.tipo === 'ingreso'
-    && (abrenMes === undefined || (!!evento.entidadId && abrenMes.has(evento.entidadId)))
-  return mesContableDe(evento.fecha, abre)
-}
-
-/**
- * Descompone una proyección larga en meses.
- *
- * Es la vista que contesta «¿y en marzo?». Cada mes se cierra con su propio
- * suelo, porque un mes puede acabar bien y aun así haber pasado por un
- * descubierto el día 12.
- *
- * @param {Proyeccion} proyeccion
- * @returns {FilaMes[]}
- */
-export function porMeses(proyeccion, abrenMes) {
-  /** @type {Map<string, FilaMes>} */
-  const filas = new Map()
-
-  for (const punto of proyeccion.curva) {
-    const mes = mesDe(punto.fecha)
-    const fila = filas.get(mes)
-    if (!fila) {
-      filas.set(mes, {
-        mes,
-        ingresos: 0,
-        gastos: 0,
-        ahorro: 0,
-        suelo: { ...punto },
-        saldoFinal: punto.saldo,
-      })
-      continue
-    }
-    if (punto.saldo < fila.suelo.saldo) fila.suelo = { ...punto }
-    fila.saldoFinal = punto.saldo
-  }
-
-  // Cada día aporta lo que de verdad goteó ese día: el goteo puede cambiar a lo
-  // largo del horizonte, porque el plan sólo manda dentro de su mes.
-  for (const punto of proyeccion.curva) {
-    const fila = filas.get(mesDe(punto.fecha))
-    if (fila) fila.gastos += punto.gota
-  }
-
-  for (const e of proyeccion.eventos) {
-    const fila = filas.get(mesContable(e, abrenMes))
-    if (!fila) continue
-    if (e.importe > 0) fila.ingresos += e.importe
-    else fila.gastos += e.importe
-  }
-
-  for (const fila of filas.values()) fila.ahorro = fila.ingresos + fila.gastos
-  return [...filas.values()]
 }
