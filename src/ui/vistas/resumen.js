@@ -196,7 +196,10 @@ function pintarLlego(estado, periodo, animar) {
     desde: periodo.desde,
     hasta: periodo.hasta,
     saldoInicial: periodo.apertura,
-  }, { rotuloInicio: 'empiezas con' }))
+  }, {
+    rotuloInicio: periodo.estado === 'cerrado' ? 'empezaste con' : 'empiezas con',
+    vivido: periodo.estado === 'cerrado',
+  }))
   lamina.classList.remove('dibujando')
   if (animar) {
     void lamina.offsetWidth // reiniciar la animación sin esperar a un cuadro
@@ -235,8 +238,27 @@ function pintarVivir(estado, periodo) {
   caja.append(total)
 
   const dias = diasQueDura(periodo)
-  const alDia = Math.round(queda / Math.max(dias, 1))
   const habitual = Math.round(Math.abs(estado.ritmo.porMes) / 30.4)
+  const gastado = Math.abs(periodo.diaADiaGastado)
+
+  /*
+   * Un periodo cerrado no se prevé, se cuenta. Decirle a alguien que «vas
+   * holgado» de un mes que terminó hace seis días es hablarle de un dinero
+   * que ya no existe: lo que quiere saber es en qué se le fue.
+   */
+  if (periodo.estado === 'cerrado') {
+    const alDiaReal = Math.round(gastado / Math.max(dias, 1))
+    const sobro = queda - gastado
+    requerir('vivir-nota').textContent = gastado === 0
+      ? 'No gastaste nada en el día a día.'
+      : `Gastaste ${formatEurosRedondo(gastado)}, ${formatEurosRedondo(alDiaReal)} al día durante ${dias} días. `
+        + (sobro >= 0
+          ? `Te sobraron ${formatEurosRedondo(sobro)}.`
+          : `Te pasaste en ${formatEurosRedondo(-sobro)}.`)
+    return
+  }
+
+  const alDia = Math.round(queda / Math.max(dias, 1))
   const comparacion = habitual === 0
     ? ''
     : alDia < habitual
@@ -244,7 +266,6 @@ function pintarVivir(estado, periodo) {
       : ` Sueles gastar ${formatEurosRedondo(habitual)}, así que vas holgado.`
   // Lo ya gastado del día a día, que es lo que convierte la previsión en real
   // según van llegando los apuntes.
-  const gastado = Math.abs(periodo.diaADiaGastado)
   const llevas = gastado > 0
     ? ` Llevas gastados ${formatEurosRedondo(gastado)}.`
     : ''

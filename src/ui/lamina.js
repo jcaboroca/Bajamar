@@ -21,7 +21,7 @@ const MARGEN_INFERIOR = 24
 
 /**
  * @param {import('../analisis/bajamar.js').Proyeccion} proyeccion
- * @param {{ marca?: string }} [opciones] distingue el degradado cuando hay dos láminas a la vez
+ * @param {{ marca?: string, rotuloInicio?: string, vivido?: boolean }} [opciones] marca distingue el degradado cuando hay dos láminas a la vez
  * @returns {SVGSVGElement}
  */
 export function dibujarLamina(proyeccion, opciones = {}) {
@@ -59,8 +59,10 @@ export function dibujarLamina(proyeccion, opciones = {}) {
     viewBox: `0 0 ${ANCHO} ${ALTO}`,
     role: 'img',
     'aria-label':
-      `Saldo previsto desde el ${fechaLarga(proyeccion.desde)} hasta el ${fechaLarga(proyeccion.hasta)}. ` +
-      `El mínimo es ${formatEurosRedondo(proyeccion.suelo.saldo)} el ${fechaLarga(proyeccion.suelo.fecha)}.`,
+      `Saldo ${opciones.vivido === true ? 'real' : 'previsto'} desde el ${fechaLarga(proyeccion.desde)} `
+      + `hasta el ${fechaLarga(proyeccion.hasta)}. `
+      + `El mínimo ${opciones.vivido === true ? 'fue' : 'es'} ${formatEurosRedondo(proyeccion.suelo.saldo)} `
+      + `el ${fechaLarga(proyeccion.suelo.fecha)}.`,
   })
 
   svg.append(

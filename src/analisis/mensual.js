@@ -79,6 +79,7 @@ import { diasEntre } from '../dominio/tipos.js'
  */
 export function detallarPeriodos({ periodos, movimientos, proyeccion, ordinarios, hoy }) {
   const orden = [...movimientos].sort((a, b) => a.fecha.localeCompare(b.fecha))
+  const cierres = cierresPorDia(orden)
   const saldoPrevisto = new Map(proyeccion.curva.map((p) => [p.fecha, p.saldo]))
   const gotaPorDia = new Map(proyeccion.curva.map((p) => [p.fecha, p.gota]))
 
@@ -134,7 +135,7 @@ export function detallarPeriodos({ periodos, movimientos, proyeccion, ordinarios
       lista.sort((a, b) => a.fecha.localeCompare(b.fecha))
     }
 
-    const { curva, apertura } = curvaEntre({ periodo, ordenados: orden, saldoPrevisto, hoy })
+    const { curva, apertura } = curvaEntre({ periodo, cierres, saldoPrevisto, hoy })
     let goteoPrevisto = 0
     for (const p of curva) if (p.fecha > hoy) goteoPrevisto += gotaPorDia.get(p.fecha) ?? 0
 
@@ -170,6 +171,66 @@ export function detallarPeriodos({ periodos, movimientos, proyeccion, ordinarios
 }
 
 /**
+ * Con qué saldo se cierra un día.
+ *
+ * Dentro de un mismo día el extracto no viene en orden, así que el último de
+ * la lista no es el último del día. Pero cada apunte trae el saldo que dejó, y
+ * eso basta para encadenarlos: el saldo de cierre es el único que no es el
+ * saldo de partida de ningún otro apunte de ese día.
+ *
+ * @param {Movimiento[]} delDia
+ * @param {number | null} alAbrir  con cuánto empezó el día, si se sabe
+ * @returns {number | null}  null si ese día no trae ningún saldo
+ */
+function saldoAlCerrar(delDia, alAbrir) {
+  const conSaldo = delDia.filter((m) => m.saldo !== null && m.saldo !== undefined)
+  if (conSaldo.length === 0) return null
+  const departida = new Set(conSaldo.map((m) => (m.saldo ?? 0) - m.importe))
+  const cierres = conSaldo.filter((m) => !departida.has(m.saldo ?? 0))
+  if (cierres.length === 1) return cierres[0].saldo ?? null
+  /*
+   * Un cargo y su devolución el mismo día dejan dos apuntes con el mismo
+   * saldo: la cadena se muerde la cola y no queda ninguno suelto. Cuando pasa
+   * eso, la cuenta se hace sola —lo que había al abrir más todo lo del día—,
+   * que es más fiable que fiarse del orden del fichero.
+   */
+  if (alAbrir !== null) return conSaldo.reduce((total, m) => total + m.importe, alAbrir)
+  return conSaldo[conSaldo.length - 1].saldo ?? null
+}
+
+/**
+ * Con cuánto cerró cada día del extracto.
+ *
+ * Se recorre de principio a fin porque el cierre de un día es la apertura del
+ * siguiente, y eso es lo que permite desatascar los días en que la cadena de
+ * saldos no tiene principio ni final.
+ *
+ * @param {Movimiento[]} movimientos
+ * @returns {Map<string, number>}
+ */
+export function cierresPorDia(movimientos) {
+  /** @type {Map<string, Movimiento[]>} */
+  const porDia = new Map()
+  for (const m of movimientos) {
+    const delDia = porDia.get(m.fecha)
+    if (delDia === undefined) porDia.set(m.fecha, [m])
+    else delDia.push(m)
+  }
+
+  /** @type {Map<string, number>} */
+  const cierres = new Map()
+  /** @type {number | null} */
+  let anterior = null
+  for (const fecha of [...porDia.keys()].sort()) {
+    const cierre = saldoAlCerrar(porDia.get(fecha) ?? [], anterior)
+    if (cierre === null) continue
+    cierres.set(fecha, cierre)
+    anterior = cierre
+  }
+  return cierres
+}
+
+/**
  * La curva de un periodo, día a día, de su primer día a su último.
  *
  * Los días vividos salen del extracto —cada apunte trae el saldo que dejó, y
@@ -179,19 +240,18 @@ export function detallarPeriodos({ periodos, movimientos, proyeccion, ordinarios
  *
  * @param {object} entrada
  * @param {Periodo} entrada.periodo
- * @param {Movimiento[]} entrada.ordenados
+ * @param {Map<string, number>} entrada.cierres  con cuánto cerró cada día vivido
  * @param {Map<string, number>} entrada.saldoPrevisto
  * @param {string} entrada.hoy
  * @returns {{ curva: Punto[], apertura: number }}
  */
-function curvaEntre({ periodo, ordenados, saldoPrevisto, hoy }) {
+function curvaEntre({ periodo, cierres, saldoPrevisto, hoy }) {
   let arrastre = 0
   /** @type {Map<string, number>} */
   const realPorDia = new Map()
-  for (const m of ordenados) {
-    if (m.saldo === null || m.saldo === undefined) continue
-    if (m.fecha < periodo.desde) arrastre = m.saldo
-    else if (m.fecha <= periodo.hasta) realPorDia.set(m.fecha, m.saldo)
+  for (const [fecha, cierre] of cierres) {
+    if (fecha < periodo.desde) arrastre = cierre
+    else if (fecha <= periodo.hasta) realPorDia.set(fecha, cierre)
   }
   /*
    * Con cuánto se entra es lo que había ANTES del primer día, no el saldo de

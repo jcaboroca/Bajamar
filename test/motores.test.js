@@ -6,6 +6,7 @@ import { describirFijos, estructura, MESES_DE } from '../src/analisis/fijos.js'
 import { cascadaDelPeriodo } from '../src/analisis/cascada.js'
 import { periodosEntre } from '../src/analisis/periodos.js'
 import { cuotasPendientes } from '../src/analisis/fraccionados.js'
+import { cierresPorDia } from '../src/analisis/mensual.js'
 import { disponibleReal } from '../src/analisis/mes.js'
 import { revisarPresupuestos } from '../src/analisis/presupuestos.js'
 import { capacidadDeAhorro, progresoDe } from '../src/analisis/objetivos.js'
@@ -658,5 +659,49 @@ describe('lo que aplazas vuelve en tres cuotas', () => {
   test('el apunte de la tarjeta no cuenta: ahí sólo está la cuota del mes', () => {
     const enTarjeta = { ...abono('2026-07-01', 11000, 'FRACCIONAMIENTO IMPUESTOS'), origen: 'tarjeta' }
     assert.deepEqual(cuotasPendientes([enTarjeta], '2026-06-30'), [])
+  })
+})
+
+describe('con qué cerró cada día', () => {
+  /** @param {string} fecha @param {number} importe @param {number} saldo */
+  const apunte = (fecha, importe, saldo) => ({
+    id: `${fecha}-${importe}-${saldo}`, fecha, importe, saldo, origen: 'cuenta',
+    concepto: 'x', conceptoRaw: 'x', entidadId: 'x', categoria: 'otros',
+  })
+
+  test('dentro de un día manda la cadena de saldos, no el orden del fichero', () => {
+    // El extracto los trae al revés: el de -39,99 aparece antes que el de
+    // -134,95, pero es el segundo quien deja el saldo del que parte el primero.
+    const cierres = cierresPorDia([
+      apunte('2026-08-26', -3999, 74760),
+      apunte('2026-08-26', -13495, 78759),
+    ])
+    assert.equal(cierres.get('2026-08-26'), 74760)
+  })
+
+  test('un cargo y su devolución el mismo día no descuadran el cierre', () => {
+    // La comisión de 60 € que el banco cobra y devuelve el mismo día deja dos
+    // apuntes con idéntico saldo: la cadena se muerde la cola y hay que
+    // resolverla sumando sobre lo que había al abrir el día.
+    const cierres = cierresPorDia([
+      apunte('2026-09-23', -1000, 114267),
+      apunte('2026-09-24', 6000, 104866),
+      apunte('2026-09-24', -8702, 104866),
+      apunte('2026-09-24', -699, 113568),
+      apunte('2026-09-24', -6000, 98866),
+    ])
+    assert.equal(cierres.get('2026-09-23'), 114267)
+    assert.equal(cierres.get('2026-09-24'), 104866)
+  })
+
+  test('un día sin saldos no rompe la cadena', () => {
+    const cierres = cierresPorDia([
+      apunte('2026-09-01', -100, 50000),
+      { ...apunte('2026-09-02', -100, 0), saldo: null },
+      apunte('2026-09-03', -100, 49800),
+    ])
+    assert.equal(cierres.get('2026-09-01'), 50000)
+    assert.equal(cierres.has('2026-09-02'), false)
+    assert.equal(cierres.get('2026-09-03'), 49800)
   })
 })

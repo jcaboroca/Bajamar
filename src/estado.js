@@ -15,7 +15,7 @@ import { cuotasPendientes } from './analisis/fraccionados.js'
 import { disponibleReal } from './analisis/mes.js'
 import { gastoPorCategoria, revisarPresupuestos } from './analisis/presupuestos.js'
 import { cuadre as cuadrarPlan, ritmoDelPlan } from './analisis/plan.js'
-import { detallarPeriodos, residuoDe } from './analisis/mensual.js'
+import { cierresPorDia, detallarPeriodos, residuoDe } from './analisis/mensual.js'
 import { cortesDeNomina, periodoDe, periodosEntre } from './analisis/periodos.js'
 import { balance, evolucion } from './analisis/patrimonio.js'
 import { capacidadDeAhorro } from './analisis/objetivos.js'
@@ -233,11 +233,9 @@ export function construirEstado(crudos, opciones = {}) {
   ).filter((m) => !apagadas[m.categoria ?? 'otros'])
   const ritmo = ritmoOrdinario(ordinarios, opciones.ventanaRitmo)
 
-  const ultimo = cuenta.reduce(
-    (mejor, m) => (m.fecha > mejor.fecha || (m.fecha === mejor.fecha && (m.saldo ?? 0) < (mejor.saldo ?? 0)) ? m : mejor),
-    cuenta[0],
-  )
-  const saldoInicial = ultimo?.saldo ?? 0
+  const ultimaFecha = cuenta.reduce((mayor, m) => (m.fecha > mayor ? m.fecha : mayor), cuenta[0]?.fecha ?? '')
+  const ultimo = cuenta.findLast((m) => m.fecha === ultimaFecha)
+  const saldoInicial = cierresPorDia([...cuenta].sort((a, b) => a.fecha.localeCompare(b.fecha))).get(ultimaFecha) ?? 0
 
   // La tarjeta se conoce por dos vías y cada una sabe una cosa: el histórico de
   // la cuenta sabe CUÁNDO la cobran, y el extracto de la tarjeta sabe CUÁNTO
