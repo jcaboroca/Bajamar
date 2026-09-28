@@ -137,17 +137,26 @@ function pintarSuelo(estado, mes) {
   cifra.replaceChildren(...titular(formatEurosRedondo(mes.suelo.saldo)))
   cifra.parentElement?.classList.toggle('en-rojo', mes.suelo.saldo < 0)
 
-  const faltan = diasEntre(estado.hoy, mes.suelo.fecha)
-  const cierre = `Cierras el mes con ${formatEurosRedondo(mes.saldoFinal)}.`
+  // Ahora el mes se mira entero, así que el punto más bajo puede haber pasado
+  // ya. Decir «dentro de -4 días» sería peor que no decir nada.
+  const dias = diasEntre(estado.hoy, mes.suelo.fecha)
+  const cuando = dias === 0
+    ? 'hoy mismo'
+    : dias > 0
+      ? `dentro de ${dias} ${dias === 1 ? 'día' : 'días'}`
+      : `hace ${-dias} ${dias === -1 ? 'día' : 'días'}`
+
+  const ultimo = mes.curva[mes.curva.length - 1]
+  const cierre = mes.acabado
+    ? `Cerraste con ${formatEurosRedondo(ultimo.saldo)}.`
+    : `Cierras el mes con ${formatEurosRedondo(ultimo.saldo)}.`
+
   const pie = requerir('suelo-pie')
-  pie.replaceChildren(...(faltan <= 0
-    ? [document.createTextNode(`Hoy mismo es el punto más bajo. ${cierre}`)]
-    : [
-        document.createTextNode('el '),
-        nodo('strong', '', fechaLarga(mes.suelo.fecha)),
-        document.createTextNode(`, dentro de ${faltan} ${faltan === 1 ? 'día' : 'días'}. `),
-        document.createTextNode(cierre),
-      ]))
+  pie.replaceChildren(
+    document.createTextNode('el '),
+    nodo('strong', '', fechaLarga(mes.suelo.fecha)),
+    document.createTextNode(`, ${cuando}. ${cierre}`),
+  )
 
   // El margen sólo es noticia si de verdad mueve el suelo, y sólo del mes en
   // curso: para uno que no ha empezado, saltarse un recibo es una decisión que
@@ -170,21 +179,28 @@ function pintarSuelo(estado, mes) {
  * @param {boolean} animar
  */
 function pintarLamina(estado, mes, animar) {
-  const curva = estado.proyeccionLarga.curva.filter((p) => mesDe(p.fecha) === mes.mes)
+  const curva = mes.curva
   const lamina = requerir('lamina')
   if (curva.length < 2) {
     lamina.replaceChildren(vacio('No hay días que dibujar en este mes.'))
     return
   }
 
-  requerir('lamina-rotulo').textContent = `Cómo llegas hasta ahí · ${comoSeLlama(mes, estado)}`
+  // Si las dos lecturas se separan es porque en el mes entró dinero que paga
+  // el siguiente. Merece decirse, porque es la única forma de entender que el
+  // punto más bajo esté por debajo de la línea de arriba.
+  const seSepara = curva.some((p) => p.propio !== p.saldo)
+  requerir('lamina-rotulo').textContent = seSepara
+    ? `Cómo va ${comoSeLlama(mes, estado)} · la línea de puntos no cuenta lo que paga el mes siguiente`
+    : `Cómo va ${comoSeLlama(mes, estado)}`
+
   lamina.replaceChildren(dibujarLamina({
     curva,
     suelo: mes.suelo,
     desde: curva[0].fecha,
     hasta: curva[curva.length - 1].fecha,
-    saldoInicial: mes.apertura,
-  }, { rotuloInicio: mes.estado === 'enCurso' ? 'hoy' : 'entras con' }))
+    saldoInicial: curva[0].saldo,
+  }, { rotuloInicio: 'día 1' }))
 
   lamina.classList.remove('dibujando')
   if (animar) {

@@ -158,3 +158,86 @@ export function residuoDe(mes, colchon = 0) {
 export function estaAcabado(mes, hoy) {
   return hoy >= ultimoDiaDelMes(`${mes}-01`)
 }
+
+/**
+ * @typedef {object} Punto
+ * @property {string} fecha
+ * @property {number} saldo   lo que dice el banco
+ * @property {number} propio  lo mismo, sin el dinero que paga el mes siguiente
+ */
+
+/**
+ * La curva de un mes entero, del día 1 al último.
+ *
+ * Hasta ahora la gráfica empezaba en hoy, porque salía de la proyección y la
+ * proyección no mira atrás. Eso hacía que «la bajamar de septiembre» fuese en
+ * realidad el mínimo de los días que quedaban de septiembre: un día 28, tres
+ * días. El punto más bajo del mes, que es el titular de la aplicación, se
+ * quedaba fuera por haber pasado ya.
+ *
+ * Los días vividos salen del extracto, que trae el saldo en cada apunte, y los
+ * que faltan de la proyección. Un día sin movimientos no tiene saldo propio:
+ * arrastra el del último que hubo.
+ *
+ * Y va una segunda lectura encima. La nómina del 25 está en la cuenta pero es
+ * el dinero de octubre, así que para saber hasta dónde bajó **lo de
+ * septiembre** hay que quitarla. Las dos líneas son la misma hasta que ese
+ * cobro entra, y a partir de ahí se separan justo por su importe: esa
+ * separación es la explicación, sin tener que escribirla.
+ *
+ * @param {object} entrada
+ * @param {string} entrada.mes
+ * @param {Array<{ fecha: string, saldo: number | null, importe: number }>} entrada.movimientos
+ * @param {Proyeccion} entrada.proyeccion
+ * @param {string} entrada.hoy
+ * @param {Array<{ fecha: string, importe: number }>} entrada.desplazados lo que cobra este mes y paga el siguiente
+ * @returns {{ curva: Punto[], suelo: { fecha: string, saldo: number } }}
+ */
+export function curvaDelMes({ mes, movimientos, proyeccion, hoy, desplazados }) {
+  const primero = `${mes}-01`
+  const ultimo = ultimoDiaDelMes(primero)
+
+  // Con cuánto se entra: el saldo del último apunte anterior al día 1. Si no
+  // hay extracto tan atrás, se empieza por el primero que haya dentro del mes.
+  const conSaldo = movimientos.filter((m) => m.saldo !== null && m.saldo !== undefined)
+    .slice().sort((a, b) => a.fecha.localeCompare(b.fecha))
+  let arrastre = 0
+  for (const m of conSaldo) {
+    if (m.fecha >= primero) break
+    arrastre = /** @type {number} */ (m.saldo)
+  }
+
+  /** @type {Map<string, number>} */
+  const realPorDia = new Map()
+  for (const m of conSaldo) {
+    if (m.fecha < primero || m.fecha > ultimo) continue
+    realPorDia.set(m.fecha, /** @type {number} */ (m.saldo))
+  }
+
+  const previstoPorDia = new Map(proyeccion.curva.map((p) => [p.fecha, p.saldo]))
+
+  /** @type {Punto[]} */
+  const curva = []
+  let quitado = 0
+  for (let fecha = primero; fecha <= ultimo; fecha = siguienteDia(fecha)) {
+    if (fecha <= hoy) arrastre = realPorDia.get(fecha) ?? arrastre
+    else arrastre = previstoPorDia.get(fecha) ?? arrastre
+
+    // Lo que entró hoy y es del mes que viene deja de contar desde hoy mismo.
+    for (const d of desplazados) if (d.fecha === fecha) quitado += d.importe
+    curva.push({ fecha, saldo: arrastre, propio: arrastre - quitado })
+  }
+
+  const suelo = curva.reduce(
+    (bajo, p) => (p.propio < bajo.saldo ? { fecha: p.fecha, saldo: p.propio } : bajo),
+    { fecha: curva[0].fecha, saldo: curva[0].propio },
+  )
+  return { curva, suelo }
+}
+
+/** @param {string} iso */
+function siguienteDia(iso) {
+  const [a, m, d] = iso.split('-').map(Number)
+  const t = new Date(Date.UTC(a, m - 1, d + 1))
+  return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}-${String(t.getUTCDate()).padStart(2, '0')}`
+}

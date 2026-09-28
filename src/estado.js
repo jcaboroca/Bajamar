@@ -12,10 +12,10 @@ import { eventosDesde, proyectar } from './analisis/bajamar.js'
 import { describirFijos, estructura } from './analisis/fijos.js'
 import { cascadaDelMes, mesEnCurso as mesQuePagaLaNomina } from './analisis/cascada.js'
 import { cuotasPendientes } from './analisis/fraccionados.js'
-import { conGotaDiaria, disponibleReal, mesDeUnMovimiento, porMeses, resumenDeMes } from './analisis/mes.js'
+import { conGotaDiaria, disponibleReal, mesContable, mesDeUnMovimiento, porMeses, resumenDeMes } from './analisis/mes.js'
 import { gastoPorCategoriaYMes, revisarPresupuestos } from './analisis/presupuestos.js'
 import { cuadre as cuadrarPlan, residuoDelMes, ritmoDelPlan } from './analisis/plan.js'
-import { detallarMeses, estaAcabado, residuoDe } from './analisis/mensual.js'
+import { curvaDelMes, detallarMeses, estaAcabado, residuoDe } from './analisis/mensual.js'
 import { balance, evolucion } from './analisis/patrimonio.js'
 import { capacidadDeAhorro } from './analisis/objetivos.js'
 import { revisar } from './analisis/alertas.js'
@@ -409,6 +409,21 @@ export function construirEstado(crudos, opciones = {}) {
     // Dos cifras iguales en la misma pantalla que son dinero distinto.
     cobrado: contables.filter((x) => x.origen !== 'tarjeta' && x.importe > 0
       && mesDeUnMovimiento(x, x.categoria ?? 'otros', ingresosRecurrentes) === m.mes),
+    ...curvaDelMes({
+      mes: m.mes,
+      movimientos: cuenta,
+      proyeccion: proyeccionLarga,
+      hoy,
+      // Lo que entra en este mes pero paga el siguiente: la nómina del 25. Se
+      // enseña en la línea del banco, porque está en la cuenta, pero no cuenta
+      // para saber hasta dónde bajó el dinero de este mes.
+      desplazados: [
+        ...cuenta.filter((x) => x.importe > 0 && x.fecha.slice(0, 7) === m.mes
+          && mesDeUnMovimiento(x, x.categoria ?? 'otros', ingresosRecurrentes) !== m.mes),
+        ...proyeccionLarga.eventos.filter((ev) => ev.importe > 0
+          && ev.fecha.slice(0, 7) === m.mes && mesContable(ev) !== m.mes),
+      ],
+    }),
     plan: planes[m.mes] ?? null,
     lineas: revisarPresupuestos({
       movimientos: contables,
@@ -537,9 +552,21 @@ export function construirEstado(crudos, opciones = {}) {
       mes: mesQuePagaLaNomina(hoy),
       fijos,
       ingreso: ingresoMensual,
-      // Por días y no la media mensual: si no, la cascada y la proyección dan
-      // cifras distintas del mismo mes y una de las dos miente.
-      diaADia: ritmoEfectivo.porDia * Number(ultimoDiaDelMes(`${mesQuePagaLaNomina(hoy)}-01`).slice(8)),
+      /*
+       * El día a día del mes de la cascada, que es un mes entero.
+       *
+       * Si lo has repartido, es lo que repartiste. Si no, el goteo medido por
+       * días, que es como lo cuenta la proyección y así las dos dicen lo mismo.
+       *
+       * Lo que no puede ser es multiplicar el ritmo del plan por los días de
+       * este mes: ese ritmo es «lo que queda entre los días que quedan» del mes
+       * en curso, y un día 28 vale sesenta y cuatro euros al día. Por treinta y
+       * un días daba mil novecientos, y la cascada cerraba en rojo un mes que
+       * la portada daba por ahorrado.
+       */
+      diaADia: planificando.plan
+        ? -Object.values(planificando.plan.asignado).reduce((t, x) => t + x, 0)
+        : ritmo.porDia * Number(ultimoDiaDelMes(`${mesQuePagaLaNomina(hoy)}-01`).slice(8)),
       inversiones: opciones.inversiones,
       plazos,
       saltados,

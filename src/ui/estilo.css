@@ -252,6 +252,17 @@ main {
 
 .relleno-agua { stroke: none; }
 
+/* La segunda lectura del mes: el mismo saldo sin el dinero que paga el mes
+   siguiente. Discontinua y sin relleno a propósito — no es otra cuenta, es la
+   misma leída de otra manera, y sólo se separa de la primera donde importa. */
+.trazo-propio {
+  fill: none;
+  stroke: var(--acento);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+  opacity: 0.75;
+}
+
 .marca-suelo { stroke: var(--acento); stroke-width: 1; stroke-dasharray: 2 3; }
 .punto-suelo { fill: var(--acento); }
 

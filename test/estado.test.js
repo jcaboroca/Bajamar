@@ -292,3 +292,42 @@ test('el mes que viene no sale sin ingresos: lo paga la nómina ya cobrada', () 
   // Y no se cuenta dos veces: noviembre cobra la suya dentro del horizonte.
   assert.equal(estado.meses.find((f) => f.mes === '2026-11')?.ingresos, 200000)
 })
+
+test('la cascada y el resumen no pueden dar cifras distintas del mismo mes', () => {
+  // El ritmo del plan es «lo que queda entre los días que quedan» del mes en
+  // curso. Multiplicarlo por los días del mes siguiente daba un día a día
+  // absurdo: la cascada cerraba octubre en rojo mientras el resumen lo daba
+  // por ahorrado.
+  const movimientos = []
+  let saldo = 400000
+  let n = 0
+  for (let i = 0; i < 6; i += 1) {
+    const mes = String(4 + i).padStart(2, '0')
+    saldo += 200000
+    movimientos.push(fila(`n${i}`, `2026-${mes}-25`, 'TRANSFERENCIA NOMINA ACME', 200000, saldo))
+    saldo -= 60000
+    movimientos.push(fila(`a${i}`, `2026-${mes}-01`, 'RECIBO ALQUILER VIVIENDA', -60000, saldo))
+    // Gasto irregular: días e importes distintos, para que no se confunda con
+    // un recibo y quede como goteo del día a día.
+    for (const [dia, importe] of [['07', -3150], ['12', -2780], ['21', -4310]]) {
+      saldo -= Math.abs(importe)
+      movimientos.push(fila(`b${n++}`, `2026-${mes}-${dia}`, `BAR LA PLACETA ${i}${dia}`, importe, saldo))
+    }
+  }
+  // Un plan del mes en curso, con casi nada de mes por delante: es lo que
+  // disparaba el ritmo diario.
+  const planes = {
+    '2026-09': { mes: '2026-09', asignado: { restaurantes: 20000 }, residuo: 100000, sello: '2026-09-28' },
+  }
+  const estado = construirEstado(movimientos, { hoy: '2026-09-28', meses: 3, planes })
+
+  assert.equal(estado.cascada.mes, '2026-10')
+  assert.ok(Math.abs(estado.ritmo.porMes) > 0, 'el fixture tiene que producir goteo')
+  // Sin plan de octubre, su día a día es el goteo medido del mes, no el ritmo
+  // de septiembre estirado a treinta y un días.
+  assert.ok(
+    Math.abs(estado.cascada.diaADia) < Math.abs(estado.ritmo.porMes) * 2,
+    `el día a día de la cascada se ha disparado: ${estado.cascada.diaADia} `
+    + `frente a un goteo medido de ${estado.ritmo.porMes}`,
+  )
+})

@@ -2,7 +2,7 @@
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { detallarMeses, estaAcabado, residuoDe } from '../src/analisis/mensual.js'
+import { curvaDelMes, detallarMeses, estaAcabado, residuoDe } from '../src/analisis/mensual.js'
 import { porMeses } from '../src/analisis/mes.js'
 import { proyectar } from '../src/analisis/bajamar.js'
 
@@ -117,5 +117,70 @@ describe('cuándo se da un mes por acabado', () => {
 
   test('febrero no tiene día 30', () => {
     assert.equal(estaAcabado('2026-02', '2026-02-28'), true)
+  })
+})
+
+describe('la curva de un mes entero', () => {
+  // Septiembre de verdad: se entra con 2.290,18 €, se va gastando, y el 25
+  // entra la nómina, que es el dinero de octubre. Hoy es 28.
+  const movimientos = [
+    { fecha: '2026-08-31', saldo: 229_018, importe: 0 },
+    { fecha: '2026-09-05', saldo: 180_000, importe: -49_018 },
+    { fecha: '2026-09-24', saldo: 104_866, importe: -75_134 },
+    { fecha: '2026-09-25', saldo: 384_866, importe: 280_000 }, // nómina
+    { fecha: '2026-09-28', saldo: 374_866, importe: -10_000 },
+  ]
+  const proyeccion = proyectar({
+    saldoInicial: 374_866, desde: '2026-09-28', hasta: '2026-10-31',
+    ritmoPorDia: -1000, eventos: [],
+  })
+  const { curva, suelo } = curvaDelMes({
+    mes: '2026-09',
+    movimientos,
+    proyeccion,
+    hoy: '2026-09-28',
+    desplazados: [{ fecha: '2026-09-25', importe: 280_000 }],
+  })
+  const dia = (d) => curva.find((p) => p.fecha === `2026-09-${d}`)
+
+  test('empieza el día 1 y acaba el último, pase lo que pase', () => {
+    assert.equal(curva[0].fecha, '2026-09-01')
+    assert.equal(curva[curva.length - 1].fecha, '2026-09-30')
+    assert.equal(curva.length, 30)
+  })
+
+  test('se entra con el saldo del último apunte del mes anterior', () => {
+    assert.equal(dia('01').saldo, 229_018)
+  })
+
+  test('un día sin movimientos arrastra el saldo del anterior', () => {
+    assert.equal(dia('06').saldo, 180_000)
+    assert.equal(dia('23').saldo, 180_000)
+  })
+
+  test('los días vividos salen del extracto, no de la previsión', () => {
+    assert.equal(dia('24').saldo, 104_866)
+    assert.equal(dia('25').saldo, 384_866)
+  })
+
+  test('la línea del banco sube el 25; la del dinero del mes no', () => {
+    assert.equal(dia('25').saldo, 384_866)
+    assert.equal(dia('25').propio, 384_866 - 280_000)
+    // Antes de que entre, las dos son la misma.
+    assert.equal(dia('24').saldo, dia('24').propio)
+  })
+
+  test('la bajamar del mes es el mínimo sin contar la nómina', () => {
+    // El 24 quedaban 1.048,66 €, y del 25 en adelante se sigue gastando sin
+    // que la nómina cuente, así que el suelo está al final del mes.
+    assert.ok(suelo.saldo <= 104_866)
+    assert.equal(suelo.saldo, Math.min(...curva.map((p) => p.propio)))
+  })
+
+  test('sin la nómina desplazada, las dos líneas son la misma', () => {
+    const { curva: igual } = curvaDelMes({
+      mes: '2026-09', movimientos, proyeccion, hoy: '2026-09-28', desplazados: [],
+    })
+    for (const p of igual) assert.equal(p.saldo, p.propio, p.fecha)
   })
 })

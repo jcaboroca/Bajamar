@@ -27,7 +27,16 @@ const MARGEN_INFERIOR = 24
 export function dibujarLamina(proyeccion, opciones = {}) {
   const marca = opciones.marca ?? 'agua'
   const puntos = proyeccion.curva
-  const valores = puntos.map((p) => p.saldo)
+  /*
+   * Puede haber dos lecturas del mismo mes: lo que dice el banco y lo que es
+   * dinero de este mes. Se separan el día que entra una nómina que paga el
+   * siguiente, y esa separación explica sola por qué el punto más bajo está
+   * donde está. La escala tiene que abarcar las dos o una se saldría.
+   */
+  const hayPropia = puntos.some((p) => typeof p.propio === 'number' && p.propio !== p.saldo)
+  const valores = hayPropia
+    ? puntos.flatMap((p) => [p.saldo, p.propio])
+    : puntos.map((p) => p.saldo)
   const techo = Math.max(...valores, 0)
   const sueloEscala = Math.min(...valores, 0)
   const rango = Math.max(techo - sueloEscala, 1)
@@ -36,6 +45,9 @@ export function dibujarLamina(proyeccion, opciones = {}) {
   const y = (v) => MARGEN_SUPERIOR + (1 - (v - sueloEscala) / rango) * (ALTO - MARGEN_SUPERIOR - MARGEN_INFERIOR)
 
   const linea = puntos.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(p.saldo).toFixed(1)}`).join('')
+  const lineaPropia = hayPropia
+    ? puntos.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(p.propio).toFixed(1)}`).join('')
+    : null
   const base = y(Math.max(sueloEscala, 0)).toFixed(1)
   const area = `${linea}L${ANCHO},${base}L0,${base}Z`
 
@@ -67,6 +79,7 @@ export function dibujarLamina(proyeccion, opciones = {}) {
 
   svg.append(
     crear('path', { class: 'trazo-agua', d: linea }),
+    ...(lineaPropia ? [crear('path', { class: 'trazo-propio', d: lineaPropia })] : []),
     crear('line', { class: 'marca-suelo', x1: xSuelo, x2: xSuelo, y1: ySuelo, y2: ALTO - MARGEN_INFERIOR + 6 }),
     crear('circle', { class: 'punto-suelo', cx: xSuelo, cy: ySuelo, r: 3.5 }),
     // El rótulo del arranque no siempre es «hoy»: mirando un mes que aún no ha
