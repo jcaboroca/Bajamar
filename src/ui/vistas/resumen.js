@@ -141,6 +141,20 @@ function pintarNavegador(estado, periodo) {
 function pintarLlego(estado, periodo, animar) {
   requerir('suelo-rotulo').textContent = `La bajamar de ${comoSeLlama(periodo, estado)}`
 
+  /*
+   * El saldo, dicho con todas las letras y antes que nada.
+   *
+   * La bajamar ya es un saldo —lo que habrá en la cuenta ese día, con el
+   * ahorro acumulado dentro— pero leída sola, encima de un bloque que suma y
+   * resta la nómina, parece flujo del mes. Faltaba el punto de partida: lo que
+   * hay ahora mismo. Estaba, en letra pequeña dentro del gráfico.
+   */
+  requerir('suelo-saldo').textContent = periodo.estado === 'enCurso'
+    ? `Hoy tienes ${formatEurosRedondo(estado.saldoInicial)}`
+    : periodo.estado === 'futuro'
+      ? `Entras con ${formatEurosRedondo(periodo.apertura)}`
+      : `Empezaste con ${formatEurosRedondo(periodo.apertura)}`
+
   const cifra = requerir('suelo-cifra')
   cifra.replaceChildren(...titular(formatEurosRedondo(periodo.suelo.saldo)))
   cifra.parentElement?.classList.toggle('en-rojo', periodo.suelo.saldo < 0)
@@ -225,9 +239,10 @@ function pintarVivir(estado, periodo) {
     : alDia < habitual
       ? ` Sueles gastar ${formatEurosRedondo(habitual)}, así que toca apretar.`
       : ` Sueles gastar ${formatEurosRedondo(habitual)}, así que vas holgado.`
+  const aclara = ' Esto es sólo lo que entra y sale este periodo: lo que ya tenías ahorrado no se toca ni se cuenta aquí.'
   requerir('vivir-nota').textContent = queda <= 0
-    ? 'No queda nada: todo lo que gastes sale del colchón.'
-    : `${formatEurosRedondo(alDia)} al día durante ${dias} días.${comparacion}`
+    ? `No queda nada: todo lo que gastes sale de lo ahorrado.${aclara}`
+    : `${formatEurosRedondo(alDia)} al día durante ${dias} días.${comparacion}${aclara}`
 }
 
 /**
