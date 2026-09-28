@@ -145,6 +145,7 @@ async function arrancar() {
   }
 
   ponerseAlDia()
+  tirarParaBuscar()
 
   // Volver a la app es abrirla: en el móvil casi nunca se arranca de cero.
   addEventListener('visibilitychange', () => {
@@ -338,8 +339,15 @@ async function refrescar({ animar = false, local = true } = {}) {
  * dispositivo es mezclar, no elegir cuál gana. Y lo decidido a mano se funde
  * con lo de aquí por la hora en que se decidió.
  */
-async function ponerseAlDia() {
-  if (!BUZON || !claveRecordada()) return
+async function ponerseAlDia({ aMano = false } = {}) {
+  if (!BUZON) {
+    if (aMano) decir('Esta copia no tiene buzón donde mirar.')
+    return
+  }
+  if (!claveRecordada()) {
+    if (aMano) decir('Aquí no hay contraseña puesta, así que este aparato no busca nada. Ponla en Ajustes, en «Enviar cifrado», y que sea la misma que en el otro.')
+    return
+  }
   try {
     const maleta = await bajar(BUZON, claveRecordada())
     const antes = (await leerMovimientos()).length
@@ -351,15 +359,27 @@ async function ponerseAlDia() {
     // sólo se subía al importar o al decidir algo: si aquella vez falló, lo de
     // este aparato no volvía a salir nunca.
     if (ahora > maleta.movimientos.length || sobran(await leerDecisiones(), maleta.decisiones ?? {})) publicar()
-    if (ahora === antes && cambios === 0) return pintarSincro()
+    if (ahora === antes && cambios === 0) {
+      pintarSincro()
+      if (aMano) decir(`Ya tenías todo lo que hay en el otro dispositivo: ${ahora} movimientos.`)
+      return
+    }
     await refrescar({ animar: antes === 0, local: false })
     if (ahora !== antes) decir(`Traídos ${ahora - antes} movimientos del otro dispositivo.`)
     else decir('Actualizado con lo que cambiaste en el otro dispositivo.')
   } catch (fallo) {
     // Un buzón vacío teniendo datos aquí es lo mismo: esto nunca llegó a salir.
-    if (fallo instanceof SinBuzon && (await leerMovimientos()).length > 0) publicar()
-    // Sin red o contraseña cambiada: no es momento de dar la lata. Los botones
-    // de Ajustes siguen ahí.
+    if (fallo instanceof SinBuzon) {
+      if ((await leerMovimientos()).length > 0) publicar()
+      if (aMano) decir('Con esa contraseña no hay nada guardado. Si en el otro aparato usaste otra, ésta no le vale.')
+      return
+    }
+    if (fallo instanceof ContrasenaInvalida) {
+      if (aMano) decir('La contraseña de este aparato no abre lo que hay guardado. No es la misma que la del otro.')
+      return
+    }
+    if (aMano) decir(`No he podido mirar: ${fallo instanceof Error ? fallo.message : fallo}`)
+    // Sin red: no es momento de dar la lata. Los botones de Ajustes siguen ahí.
   }
 }
 
@@ -372,6 +392,65 @@ function sobran(mias, suyas) {
   const cuantas = (/** @type {import('../almacen/db.js').Decisiones} */ d) =>
     Object.values(d).reduce((n, filas) => n + filas.length, 0)
   return cuantas(mias) > cuantas(suyas)
+}
+
+/**
+ * Tirar hacia abajo estando arriba del todo busca lo del otro aparato.
+ *
+ * Solo hace falta cuando uno duda, y dudar es justo cuando no se puede esperar
+ * veinte segundos sin saber si la espera sirve de algo. Además, pedirlo a mano
+ * merece respuesta aunque no haya nada nuevo: el silencio se lee como avería.
+ */
+function tirarParaBuscar() {
+  const tirador = document.getElementById('tirador')
+  if (!tirador) return
+  const UMBRAL = 70
+  let empezo = -1
+  let recorrido = 0
+  let ocupado = false
+
+  const guardar = () => {
+    empezo = -1
+    recorrido = 0
+    tirador.style.transform = ''
+    tirador.classList.add('suave')
+    tirador.classList.remove('asomando', 'trabajando')
+    setTimeout(() => tirador.classList.remove('suave'), 300)
+  }
+
+  addEventListener('touchstart', (e) => {
+    if (ocupado || scrollY > 0 || e.touches.length !== 1) return
+    empezo = e.touches[0].clientY
+    recorrido = 0
+  }, { passive: true })
+
+  addEventListener('touchmove', (e) => {
+    if (empezo < 0) return
+    recorrido = e.touches[0].clientY - empezo
+    if (recorrido <= 0 || scrollY > 0) return guardar()
+    // Se arrastra a media velocidad: el dedo llega más lejos que el rótulo, y
+    // así se nota que hay un tope al que llegar.
+    tirador.classList.remove('suave')
+    tirador.classList.add('asomando')
+    tirador.style.transform = `translate(-50%, ${Math.min(recorrido / 2, UMBRAL) - 48}px)`
+    tirador.textContent = recorrido >= UMBRAL ? 'Suelta para buscar' : 'Tira para buscar'
+  }, { passive: true })
+
+  addEventListener('touchend', async () => {
+    if (empezo < 0) return
+    if (recorrido < UMBRAL) return guardar()
+    empezo = -1
+    ocupado = true
+    tirador.style.transform = ''
+    tirador.classList.add('suave', 'trabajando')
+    tirador.textContent = 'Buscando…'
+    try {
+      await ponerseAlDia({ aMano: true })
+    } finally {
+      ocupado = false
+      guardar()
+    }
+  })
 }
 
 /** @type {ReturnType<typeof setTimeout> | undefined} */

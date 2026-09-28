@@ -43,6 +43,8 @@ html { -webkit-text-size-adjust: 100%; }
 
 body {
   margin: 0;
+  /* El rebote del sistema al llegar arriba taparía el tirón para buscar. */
+  overscroll-behavior-y: contain;
   background: var(--fondo);
   color: var(--texto);
   font-family: var(--display);
@@ -754,6 +756,31 @@ main {
 
 /* Lo que la aplicación tiene que contar no puede vivir sólo en Ajustes: con
    cinco áreas, casi nunca es la que está abierta. */
+/* Tirar hacia abajo para buscar lo del otro aparato. */
+.tirador {
+  position: fixed;
+  left: 50%;
+  top: calc(env(safe-area-inset-top) + 0.25rem);
+  z-index: 9;
+  margin: 0;
+  padding: 0.4rem 0.9rem;
+  transform: translate(-50%, -3rem);
+  background: var(--superficie);
+  border: 1px solid var(--linea);
+  border-radius: 999px;
+  font-size: 0.8rem;
+  color: var(--secundario);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+}
+.tirador.asomando { opacity: 1; }
+.tirador.suave { transition: transform 260ms var(--curva), opacity 260ms var(--curva); }
+.tirador.trabajando { opacity: 1; transform: translate(-50%, 0); }
+@media (prefers-reduced-motion: reduce) {
+  .tirador.suave { transition: none; }
+}
+
 .recado {
   position: fixed;
   left: 50%;
