@@ -210,45 +210,43 @@ function pintarLlego(estado, periodo, animar) {
 /**
  * 2 · ¿Cuánto tengo para vivir, y a qué ritmo?
  *
- * Es la cascada resumida a tres líneas. Lo que entra, lo que ya está
- * comprometido, y lo que queda. El ritmo al lado, porque «1.841 €» no dice
- * nada hasta que se convierte en «59 € al día».
+ * La cascada entera en cuatro líneas: lo que había, lo que entra, lo que sale
+ * con fecha y lo que ya se ha ido en el día a día. Lo de abajo es la resta de
+ * lo de arriba, que en un mes cerrado es con lo que se cerró. El ritmo al
+ * lado, porque «1.841 €» no dice nada hasta que se convierte en «59 € al día».
  *
  * @param {Estado} estado
  * @param {Periodo} periodo
  */
 function pintarVivir(estado, periodo) {
   requerir('vivir-rotulo').textContent = periodo.estado === 'cerrado'
-    ? `Lo que tuviste para el día a día en ${comoSeLlama(periodo, estado)}`
-    : `Para el día a día de ${comoSeLlama(periodo, estado)}`
+    ? `Cómo fue ${comoSeLlama(periodo, estado)}`
+    : `Cómo va ${comoSeLlama(periodo, estado)}`
 
   const queda = residuoDe(periodo)
+  const gastado = Math.abs(periodo.diaADiaGastado)
+  const restante = queda - gastado
   const caja = requerir('vivir')
   // La fórmula entera y a la vista, para que la resta se pueda seguir con el
-  // dedo: saldo, más lo que entra, menos todo lo que sale con fecha.
+  // dedo: saldo, más lo que entra, menos todo lo que sale con fecha, menos lo
+  // que ya se ha ido en el día a día.
   caja.replaceChildren(
     cuentas([['Saldo al empezar', formatEuros(periodo.apertura)]]),
     desplegable('Nómina y otros ingresos', periodo.ingresos.total, periodo.desglose.entra, estado, true),
     desplegable('Recibos, cuotas y traspasos', periodo.compromisos, periodo.desglose.conFecha, estado, false),
+    desplegable(
+      periodo.estado === 'cerrado' ? 'Día a día' : 'Día a día, hasta hoy',
+      periodo.diaADiaGastado, periodo.desglose.diaADia, estado, false,
+    ),
   )
 
   const total = nodo('p', 'subtitular')
-  total.append(...titular(formatEurosRedondo(queda)))
-  if (queda < 0) total.classList.add('en-rojo')
+  total.append(...titular(formatEurosRedondo(restante)))
+  if (restante < 0) total.classList.add('en-rojo')
   caja.append(total)
-
-  /*
-   * El día a día va debajo del total y no encima, porque encima rompería la
-   * resta: la cifra gorda es lo que quedaba ANTES de empezar a gastarlo.
-   */
-  caja.append(desplegable(
-    periodo.estado === 'cerrado' ? 'En qué se te fue el día a día' : 'En qué se te va yendo',
-    periodo.diaADiaGastado, periodo.desglose.diaADia, estado, false,
-  ))
 
   const dias = diasQueDura(periodo)
   const habitual = Math.round(Math.abs(estado.ritmo.porMes) / 30.4)
-  const gastado = Math.abs(periodo.diaADiaGastado)
 
   /*
    * Un periodo cerrado no se prevé, se cuenta. Decirle a alguien que «vas
@@ -257,30 +255,25 @@ function pintarVivir(estado, periodo) {
    */
   if (periodo.estado === 'cerrado') {
     const alDiaReal = Math.round(gastado / Math.max(dias, 1))
-    const sobro = queda - gastado
     requerir('vivir-nota').textContent = gastado === 0
       ? 'No gastaste nada en el día a día.'
-      : `Gastaste ${formatEurosRedondo(gastado)}, ${formatEurosRedondo(alDiaReal)} al día durante ${dias} días. `
-        + (sobro >= 0
-          ? `Te sobraron ${formatEurosRedondo(sobro)}.`
-          : `Te pasaste en ${formatEurosRedondo(-sobro)}.`)
+      : `${formatEurosRedondo(alDiaReal)} al día durante ${dias} días, `
+        + `y tu mes normal son ${formatEurosRedondo(habitual)}.`
     return
   }
 
-  const alDia = Math.round(queda / Math.max(dias, 1))
+  // El ritmo que queda es sobre los días que quedan: los ya vividos tienen su
+  // gasto puesto arriba y contarlos otra vez infla lo que se puede gastar.
+  const quedanDias = Math.max(diasEntre(estado.hoy, periodo.hasta), 0) + 1
+  const alDia = Math.round(restante / quedanDias)
   const comparacion = habitual === 0
     ? ''
     : alDia < habitual
       ? ` Sueles gastar ${formatEurosRedondo(habitual)}, así que toca apretar.`
       : ` Sueles gastar ${formatEurosRedondo(habitual)}, así que vas holgado.`
-  // Lo ya gastado del día a día, que es lo que convierte la previsión en real
-  // según van llegando los apuntes.
-  const llevas = gastado > 0
-    ? ` Llevas gastados ${formatEurosRedondo(gastado)}.`
-    : ''
-  requerir('vivir-nota').textContent = queda <= 0
-    ? `No queda nada: todo lo que gastes sale de lo que tenías.${llevas}`
-    : `${formatEurosRedondo(alDia)} al día durante ${dias} días.${comparacion}${llevas}`
+  requerir('vivir-nota').textContent = restante <= 0
+    ? 'No queda nada: todo lo que gastes sale de lo que tenías.'
+    : `${formatEurosRedondo(alDia)} al día durante los ${quedanDias} días que quedan.${comparacion}`
 }
 
 /**
