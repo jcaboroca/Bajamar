@@ -82,7 +82,8 @@ function repintar() {
   const estado = ultimo
   const hasta = ultimoDiaDelMes(sumarMeses(estado.hoy, horizonte - 1))
   const proyeccion = recortar(estado.proyeccionLarga, hasta)
-  const meses = estado.meses.filter((f) => f.mes <= mesDe(hasta))
+  // La vista de cuenta no mueve la nómina: cada cobro en el mes en que cae.
+  const meses = estado.mesesDeCuenta.filter((f) => f.mes <= mesDe(hasta))
 
   requerir('lamina-larga').replaceChildren(dibujarLamina(proyeccion, { marca: 'largo' }))
 
@@ -370,7 +371,14 @@ function desglose(lista) {
     // Un traspaso a tu propio bolsillo y la cuota de un préstamo salen por el
     // mismo sitio y son lo contrario: sólo el usuario sabe cuál es cuál.
     if (e.puedeSerInversion) li.append(marcaDeInversion(e))
-    if (e.aplazable || e.saltado) li.append(botonDeSaltar(e))
+    // El botón va en todas las líneas, no sólo en las que ya habías marcado
+    // como saltables. Decir «este mes no aporto los 500 €» tenía que ser un
+    // clic, y eran dos: primero abrir el diálogo del recibo para declararlo
+    // saltable y después saltarlo. Saltar un mes no compromete a nada —el
+    // siguiente vuelve solo—, así que no hace falta pedir permiso antes.
+    // Las cuotas de lo aplazado no tienen recibo propio: no hay nada que
+    // saltarse, el banco las cobra igual.
+    if (e.reciboId) li.append(botonDeSaltar(e))
     ul.append(li)
   }
   return ul
@@ -389,7 +397,6 @@ function botonDeSaltar(e) {
   boton.dataset.mes = (e.fecha ?? '').slice(0, 7)
   boton.dataset.puesto = e.saltado ? 'si' : 'no'
   boton.textContent = e.saltado ? 'Volver a contarlo' : 'Este mes no'
-  boton.addEventListener('click', (ev) => ev.stopPropagation())
   return boton
 }
 

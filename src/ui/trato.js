@@ -104,6 +104,11 @@ export function marcarPreguntable(fila, reciboId, rotulo, categoria) {
  */
 export function preguntarAlPulsar(caja, mirarEstado, alCambiar) {
   const abrir = async (/** @type {Element} */ objetivo) => {
+    // Los botones de acción de una fila hacen lo suyo y no abren el diálogo.
+    // Antes lo evitaban cortando la propagación, pero eso mataba también al
+    // manejador que escucha en esta misma caja: el botón de «este mes no»
+    // pintaba, guardaba sus datos y al pulsarlo no ocurría absolutamente nada.
+    if (objetivo.closest('[data-saltar], [data-apagar], [data-inversion], input, label')) return
     const fila = objetivo.closest('[data-recibo]')
     if (!(fila instanceof HTMLElement)) return
     const reciboId = fila.dataset.recibo

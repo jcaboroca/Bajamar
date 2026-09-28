@@ -360,6 +360,39 @@ export function construirEstado(crudos, opciones = {}) {
    * hacia atrás buscando un mínimo no sirve de nada.
    */
   const meses = porMeses(proyeccionLarga, abrenMes)
+
+  /*
+   * Y la misma tabla sin mover nada: la cuenta tal cual, con cada cobro en el
+   * mes en que cae. El desplazamiento de la nómina sirve para leer un mes por
+   * dentro —cuánto tengo para vivir octubre— pero estorba para mirar la cuenta
+   * de lejos, donde lo que se quiere ver es cuándo entra y sale el dinero de
+   * verdad. Son dos preguntas y necesitan dos respuestas.
+   */
+  const SIN_DESPLAZAR = new Set()
+  const mesesDeCuenta = porMeses(proyeccionLarga, SIN_DESPLAZAR)
+  // El mes en curso, igual que arriba: la proyección sólo trae lo que falta,
+  // así que sus totales salen del extracto más lo que queda por pasar.
+  const enCursoDeCuenta = conGotaDiaria(
+    resumenDeMes({
+      movimientos: contables,
+      categorias,
+      noEsGasto: NO_ES_GASTO,
+      eventos: proyeccion.eventos,
+      mes: mesDe(hoy),
+      hoy,
+      abrenMes: SIN_DESPLAZAR,
+    }),
+    ritmoEfectivo.porDia,
+    hoy,
+  )
+  if (mesesDeCuenta[0] && mesesDeCuenta[0].mes === mesDe(hoy)) {
+    mesesDeCuenta[0] = {
+      ...mesesDeCuenta[0],
+      ingresos: enCursoDeCuenta.ingresos.total,
+      gastos: enCursoDeCuenta.gastos.total,
+      ahorro: enCursoDeCuenta.ahorro,
+    }
+  }
   if (meses[0] && meses[0].mes === mesDe(hoy)) {
     meses[0] = {
       ...meses[0],
@@ -556,6 +589,7 @@ export function construirEstado(crudos, opciones = {}) {
     residuo,
     cuadre,
     detalleMensual,
+    mesesDeCuenta,
     abrenMes,
     planificando: { ...planificando, cuadre: cuadrePlanificado },
     reparto: repartirGasto(ordinarios, ritmo),
