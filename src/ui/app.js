@@ -125,7 +125,23 @@ async function arrancar() {
   })
 
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-    navigator.serviceWorker.register('sw.js').catch(() => {})
+    // Si al abrir ya mandaba una versión, un relevo significa que ha entrado
+    // programa nuevo y lo que se está viendo es lo viejo. Instalada en el
+    // móvil no se cierra nunca, así que sin esto se quedaba meses atrás.
+    const habiaVersion = navigator.serviceWorker.controller !== null
+    let recargando = false
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!habiaVersion || recargando) return
+      recargando = true
+      location.reload()
+    })
+    navigator.serviceWorker.register('sw.js').then((registro) => {
+      // Al despertar del fondo nadie va a mirar si hay algo nuevo: hay que ir
+      // a preguntarlo.
+      addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') registro.update()
+      })
+    }).catch(() => {})
   }
 
   ponerseAlDia()

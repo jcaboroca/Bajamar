@@ -61,8 +61,8 @@ body {
 main {
   max-width: 44rem;
   margin: 0 auto;
-  /* Sitio para la barra de abajo más el borde curvo del teléfono. */
-  padding: 0 var(--margen) calc(6rem + env(safe-area-inset-bottom));
+  /* Arriba, el hueco de la isla del teléfono; abajo, la barra más el borde curvo. */
+  padding: env(safe-area-inset-top) var(--margen) calc(6rem + env(safe-area-inset-bottom));
 }
 
 .vista { display: block; }
@@ -123,7 +123,7 @@ main {
     align-items: center;
     justify-content: space-between;
     gap: 2rem;
-    padding: 0 var(--margen);
+    padding: env(safe-area-inset-top) var(--margen) 0;
   }
   .marca {
     display: block;
@@ -139,7 +139,7 @@ main {
     border-bottom: 2px solid transparent;
   }
   .pestana[aria-current='page'] { border-bottom-color: var(--acento); }
-  main { padding-top: 3.5rem; padding-bottom: 6rem; }
+  main { padding-top: calc(3.5rem + env(safe-area-inset-top)); padding-bottom: 6rem; }
 }
 
 /* El rótulo no compite: nombra el bloque y se aparta. */
