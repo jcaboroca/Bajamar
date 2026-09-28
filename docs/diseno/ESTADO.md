@@ -9,8 +9,9 @@ hoy se rompió por dar por supuesto algo que este documento cuenta.
 Cero dependencias, sin paso de compilación, JS vanilla. Node 22 o más.
 
 ```sh
-npm test      # 278 pruebas
+npm test      # 279 pruebas
 npm run dev   # http://localhost:4173
+npm run sellar # tras tocar cualquier fichero del programa
 ```
 
 El dinero son **céntimos enteros** en todas partes. Ningún importe pasa por un
@@ -91,9 +92,11 @@ desregistrar el SW, borrar `caches`, **y navegar a otra página antes de
 volver** — si no, la pestaña sigue controlada por el anterior aunque
 `getRegistrations()` devuelva cero.
 
-Y `PROGRAMA` es una lista manual: **todo módulo nuevo hay que añadirlo** o la
-app falla sin conexión. Hoy faltaban seis. Sube `CAU` en cada despliegue o el
-arreglo se publica y nadie lo ve.
+Y `PROGRAMA` **ya no es una lista manual**: `npm run sellar` la genera siguiendo
+los `import` desde `index.html`, y pone en `CAU` un hash del contenido de todo
+lo que entra. Una prueba (`test/sello.test.js`) falla si `sw.js` no está sellado,
+así que el olvido ya no llega a publicarse. Tras tocar cualquier fichero del
+programa: `npm run sellar`.
 
 `docs/` está excluido del repositorio por privacidad —lleva diagnósticos con
 importes reales— salvo `docs/diseno/`, que es donde está esto.
@@ -130,16 +133,16 @@ Por orden de lo que más molesta:
    las listas de fijos y suscripciones; su tabla mes a mes es la misma
    navegación que el Resumen ya tiene. Es candidata a repartirse y desaparecer,
    pero es decisión del dueño: sobran pestañas y él lo sabe.
-3. **`worker/.wrangler/cache/wrangler-account.json` está commiteado** en un
-   repositorio público. Es caché local de wrangler y no debería estar.
-4. **La versión del service worker se sube a mano.** Se puede derivar de un
-   hash de los ficheros. Casi se olvida dos veces en un día.
-5. **El README está desfasado**: dice 254 pruebas y la estructura no menciona
-   `periodos.js`. Y su tercera decisión —«con dos apariciones no se infiere una
-   periodicidad»— está contada más tajante de lo que hace el código, que tiene
-   una función llamada `anualesDeDosVistas`.
-6. **`estado.mesEnCurso` ya no existe**, pero quedó dicho que había que
-   renombrarlo: comprueba que no quede ningún nombre que signifique dos cosas.
+3. ~~`worker/.wrangler/cache/wrangler-account.json` está commiteado~~ **Sacado
+   del índice y añadido a `.gitignore`.** Ojo: sigue en el historial público, y
+   lleva el id de cuenta de Cloudflare y el correo. Borrarlo de verdad exige
+   reescribir el historial, que es decisión del dueño.
+4. ~~La versión del service worker se sube a mano.~~ **Hecho:** `npm run sellar`
+   deriva la versión del contenido y regenera la lista; una prueba lo vigila.
+5. ~~El README está desfasado~~ **Hecho:** cuenta 279 pruebas, menciona
+   `periodos.js` y la tercera decisión ya dice lo que hace el código.
+6. ~~`estado.mesEnCurso` ya no existe~~ **Comprobado:** no queda ninguna
+   referencia en `src/`, `test/` ni `index.html`.
 
 ## Cómo comprobar que no has roto nada
 

@@ -19,7 +19,7 @@ petición de red. Todo ocurre y se queda en tu navegador.
 
 ```sh
 npm run dev      # sirve la aplicación en http://localhost:4173
-npm test         # 278 pruebas, sin dependencias
+npm test         # 279 pruebas, sin dependencias
 ```
 
 No hay `npm install` porque no hay nada que instalar: **cero dependencias**,
@@ -90,10 +90,15 @@ dice 58 y el último valor dice 70. La mediana dice 55, que es lo que de verdad
 cuesta. Una sola factura rara desplaza una media y la deja inservible para
 predecir.
 
-**Con dos apariciones no se infiere una periodicidad.** Dos fechas dan un solo
-intervalo, y un intervalo de 365 días no distingue un seguro anual de dos
-visitas al mismo bar con un año de diferencia. Eso va a la lista de preguntas,
-no a la de certezas.
+**Con dos apariciones no se infiere una periodicidad, salvo que no quede lugar
+a duda.** Dos fechas dan un solo intervalo, y un intervalo de 365 días no
+distingue un seguro anual de dos visitas al mismo bar con un año de diferencia.
+Por eso lo normal es que vaya a la lista de preguntas, no a la de certezas. La
+excepción es lo anual cuando las dos coinciden en día del año y en precio, y el
+importe es de los que se notan: ahí la prueba es más dura que la que se le pide
+a un recibo mensual. Y un cobrador que ya ha demostrado dos veces que factura en
+fechas fijas arrastra consigo sus otros plazos, mientras su turno no haya
+pasado.
 
 **Un mismo cobrador puede tener varias series.** El ayuntamiento cobra el IBI, la
 basura y el vado por separado. Promediarlos da una cifra que no corresponde a
