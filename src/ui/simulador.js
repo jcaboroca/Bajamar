@@ -144,11 +144,18 @@ function repartoDePartida(estado) {
 
   /** @type {Record<string, number>} */
   const limpio = {}
+  // Las barras salen de en qué sueles gastar, no de lo que te sobre. Un mes sin
+  // margen reparte lo mismo que cualquier otro, solo que menos.
+  for (const trozo of estado.reparto) {
+    if (SIN_BARRA.has(trozo.categoria)) continue
+    if (estado.apagadas.includes(trozo.categoria)) continue
+    if (Math.abs(trozo.alMes) < MINIMO_AL_MES) continue
+    limpio[trozo.categoria] = crudo[trozo.categoria] ?? 0
+  }
   for (const [categoria, importe] of Object.entries(crudo)) {
     if (SIN_BARRA.has(categoria)) continue
     if (estado.apagadas.includes(categoria)) continue
-    if (importe < MINIMO_AL_MES && !estado.plan) continue
-    limpio[categoria] = importe
+    if (!(categoria in limpio)) limpio[categoria] = importe
   }
   return limpio
 }
