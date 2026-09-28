@@ -5,7 +5,7 @@
  * programa, que es lo único que hace falta descargar.
  */
 
-const CAU = 'bajamar-8ce1fb865a'
+const CAU = 'bajamar-97fbea255b'
 
 const PROGRAMA = [
   './',
@@ -59,20 +59,37 @@ const PROGRAMA = [
   './src/ui/vistas/resumen.js',
 ]
 
+// Si al instalar ya había programa, esto es un relevo y hay ventanas mirando
+// una versión que ya no existe.
+let relevo = false
+
 self.addEventListener('install', (evento) => {
-  evento.waitUntil(
-    caches.open(CAU)
-      .then((cau) => cau.addAll(PROGRAMA.map((u) => new Request(u, { cache: 'reload' }))))
-      .then(() => self.skipWaiting()),
-  )
+  evento.waitUntil((async () => {
+    relevo = (await caches.keys()).some((c) => c.startsWith('bajamar-') && c !== CAU)
+    const cau = await caches.open(CAU)
+    await cau.addAll(PROGRAMA.map((u) => new Request(u, { cache: 'reload' })))
+    await self.skipWaiting()
+  })())
 })
 
 self.addEventListener('activate', (evento) => {
-  evento.waitUntil(
-    caches.keys()
-      .then((claves) => Promise.all(claves.filter((c) => c !== CAU).map((c) => caches.delete(c))))
-      .then(() => self.clients.claim()),
-  )
+  evento.waitUntil((async () => {
+    const claves = await caches.keys()
+    await Promise.all(claves.filter((c) => c !== CAU).map((c) => caches.delete(c)))
+    await self.clients.claim()
+    if (!relevo) return
+    // Recargar desde aquí y no desde la página: instalada en el teléfono, la
+    // página nunca se vuelve a leer, así que un arreglo que viva en ella no
+    // llega jamás a la versión vieja que hay que relevar.
+    for (const ventana of await self.clients.matchAll({ type: 'window' })) {
+      try {
+        await ventana.navigate(ventana.url)
+      } catch {
+        // Una ventana que no controlamos todavía no se puede navegar; al abrirla
+        // de nuevo ya vendrá con lo nuevo.
+      }
+    }
+  })())
 })
 
 self.addEventListener('fetch', (evento) => {

@@ -125,19 +125,9 @@ async function arrancar() {
   })
 
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-    // Si al abrir ya mandaba una versión, un relevo significa que ha entrado
-    // programa nuevo y lo que se está viendo es lo viejo. Instalada en el
-    // móvil no se cierra nunca, así que sin esto se quedaba meses atrás.
-    const habiaVersion = navigator.serviceWorker.controller !== null
-    let recargando = false
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (!habiaVersion || recargando) return
-      recargando = true
-      location.reload()
-    })
     navigator.serviceWorker.register('sw.js').then((registro) => {
       // Al despertar del fondo nadie va a mirar si hay algo nuevo: hay que ir
-      // a preguntarlo.
+      // a preguntarlo. Quien recarga es el service worker al tomar el relevo.
       addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') registro.update()
       })
@@ -569,6 +559,23 @@ async function pintarSincro() {
     : ''
   donde.textContent = `${cuantos} movimientos en este dispositivo. `
     + (fecha ? `Lo último que se juntó con el otro: ${fecha}.` : 'Todavía no se ha juntado con ningún otro.')
+    + ` Programa ${await versionInstalada()}.`
+}
+
+/**
+ * Qué versión del programa está corriendo aquí.
+ *
+ * Instalada en el teléfono no se cierra nunca, así que puede quedarse meses
+ * atrás enseñando cuentas viejas con datos nuevos. Sin poder comparar las dos
+ * versiones, eso parece un error de cálculo.
+ */
+async function versionInstalada() {
+  try {
+    const llaves = await caches.keys()
+    return llaves.find((k) => k.startsWith('bajamar-'))?.replace('bajamar-', '') ?? 'sin instalar'
+  } catch {
+    return 'sin instalar'
+  }
 }
 
 async function enviar() {
