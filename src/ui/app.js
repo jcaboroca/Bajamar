@@ -347,19 +347,31 @@ async function ponerseAlDia() {
     const cambios = await mezclarDecisiones(maleta.decisiones ?? {})
     const ahora = (await leerMovimientos()).length
     marcarSincro()
+    // Mirar el buzón también sirve para ver si falta ahí lo de aquí. Sin esto
+    // sólo se subía al importar o al decidir algo: si aquella vez falló, lo de
+    // este aparato no volvía a salir nunca.
+    if (ahora > maleta.movimientos.length || sobran(await leerDecisiones(), maleta.decisiones ?? {})) publicar()
     if (ahora === antes && cambios === 0) return pintarSincro()
     await refrescar({ animar: antes === 0, local: false })
     if (ahora !== antes) decir(`Traídos ${ahora - antes} movimientos del otro dispositivo.`)
     else decir('Actualizado con lo que cambiaste en el otro dispositivo.')
   } catch (fallo) {
-    // Un buzón vacío teniendo datos aquí no es un fallo ajeno: es que lo de
-    // aquí nunca llegó a salir. Sólo se subía al importar o al decidir algo,
-    // así que si aquella vez falló, los dos aparatos se quedaban esperando
-    // para siempre, cada uno con lo suyo y creyendo que estaban al día.
+    // Un buzón vacío teniendo datos aquí es lo mismo: esto nunca llegó a salir.
     if (fallo instanceof SinBuzon && (await leerMovimientos()).length > 0) publicar()
     // Sin red o contraseña cambiada: no es momento de dar la lata. Los botones
     // de Ajustes siguen ahí.
   }
+}
+
+/**
+ * Si aquí hay decisiones tomadas que en el buzón no constan.
+ * @param {import('../almacen/db.js').Decisiones} mias
+ * @param {import('../almacen/db.js').Decisiones} suyas
+ */
+function sobran(mias, suyas) {
+  const cuantas = (/** @type {import('../almacen/db.js').Decisiones} */ d) =>
+    Object.values(d).reduce((n, filas) => n + filas.length, 0)
+  return cuantas(mias) > cuantas(suyas)
 }
 
 /** @type {ReturnType<typeof setTimeout> | undefined} */
