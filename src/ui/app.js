@@ -14,7 +14,7 @@
 
 import { hoyIso } from '../dominio/tipos.js'
 import { importarXls } from '../importar/sabadell.js'
-import { guardarMovimientos, leerDecisiones, leerMovimientos, mezclarDecisiones, vaciar } from '../almacen/db.js'
+import { guardarMovimientos, hayQueSubir, leerDecisiones, leerMovimientos, mezclarDecisiones, vaciar } from '../almacen/db.js'
 import { bajar, subir, aFichero, desdeFichero, hacerMaleta, buzonDesde, SinBuzon } from '../almacen/sincro.js'
 import { ContrasenaInvalida } from '../almacen/cifrado.js'
 import { BUZON } from '../../config.js'
@@ -346,7 +346,7 @@ async function ponerseAlDia({ aMano = false } = {}) {
     // Mirar el buzón también sirve para ver si falta ahí lo de aquí. Sin esto
     // sólo se subía al importar o al decidir algo: si aquella vez falló, lo de
     // este aparato no volvía a salir nunca.
-    if (ahora > maleta.movimientos.length || sobran(await leerDecisiones(), maleta.decisiones ?? {})) publicar()
+    if (ahora > maleta.movimientos.length || hayQueSubir(await leerDecisiones(), maleta.decisiones ?? {})) publicar()
     if (ahora === antes && cambios === 0) {
       pintarSincro()
       if (aMano) decir(`Ya tenías todo lo que hay en el otro dispositivo: ${ahora} movimientos.`)
@@ -371,16 +371,6 @@ async function ponerseAlDia({ aMano = false } = {}) {
   }
 }
 
-/**
- * Si aquí hay decisiones tomadas que en el buzón no constan.
- * @param {import('../almacen/db.js').Decisiones} mias
- * @param {import('../almacen/db.js').Decisiones} suyas
- */
-function sobran(mias, suyas) {
-  const cuantas = (/** @type {import('../almacen/db.js').Decisiones} */ d) =>
-    Object.values(d).reduce((n, filas) => n + filas.length, 0)
-  return cuantas(mias) > cuantas(suyas)
-}
 
 /**
  * Tirar hacia abajo estando arriba del todo busca lo del otro aparato.

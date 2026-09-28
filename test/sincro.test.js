@@ -2,7 +2,7 @@
 import { describe, test } from 'node:test'
 import assert from 'node:assert/strict'
 import { buzonDesde, hacerMaleta, subir, bajar, desdeFichero, SinBuzon } from '../src/almacen/sincro.js'
-import { fundir } from '../src/almacen/db.js'
+import { fundir, hayQueSubir } from '../src/almacen/db.js'
 import { cifrar, ContrasenaInvalida } from '../src/almacen/cifrado.js'
 import worker from '../worker/src/index.js'
 
@@ -176,5 +176,34 @@ describe('juntar lo decidido en dos sitios', () => {
       plan.aEscribir.map(([almacen]) => almacen).sort(),
       ['ajustes', 'bultos', 'objetivos', 'patrimonio', 'presupuestos', 'reglas', 'retoques'],
     )
+  })
+})
+
+describe('a quién le toca subir', () => {
+  const ANTES = '2026-09-26T10:00:00.000Z'
+  const DESPUES = '2026-09-26T11:00:00.000Z'
+  const fila = (/** @type {string} */ id, /** @type {string} */ tocado) => ({ id, tocado })
+
+  test('sube quien tiene algo que allí no consta', () => {
+    assert.equal(hayQueSubir({ anuales: [fila('mapfre', ANTES)] }, { anuales: [] }), true)
+  })
+
+  test('sube aunque allí haya muchísimas más cosas', () => {
+    const pocas = { anuales: [fila('mapfre', ANTES)] }
+    const muchas = { reglas: Array.from({ length: 102 }, (_, i) => fila(`r${i}`, DESPUES)) }
+    assert.equal(hayQueSubir(pocas, muchas), true)
+  })
+
+  test('sube quien tocó lo mismo más tarde', () => {
+    assert.equal(hayQueSubir({ tratos: [fila('netflix', DESPUES)] }, { tratos: [fila('netflix', ANTES)] }), true)
+  })
+
+  test('no sube quien no aporta nada nuevo', () => {
+    const iguales = { tratos: [fila('netflix', ANTES)] }
+    assert.equal(hayQueSubir(iguales, iguales), false)
+  })
+
+  test('no sube quien va por detrás', () => {
+    assert.equal(hayQueSubir({ tratos: [fila('netflix', ANTES)] }, { tratos: [fila('netflix', DESPUES)] }), false)
   })
 })

@@ -174,6 +174,25 @@ export async function leerDecisiones() {
 }
 
 /**
+ * Si aquí hay algo que al buzón no le consta. Contar cuántas decisiones tiene
+ * cada lado no vale: el que tiene menos puede ser justo el que tiene la única
+ * que falta, y entonces no subiría nunca.
+ * @param {Decisiones} mias
+ * @param {Decisiones} suyas
+ */
+export function hayQueSubir(mias, suyas) {
+  const cuando = (/** @type {{ tocado?: string } | undefined} */ fila) => fila?.tocado ?? ''
+  for (const [almacen, filas] of Object.entries(mias)) {
+    const alla = new Map((suyas[almacen] ?? []).map((f) => [f.id, f]))
+    for (const fila of filas) {
+      if (!alla.has(fila.id)) return true
+      if (cuando(alla.get(fila.id)) < cuando(fila)) return true
+    }
+  }
+  return false
+}
+
+/**
  * Decide qué hacer al juntar lo de dos dispositivos, sin tocar nada todavía.
  *
  * La regla es una sola y vale para todo: gana la versión decidida más tarde.
