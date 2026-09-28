@@ -19,7 +19,7 @@ petición de red. Todo ocurre y se queda en tu navegador.
 
 ```sh
 npm run dev      # sirve la aplicación en http://localhost:4173
-npm test         # 254 pruebas, sin dependencias
+npm test         # 278 pruebas, sin dependencias
 ```
 
 No hay `npm install` porque no hay nada que instalar: **cero dependencias**,
@@ -124,7 +124,7 @@ src/
   importar/    ole2.js · biff.js · xls.js · sabadell.js
   dominio/     dinero.js (céntimos enteros) · tipos.js (fechas)
   entidades/   limpiar.js · semillas.js · reconciliar.js
-  analisis/    compromisos.js · bajamar.js · cascada.js · plan.js
+  analisis/    periodos.js · compromisos.js · bajamar.js · cascada.js · plan.js
   almacen/     db.js (IndexedDB) · cifrado.js · sincro.js
   ui/          app.js · lamina.js · clave.js · estilo.css
 worker/        el buzón, opcional
@@ -145,6 +145,13 @@ Ahora mismo reconoce dos plantillas del Banco Sabadell: el extracto de cuenta
 («Consulta de movimientos») y el de tarjeta («Saldos y movimientos»). Añadir otro
 banco es escribir un analizador nuevo en `src/importar/` que devuelva la misma
 forma; el resto de la aplicación no se entera de dónde vienen los datos.
+
+## Si vas a tocarlo
+
+[docs/diseno/ESTADO.md](docs/diseno/ESTADO.md) cuenta por dónde va, qué
+invariantes no hay que romper y las trampas del entorno. Lo importante que no
+se adivina leyendo el código: **un mes no es un mes natural, es el periodo
+entre dos nóminas**.
 
 ## Licencia
 
