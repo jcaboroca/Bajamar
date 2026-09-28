@@ -46,9 +46,10 @@ import { mesContableDe } from './cascada.js'
  * @param {Evento[]} entrada.eventos
  * @param {string} entrada.mes
  * @param {string} entrada.hoy
+ * @param {Set<string>} [entrada.ingresosRecurrentes] entidadId de los cobros que vuelven
  * @returns {ResumenMes}
  */
-export function resumenDeMes({ movimientos, categorias, noEsGasto, eventos, mes, hoy }) {
+export function resumenDeMes({ movimientos, categorias, noEsGasto, eventos, mes, hoy, ingresosRecurrentes }) {
   let ingresoReal = 0
   let gastoReal = 0
   let apartado = 0
@@ -62,7 +63,15 @@ export function resumenDeMes({ movimientos, categorias, noEsGasto, eventos, mes,
     // Una nómina cobrada el 25 ya es el dinero del mes que viene, igual que en
     // la previsión. Los demás cobros —una devolución, un Bizum— se quedan en el
     // mes natural en que entraron.
-    if (mesContableDe(m.fecha, categoria === 'nomina') !== mes) continue
+    //
+    // Se reconoce de dos maneras a propósito. Por categoría, que es lo directo
+    // cuando la nómina está identificada; y porque sea un ingreso que se
+    // repite, que es el mismo criterio con el que se desplazan los eventos
+    // previstos. Con sólo lo primero, una nómina que la aplicación no ha
+    // sabido etiquetar dejaba el mes siguiente a cero sin decir por qué.
+    const abreMes = categoria === 'nomina'
+      || (m.importe > 0 && !!m.entidadId && ingresosRecurrentes?.has(m.entidadId) === true)
+    if (mesContableDe(m.fecha, abreMes) !== mes) continue
     cuantos += 1
     if (categoria === 'traspaso') {
       if (m.importe < 0) apartado += m.importe

@@ -304,6 +304,11 @@ export function construirEstado(crudos, opciones = {}) {
     hoy,
   })
 
+  // Quiénes son los cobros que vuelven, para saber cuáles abren mes.
+  const ingresosRecurrentes = new Set(
+    ingresos.map((i) => i.entidadId).filter((id) => typeof id === 'string'),
+  )
+
   const mesEnCurso = conGotaDiaria(
     resumenDeMes({
       movimientos: contables,
@@ -312,6 +317,7 @@ export function construirEstado(crudos, opciones = {}) {
       eventos: proyeccion.eventos,
       mes: mesDe(hoy),
       hoy,
+      ingresosRecurrentes,
     }),
     ritmoEfectivo.porDia,
     hoy,
@@ -341,6 +347,34 @@ export function construirEstado(crudos, opciones = {}) {
       gastos: mesEnCurso.gastos.total,
       ahorro: mesEnCurso.ahorro,
     }
+  }
+
+  /*
+   * Al mes que viene lo paga una nómina que ya ha entrado. La regla de que un
+   * cobro del 25 cuenta en el mes que abre sí se aplica en porMeses, pero esa
+   * nómina no llega hasta allí: cayó antes de que empezara la proyección, así
+   * que no es un evento futuro, está dentro del saldo. Sin esto, el mes que
+   * viene sale con cero ingresos y la tabla dice «se va más de lo que entra»
+   * todos los meses del año, para el mismo mes y por el mismo motivo.
+   *
+   * Sólo le pasa al siguiente. Los demás cobran su nómina dentro del horizonte,
+   * así que su parte ya cobrada es cero y sumarla no cambiaría nada.
+   */
+  const mesQueViene = sumarMeses(`${mesDe(hoy)}-01`, 1).slice(0, 7)
+  const fila = meses.find((f) => f.mes === mesQueViene)
+  if (fila) {
+    const yaCobrado = resumenDeMes({
+      movimientos: contables,
+      categorias,
+      noEsGasto: NO_ES_GASTO,
+      eventos: [],
+      mes: mesQueViene,
+      hoy,
+      ingresosRecurrentes,
+    })
+    fila.ingresos += yaCobrado.ingresos.real
+    fila.gastos += yaCobrado.gastos.real
+    fila.ahorro = fila.ingresos + fila.gastos
   }
 
   const ingresoMensual = ingresos

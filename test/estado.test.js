@@ -261,3 +261,34 @@ test('una categoría apagada sale del goteo y de las barras', () => {
   // Sigue nombrada para poder volver a encenderla.
   assert.deepEqual(sin.apagadas, [gorda.categoria])
 })
+
+test('el mes que viene no sale sin ingresos: lo paga la nómina ya cobrada', () => {
+  // Hace falta que la última nómina del extracto ya haya caído este mes y
+  // pasado el día 20: es justo el hueco en que su dinero es de octubre pero su
+  // fecha es de septiembre.
+  const movimientos = []
+  let saldo = 400000
+  for (let i = 0; i < 6; i += 1) {
+    const mes = String(4 + i).padStart(2, '0')
+    saldo += 200000
+    movimientos.push(fila(`n${i}`, `2026-${mes}-25`, 'TRANSFERENCIA NOMINA ACME', 200000, saldo))
+    saldo -= 60000
+    movimientos.push(fila(`a${i}`, `2026-${mes}-01`, 'RECIBO ALQUILER VIVIENDA', -60000, saldo))
+    saldo -= 4000
+    movimientos.push(fila(`g${i}`, `2026-${mes}-05`, 'COMPRA SUPERMERCADO', -4000, saldo))
+  }
+  const estado = construirEstado(movimientos, { hoy: '2026-09-28', meses: 3 })
+  const octubre = estado.meses.find((f) => f.mes === '2026-10')
+  assert.ok(octubre, 'octubre tiene que estar en la tabla')
+
+  // La nómina del 25 de septiembre es la que paga octubre, y cayó antes de que
+  // empezara la proyección: no es un evento futuro, está dentro del saldo. Sin
+  // recuperarla del extracto, octubre salía con cero ingresos y la tabla decía
+  // «se va más de lo que entra» todos los meses del año, por el mismo motivo.
+  assert.equal(octubre.ingresos, 200000)
+  assert.equal(octubre.ahorro, octubre.ingresos + octubre.gastos)
+  assert.ok(octubre.ahorro > 0, 'con una nómina de 2.000 € octubre no puede cerrar en rojo')
+
+  // Y no se cuenta dos veces: noviembre cobra la suya dentro del horizonte.
+  assert.equal(estado.meses.find((f) => f.mes === '2026-11')?.ingresos, 200000)
+})
