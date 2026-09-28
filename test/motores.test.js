@@ -663,6 +663,22 @@ describe('saltarse un mes no es darse de baja', () => {
     assert.equal(saltada.resultado, 282249)
   })
 
+  test('lo ya saltado no se vuelve a ofrecer como margen', () => {
+    // El pie de la cascada dice «saltarte lo que puedes saltarte te dejaría X».
+    // Si lo saltado siguiera contando ahí, ofrecería por segunda vez los mismos
+    // 500 € que ya has decidido no invertir, y la cifra saldría inflada.
+    const normal = cascadaDelMes({ mes: '2026-10', fijos: [fijo], ingreso: 282249, diaADia: 0 })
+    assert.equal(normal.aplazable, -50000)
+
+    const saltada = cascadaDelMes({
+      mes: '2026-10', fijos: [fijo], ingreso: 282249, diaADia: 0,
+      saltados: { 'myinvestor#500|2026-10': true },
+    })
+    assert.equal(saltada.aplazable, 0)
+    // Y entonces no queda nada que ofrecer: ya está descontado del resultado.
+    assert.equal(saltada.resultado - saltada.aplazable, saltada.resultado)
+  })
+
   test('saltarse octubre no salta noviembre', () => {
     const noviembre = cascadaDelMes({
       mes: '2026-11', fijos: [{ ...fijo, proximaPrevista: '2026-11-28' }],

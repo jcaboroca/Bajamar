@@ -175,8 +175,12 @@ export function cascadaDelMes({ mes, fijos, ingreso, diaADia, inversiones = {}, 
     diaADia,
     sumaToca,
     sumaPlazos,
+    // Lo ya saltado no entra: su dinero está descontado del resultado y
+    // volverlo a contar aquí sería ofrecerte por segunda vez lo que ya has
+    // decidido no pagar. El margen es lo que te queda por decidir, no lo que
+    // podrías haber decidido.
     aplazable: [...listaFijos, ...listaInversiones, ...listaToca]
-      .reduce((t, e) => (e.aplazable ? t + e.importe : t), 0),
+      .reduce((t, e) => (e.aplazable && !e.saltado ? t + e.importe : t), 0),
     resultado: ingreso + sumaFijos + sumaInversiones + diaADia + sumaToca + sumaPlazos,
   }
 }
