@@ -553,6 +553,10 @@ async function pintarSincro() {
   const donde = document.getElementById('huella-sincro')
   if (!donde) return
   const cuantos = (await leerMovimientos()).length
+  const decisiones = Object.entries(await leerDecisiones())
+    .filter(([almacen, filas]) => almacen !== 'lapidas' && filas.length > 0)
+    .map(([almacen, filas]) => `${almacen} ${filas.length}`)
+    .join(', ')
   const cuando = ultimaSincro()
   const fecha = cuando
     ? new Date(cuando).toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
@@ -560,6 +564,7 @@ async function pintarSincro() {
   donde.textContent = `${cuantos} movimientos en este dispositivo. `
     + (fecha ? `Lo último que se juntó con el otro: ${fecha}.` : 'Todavía no se ha juntado con ningún otro.')
     + ` Programa ${await versionInstalada()}.`
+    + (decisiones ? ` Decidido a mano: ${decisiones}.` : ' Nada decidido a mano.')
 }
 
 /**
