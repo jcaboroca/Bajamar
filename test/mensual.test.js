@@ -7,7 +7,8 @@ import { periodosEntre } from '../src/analisis/periodos.js'
 import { proyectar } from '../src/analisis/bajamar.js'
 
 const HOY = '2026-09-28'
-const NO_ES_GASTO = new Set(['traspaso', 'banco', 'nomina'])
+/** Qué apuntes son día a día: en estos fixtures, los de super. */
+const ordinariosDe = (ms) => new Set(ms.filter((m) => m.categoria === 'super').map((m) => m.id))
 
 /**
  * @param {string} fecha
@@ -52,7 +53,7 @@ const periodos = periodosEntre({
   hasta: '2026-10-31',
 })
 
-const detalle = detallarPeriodos({ periodos, movimientos, proyeccion, noEsGasto: NO_ES_GASTO, hoy: HOY })
+const detalle = detallarPeriodos({ periodos, movimientos, proyeccion, ordinarios: ordinariosDe(movimientos), hoy: HOY })
 const de = (id) => detalle.find((p) => p.id === id)
 
 describe('cada periodo, contado entero', () => {
@@ -107,24 +108,23 @@ describe('cada periodo, contado entero', () => {
   test('un periodo cerrado no tiene nada previsto', () => {
     assert.equal(de('2026-09')?.ingresos.previsto, 0)
     assert.equal(de('2026-09')?.gastos.previsto, 0)
-    assert.equal(de('2026-09')?.goteo, 0)
+    assert.equal(de('2026-09')?.diaADia, de('2026-09')?.diaADiaGastado)
   })
 
-  test('el goteo se separa de lo comprometido', () => {
+  test('lo que sale con fecha se separa del día a día', () => {
     const oct = de('2026-10')
     assert.ok(oct)
-    assert.equal(oct.goteo + oct.compromisos, oct.gastos.total)
+    assert.equal(oct.diaADia + oct.compromisos, oct.gastos.total)
     // El alquiler del 1 de octubre está dentro del periodo que abre el 25-sep.
     assert.ok(oct.compromisos <= -75_000)
   })
 })
 
 describe('lo que queda para el día a día', () => {
-  test('es lo que cobras menos lo comprometido, sin sumar los ahorros', () => {
+  test('es el saldo, más lo que entra, menos lo que sale con fecha', () => {
     const oct = de('2026-10')
     assert.ok(oct)
-    assert.equal(residuoDe(oct), oct.ingresos.total + oct.compromisos)
-    assert.notEqual(residuoDe(oct), oct.apertura + oct.ingresos.total + oct.compromisos)
+    assert.equal(residuoDe(oct), oct.apertura + oct.ingresos.total + oct.compromisos)
   })
 
   test('el colchón se aparta, venga con el signo que venga', () => {
@@ -151,7 +151,7 @@ describe('con cuánto se entra en un periodo', () => {
     periodos: periodosEntre({ cortes: ['2026-08-25'], desde: '2026-08-25', hasta: '2026-09-24' }),
     movimientos: movs,
     proyeccion: proy,
-    noEsGasto: NO_ES_GASTO,
+    ordinarios: ordinariosDe(movs),
     hoy: HOY,
   })
 
@@ -164,5 +164,42 @@ describe('con cuánto se entra en un periodo', () => {
   test('así la cuenta cuadra: entras, sumas lo que entra, restas lo que sale', () => {
     const esperado = septiembre.apertura + septiembre.ingresos.total + septiembre.gastos.total
     assert.equal(esperado, septiembre.saldoFinal)
+  })
+})
+
+describe('la cuenta cuadra con el banco, pase lo que pase', () => {
+  // La razón de que antes no cuadrara: los traspasos salían de la cuenta pero
+  // no contaban como gasto, así que la resta daba una cosa y el saldo otra.
+  const movs = [
+    mov('2026-08-20', -5_000, 100_000, 'super'),
+    mov('2026-08-25', 280_000, 380_000, 'nomina'),
+    mov('2026-08-26', -50_000, 330_000, 'traspaso'),  // a la inversión
+    mov('2026-08-27', -46_800, 283_200, 'traspaso'),  // el crédito de la furgo
+    mov('2026-09-02', -1_200, 282_000, 'banco'),      // comisión
+    mov('2026-09-10', -40_000, 242_000, 'super'),     // día a día
+  ]
+  const [septiembre] = detallarPeriodos({
+    periodos: periodosEntre({ cortes: ['2026-08-25'], desde: '2026-08-25', hasta: '2026-09-24' }),
+    movimientos: movs,
+    proyeccion: proyectar({ saldoInicial: 242_000, desde: HOY, hasta: '2026-10-31', ritmoPorDia: 0, eventos: [] }),
+    ordinarios: ordinariosDe(movs),
+    hoy: HOY,
+  })
+
+  test('entras con, más lo que entra, menos todo lo que sale, da el saldo final', () => {
+    assert.equal(
+      septiembre.apertura + septiembre.ingresos.total + septiembre.gastos.total,
+      septiembre.saldoFinal,
+    )
+  })
+
+  test('los traspasos y las comisiones salen con fecha, no son día a día', () => {
+    assert.equal(septiembre.compromisos, -(50_000 + 46_800 + 1_200))
+    assert.equal(septiembre.diaADiaGastado, -40_000)
+  })
+
+  test('lo que queda para el día a día descuenta también los traspasos', () => {
+    // 1.000 de saldo + 2.800 de nómina − 980 de traspasos y comisión.
+    assert.equal(residuoDe(septiembre), 100_000 + 280_000 - 98_000)
   })
 })

@@ -221,9 +221,12 @@ function pintarVivir(estado, periodo) {
 
   const queda = residuoDe(periodo)
   const caja = requerir('vivir')
+  // La fórmula entera y a la vista, para que la resta se pueda seguir con el
+  // dedo: saldo, más lo que entra, menos todo lo que sale con fecha.
   caja.replaceChildren(cuentas([
-    ['Lo que entra', formatEuros(periodo.ingresos.total, { signo: true })],
-    ['Recibos y cuotas', formatEuros(periodo.compromisos)],
+    ['Saldo al empezar', formatEuros(periodo.apertura)],
+    ['Nómina y otros ingresos', formatEuros(periodo.ingresos.total, { signo: true })],
+    ['Recibos, cuotas y traspasos', formatEuros(periodo.compromisos)],
   ]))
 
   const total = nodo('p', 'subtitular')
@@ -239,10 +242,15 @@ function pintarVivir(estado, periodo) {
     : alDia < habitual
       ? ` Sueles gastar ${formatEurosRedondo(habitual)}, así que toca apretar.`
       : ` Sueles gastar ${formatEurosRedondo(habitual)}, así que vas holgado.`
-  const aclara = ' Esto es sólo lo que entra y sale este periodo: lo que ya tenías ahorrado no se toca ni se cuenta aquí.'
+  // Lo ya gastado del día a día, que es lo que convierte la previsión en real
+  // según van llegando los apuntes.
+  const gastado = Math.abs(periodo.diaADiaGastado)
+  const llevas = gastado > 0
+    ? ` Llevas gastados ${formatEurosRedondo(gastado)}.`
+    : ''
   requerir('vivir-nota').textContent = queda <= 0
-    ? `No queda nada: todo lo que gastes sale de lo ahorrado.${aclara}`
-    : `${formatEurosRedondo(alDia)} al día durante ${dias} días.${comparacion}${aclara}`
+    ? `No queda nada: todo lo que gastes sale de lo que tenías.${llevas}`
+    : `${formatEurosRedondo(alDia)} al día durante ${dias} días.${comparacion}${llevas}`
 }
 
 /**

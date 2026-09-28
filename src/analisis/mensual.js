@@ -50,8 +50,9 @@ import { diasEntre } from '../dominio/tipos.js'
  * @property {Punto[]} curva
  * @property {number} apertura       con cuánto se entra
  * @property {number} saldoFinal
- * @property {number} goteo          la parte del gasto que es día a día
- * @property {number} compromisos    el resto: recibos, cuotas, lo que toca
+ * @property {number} compromisos    lo que sale con fecha: recibos, cuotas, traspasos
+ * @property {number} diaADia        lo que se decide cada mañana, real más previsto
+ * @property {number} diaADiaGastado lo que de eso ya se ha ido
  * @property {Movimiento[]} movimientos  los apuntes reales del periodo
  */
 
@@ -60,28 +61,53 @@ import { diasEntre } from '../dominio/tipos.js'
  * @param {Periodo[]} entrada.periodos
  * @param {Movimiento[]} entrada.movimientos  los de cuenta, con saldo
  * @param {Proyeccion} entrada.proyeccion     la larga
- * @param {Set<string>} entrada.noEsGasto
+ * @param {Set<string>} entrada.ordinarios    ids de los apuntes que son día a día
  * @param {string} entrada.hoy
  * @returns {Detalle[]}
  */
-export function detallarPeriodos({ periodos, movimientos, proyeccion, noEsGasto, hoy }) {
-  const ordenados = [...movimientos].sort((a, b) => a.fecha.localeCompare(b.fecha))
+export function detallarPeriodos({ periodos, movimientos, proyeccion, ordinarios, hoy }) {
+  const orden = [...movimientos].sort((a, b) => a.fecha.localeCompare(b.fecha))
   const saldoPrevisto = new Map(proyeccion.curva.map((p) => [p.fecha, p.saldo]))
   const gotaPorDia = new Map(proyeccion.curva.map((p) => [p.fecha, p.gota]))
 
   return periodos.map((periodo) => {
-    const dentro = ordenados.filter((m) => m.fecha >= periodo.desde && m.fecha <= periodo.hasta)
-    const real = realesDe(dentro, noEsGasto)
+    const dentro = orden.filter((m) => m.fecha >= periodo.desde && m.fecha <= periodo.hasta)
+
+    /*
+     * Un euro que sale de la cuenta cuenta, sea lo que sea. Antes este cálculo
+     * dejaba fuera los traspasos y los gastos de banco porque «no son gasto»,
+     * y como la curva sí los ve, las dos cifras no podían cuadrar nunca: la
+     * resta daba una cosa y el saldo otra.
+     *
+     * Lo único que se separa es en dos montones: lo que sale con fecha —los
+     * recibos, las cuotas, los seguros, el traspaso a la inversión— y lo que
+     * se decide cada mañana.
+     */
+    let entra = 0
+    let conFecha = 0
+    let diaADia = 0
+    for (const m of dentro) {
+      // Las compras de la tarjeta ya están en su extracto; lo que cuenta aquí
+      // es el cargo con el que el banco las liquida.
+      if (m.origen === 'tarjeta') continue
+      if (m.importe > 0) entra += m.importe
+      else if (ordinarios.has(m.id)) diaADia += m.importe
+      else conFecha += m.importe
+    }
+
     const futuros = proyeccion.eventos.filter(
       (e) => e.fecha > hoy && e.fecha >= periodo.desde && e.fecha <= periodo.hasta,
     )
+    const entraPrevisto = suma(futuros, (i) => i > 0)
+    const conFechaPrevisto = suma(futuros, (i) => i < 0)
 
-    const { curva, apertura } = curvaEntre({ periodo, ordenados, saldoPrevisto, hoy })
-    let goteo = 0
-    for (const p of curva) if (p.fecha > hoy) goteo += gotaPorDia.get(p.fecha) ?? 0
+    const { curva, apertura } = curvaEntre({ periodo, ordenados: orden, saldoPrevisto, hoy })
+    let goteoPrevisto = 0
+    for (const p of curva) if (p.fecha > hoy) goteoPrevisto += gotaPorDia.get(p.fecha) ?? 0
 
-    const ingresos = repartir(real.ingresos + suma(futuros, (i) => i > 0), real.ingresos)
-    const gastos = repartir(real.gastos + suma(futuros, (i) => i < 0) + goteo, real.gastos)
+    const ingresos = repartir(entra + entraPrevisto, entra)
+    const compromisos = conFecha + conFechaPrevisto
+    const gastos = repartir(compromisos + diaADia + goteoPrevisto, conFecha + diaADia)
 
     return {
       id: periodo.id,
@@ -101,34 +127,12 @@ export function detallarPeriodos({ periodos, movimientos, proyeccion, noEsGasto,
       ),
       apertura,
       saldoFinal: curva[curva.length - 1]?.saldo ?? 0,
-      goteo,
-      compromisos: gastos.total - goteo,
+      compromisos,
+      diaADia: diaADia + goteoPrevisto,
+      diaADiaGastado: diaADia,
       movimientos: dentro,
     }
   })
-}
-
-/**
- * Lo que de verdad ha pasado en un periodo.
- *
- * La tarjeta se cuenta el día que el banco la liquida, no el de cada compra:
- * sus apuntes ya están en el extracto de la tarjeta y contarlos aquí sería el
- * mismo dinero dos veces.
- *
- * @param {Movimiento[]} movimientos
- * @param {Set<string>} noEsGasto
- */
-function realesDe(movimientos, noEsGasto) {
-  let ingresos = 0
-  let gastos = 0
-  for (const m of movimientos) {
-    if (m.origen === 'tarjeta') continue
-    const categoria = m.categoria ?? 'otros'
-    if (categoria === 'traspaso') continue
-    if (m.importe > 0) ingresos += m.importe
-    else if (!noEsGasto.has(categoria)) gastos += m.importe
-  }
-  return { ingresos, gastos }
 }
 
 /**
@@ -200,16 +204,16 @@ function siguienteDia(iso) {
 }
 
 /**
- * Lo que queda para el día a día de un periodo entero: lo que cobras menos lo
- * que ya está comprometido.
+ * Lo que queda para el día a día: saldo al empezar, más lo que entra, menos
+ * todo lo que sale con fecha.
  *
- * Con cuánto entras no se suma, aunque se enseñe al lado. Sumarlo diría que
- * puedes gastarte los ahorros este mes, y con doce mil euros en la cuenta la
- * cifra saldría siendo doce mil: cierta y para nada útil.
+ * Es la fórmula entera, sin filtros por categoría. Si un traspaso a la
+ * inversión sale de la cuenta, resta: que no sea «gasto» no lo devuelve. Ésa
+ * era la razón de que esta cifra y el saldo no cuadrasen nunca.
  *
  * @param {Detalle} periodo
  * @param {number} [colchon]
  */
 export function residuoDe(periodo, colchon = 0) {
-  return periodo.ingresos.total + periodo.compromisos - Math.abs(colchon)
+  return periodo.apertura + periodo.ingresos.total + periodo.compromisos - Math.abs(colchon)
 }

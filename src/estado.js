@@ -349,7 +349,9 @@ export function construirEstado(crudos, opciones = {}) {
     periodos,
     movimientos: cuenta,
     proyeccion: proyeccionLarga,
-    noEsGasto: NO_ES_GASTO,
+    // Qué apuntes son día a día ya lo sabe gastoOrdinario: lo demás sale con
+    // fecha. Preguntárselo a él evita tener dos ideas de qué es un recibo.
+    ordinarios: new Set(ordinarios.map((m) => m.id)),
     hoy,
   })
   const detalleMensual = detalleCrudo.map((p) => ({
