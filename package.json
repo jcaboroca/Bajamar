@@ -10,7 +10,6 @@
   "scripts": {
     "test": "node --test",
     "dev": "node scripts/servir.mjs",
-    "buzon": "node scripts/buzon.mjs",
-    "sellar": "node scripts/sellar.mjs"
+    "buzon": "node scripts/buzon.mjs"
   }
 }

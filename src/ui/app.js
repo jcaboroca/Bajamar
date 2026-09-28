@@ -125,13 +125,9 @@ async function arrancar() {
   })
 
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-    navigator.serviceWorker.register('sw.js').then((registro) => {
-      // Al despertar del fondo nadie va a mirar si hay algo nuevo: hay que ir
-      // a preguntarlo. Quien recarga es el service worker al tomar el relevo.
-      addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') registro.update()
-      })
-    }).catch(() => {})
+    // Ya no hay PWA, pero quien la instaló sigue con ella puesta: registrar el
+    // desinstalador es la única forma de que le llegue.
+    navigator.serviceWorker.register('sw.js').catch(() => {})
   }
 
   ponerseAlDia()
@@ -563,7 +559,6 @@ async function pintarSincro() {
     : ''
   donde.textContent = `${cuantos} movimientos en este dispositivo. `
     + (fecha ? `Lo último que se juntó con el otro: ${fecha}.` : 'Todavía no se ha juntado con ningún otro.')
-    + ` Programa ${await versionInstalada()}.`
     + (decisiones ? ` Decidido a mano: ${decisiones}.` : ' Nada decidido a mano.')
     + ` ${await buzonPuesto()}`
 }
@@ -587,14 +582,6 @@ async function buzonPuesto() {
  * atrás enseñando cuentas viejas con datos nuevos. Sin poder comparar las dos
  * versiones, eso parece un error de cálculo.
  */
-async function versionInstalada() {
-  try {
-    const llaves = await caches.keys()
-    return llaves.find((k) => k.startsWith('bajamar-'))?.replace('bajamar-', '') ?? 'sin instalar'
-  } catch {
-    return 'sin instalar'
-  }
-}
 
 async function enviar() {
   const guardados = await leerMovimientos()
