@@ -237,6 +237,15 @@ function pintarVivir(estado, periodo) {
   if (queda < 0) total.classList.add('en-rojo')
   caja.append(total)
 
+  /*
+   * El día a día va debajo del total y no encima, porque encima rompería la
+   * resta: la cifra gorda es lo que quedaba ANTES de empezar a gastarlo.
+   */
+  caja.append(desplegable(
+    periodo.estado === 'cerrado' ? 'En qué se te fue el día a día' : 'En qué se te va yendo',
+    periodo.diaADiaGastado, periodo.desglose.diaADia, estado, false,
+  ))
+
   const dias = diasQueDura(periodo)
   const habitual = Math.round(Math.abs(estado.ritmo.porMes) / 30.4)
   const gastado = Math.abs(periodo.diaADiaGastado)

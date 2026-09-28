@@ -204,9 +204,11 @@ describe('la cuenta cuadra con el banco, pase lo que pase', () => {
   })
 })
 
-describe('lo que fraccionas no es un ingreso', () => {
+describe('un euro que entra es un ingreso, venga de donde venga', () => {
   // El banco te abona los 468 € que acaba de cobrarte y luego te los cobra en
-  // tres cuotas. Contar ese abono como ingreso hinchaba la nómina del mes.
+  // tres cuotas. El bloque se llama «nómina y otros ingresos» y ese abono es
+  // de los otros: esconderlo entre los recibos hacía que la suma de la lista
+  // no diera lo que ponía en la línea.
   const movs = [
     mov('2026-08-20', -5_000, 100_000, 'super'),
     mov('2026-08-25', 280_000, 380_000, 'nomina'),
@@ -221,13 +223,12 @@ describe('lo que fraccionas no es un ingreso', () => {
     hoy: HOY,
   })
 
-  test('el abono no engorda los ingresos: sólo cuenta la nómina', () => {
-    assert.equal(septiembre.ingresos.total, 280_000)
+  test('el abono va con los ingresos, junto a la nómina', () => {
+    assert.equal(septiembre.ingresos.total, 280_000 + 46_800)
   })
 
-  test('se compensa con la liquidación que deshace', () => {
-    // -468 de la liquidación y +468 del abono: entre los dos, cero.
-    assert.equal(septiembre.compromisos, 0)
+  test('la liquidación que deshace sigue estando entre lo que sale con fecha', () => {
+    assert.equal(septiembre.compromisos, -46_800)
   })
 
   test('y la cuenta sigue cuadrando con el banco', () => {
