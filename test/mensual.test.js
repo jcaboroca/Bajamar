@@ -134,3 +134,35 @@ describe('lo que queda para el día a día', () => {
     assert.equal(residuoDe(oct, -50_000), residuoDe(oct) - 50_000)
   })
 })
+
+describe('con cuánto se entra en un periodo', () => {
+  // El periodo empieza el día que entra la nómina, así que el saldo de ese
+  // día ya la lleva dentro. Tomarlo como apertura la contaba dos veces: una
+  // en «empiezas con» y otra en «lo que entra».
+  const movs = [
+    mov('2026-08-20', -5_000, 65_153, 'super'),   // antes del periodo
+    mov('2026-08-25', 280_000, 345_153, 'nomina'), // la nómina que lo abre
+    mov('2026-09-10', -40_000, 305_153, 'super'),
+  ]
+  const proy = proyectar({
+    saldoInicial: 305_153, desde: HOY, hasta: '2026-10-31', ritmoPorDia: 0, eventos: [],
+  })
+  const [septiembre] = detallarPeriodos({
+    periodos: periodosEntre({ cortes: ['2026-08-25'], desde: '2026-08-25', hasta: '2026-09-24' }),
+    movimientos: movs,
+    proyeccion: proy,
+    noEsGasto: NO_ES_GASTO,
+    hoy: HOY,
+  })
+
+  test('es el saldo de antes del primer día, no el de ese día', () => {
+    assert.equal(septiembre.apertura, 65_153)
+    // El del primer día ya incluye la nómina, y ése es el que dibuja la curva.
+    assert.equal(septiembre.curva[0].saldo, 345_153)
+  })
+
+  test('así la cuenta cuadra: entras, sumas lo que entra, restas lo que sale', () => {
+    const esperado = septiembre.apertura + septiembre.ingresos.total + septiembre.gastos.total
+    assert.equal(esperado, septiembre.saldoFinal)
+  })
+})

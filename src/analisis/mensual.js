@@ -76,7 +76,7 @@ export function detallarPeriodos({ periodos, movimientos, proyeccion, noEsGasto,
       (e) => e.fecha > hoy && e.fecha >= periodo.desde && e.fecha <= periodo.hasta,
     )
 
-    const curva = curvaEntre({ periodo, ordenados, saldoPrevisto, hoy })
+    const { curva, apertura } = curvaEntre({ periodo, ordenados, saldoPrevisto, hoy })
     let goteo = 0
     for (const p of curva) if (p.fecha > hoy) goteo += gotaPorDia.get(p.fecha) ?? 0
 
@@ -99,7 +99,7 @@ export function detallarPeriodos({ periodos, movimientos, proyeccion, noEsGasto,
         (bajo, p) => (p.saldo < bajo.saldo ? { fecha: p.fecha, saldo: p.saldo } : bajo),
         { fecha: curva[0]?.fecha ?? periodo.desde, saldo: curva[0]?.saldo ?? 0 },
       ),
-      apertura: curva[0]?.saldo ?? 0,
+      apertura,
       saldoFinal: curva[curva.length - 1]?.saldo ?? 0,
       goteo,
       compromisos: gastos.total - goteo,
@@ -144,7 +144,7 @@ function realesDe(movimientos, noEsGasto) {
  * @param {Movimiento[]} entrada.ordenados
  * @param {Map<string, number>} entrada.saldoPrevisto
  * @param {string} entrada.hoy
- * @returns {Punto[]}
+ * @returns {{ curva: Punto[], apertura: number }}
  */
 function curvaEntre({ periodo, ordenados, saldoPrevisto, hoy }) {
   let arrastre = 0
@@ -155,6 +155,13 @@ function curvaEntre({ periodo, ordenados, saldoPrevisto, hoy }) {
     if (m.fecha < periodo.desde) arrastre = m.saldo
     else if (m.fecha <= periodo.hasta) realPorDia.set(m.fecha, m.saldo)
   }
+  /*
+   * Con cuánto se entra es lo que había ANTES del primer día, no el saldo de
+   * ese día. Un periodo empieza el día que entra la nómina, y el saldo de ese
+   * día ya la lleva dentro: tomarlo como apertura la contaba dos veces, una
+   * en «empiezas con» y otra en «lo que entra».
+   */
+  const apertura = arrastre
 
   /** @type {Punto[]} */
   const curva = []
@@ -162,7 +169,7 @@ function curvaEntre({ periodo, ordenados, saldoPrevisto, hoy }) {
     arrastre = (fecha <= hoy ? realPorDia.get(fecha) : saldoPrevisto.get(fecha)) ?? arrastre
     curva.push({ fecha, saldo: arrastre })
   }
-  return curva
+  return { curva, apertura }
 }
 
 /**
