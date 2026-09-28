@@ -54,6 +54,18 @@ import { diasEntre } from '../dominio/tipos.js'
  * @property {number} diaADia        lo que se decide cada mañana, real más previsto
  * @property {number} diaADiaGastado lo que de eso ya se ha ido
  * @property {Movimiento[]} movimientos  los apuntes reales del periodo
+ * @property {{ entra: Apunte[], conFecha: Apunte[], diaADia: Apunte[] }} desglose
+ */
+
+/**
+ * Una línea del desglose: de dónde sale cada euro de los totales.
+ *
+ * @typedef {object} Apunte
+ * @property {string} fecha
+ * @property {number} importe
+ * @property {string} concepto
+ * @property {string | null} entidadId  para poder ponerle el nombre bueno
+ * @property {boolean} previsto         todavía no ha pasado
  */
 
 /**
@@ -86,6 +98,17 @@ export function detallarPeriodos({ periodos, movimientos, proyeccion, ordinarios
     let entra = 0
     let conFecha = 0
     let diaADia = 0
+    /** @type {{ entra: Apunte[], conFecha: Apunte[], diaADia: Apunte[] }} */
+    const desglose = { entra: [], conFecha: [], diaADia: [] }
+    /** @param {'entra'|'conFecha'|'diaADia'} donde @param {any} m @param {boolean} previsto */
+    const anotar = (donde, m, previsto) => desglose[donde].push({
+      fecha: m.fecha,
+      importe: m.importe,
+      concepto: m.nombre ?? m.conceptoRaw ?? '',
+      entidadId: m.entidadId ?? null,
+      previsto,
+    })
+
     for (const m of dentro) {
       // Las compras de la tarjeta ya están en su extracto; lo que cuenta aquí
       // es el cargo con el que el banco las liquida.
@@ -95,10 +118,10 @@ export function detallarPeriodos({ periodos, movimientos, proyeccion, ordinarios
       // que va con lo que tiene fecha: ahí se compensa con la liquidación de
       // la tarjeta que deshace, y las dos cuotas que faltan las pone la
       // previsión. Contarlo como ingreso hinchaba la nómina del mes.
-      if (m.fraccionado) conFecha += m.importe
-      else if (m.importe > 0) entra += m.importe
-      else if (ordinarios.has(m.id)) diaADia += m.importe
-      else conFecha += m.importe
+      if (m.fraccionado) { conFecha += m.importe; anotar('conFecha', m, false) }
+      else if (m.importe > 0) { entra += m.importe; anotar('entra', m, false) }
+      else if (ordinarios.has(m.id)) { diaADia += m.importe; anotar('diaADia', m, false) }
+      else { conFecha += m.importe; anotar('conFecha', m, false) }
     }
 
     const futuros = proyeccion.eventos.filter(
@@ -106,6 +129,10 @@ export function detallarPeriodos({ periodos, movimientos, proyeccion, ordinarios
     )
     const entraPrevisto = suma(futuros, (i) => i > 0)
     const conFechaPrevisto = suma(futuros, (i) => i < 0)
+    for (const e of futuros) anotar(e.importe > 0 ? 'entra' : 'conFecha', e, true)
+    for (const lista of Object.values(desglose)) {
+      lista.sort((a, b) => a.fecha.localeCompare(b.fecha))
+    }
 
     const { curva, apertura } = curvaEntre({ periodo, ordenados: orden, saldoPrevisto, hoy })
     let goteoPrevisto = 0
@@ -137,6 +164,7 @@ export function detallarPeriodos({ periodos, movimientos, proyeccion, ordinarios
       diaADia: diaADia + goteoPrevisto,
       diaADiaGastado: diaADia,
       movimientos: dentro,
+      desglose,
     }
   })
 }

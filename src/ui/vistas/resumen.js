@@ -23,7 +23,7 @@ import { diasEntre, fechaLarga } from '../../dominio/tipos.js'
 import { residuoDe } from '../../analisis/mensual.js'
 import { diasQueDura } from '../../analisis/periodos.js'
 import { dibujarLamina } from '../lamina.js'
-import { barra, cuentas, nodo, nombreDeMes, requerir, titular, vacio } from '../piezas.js'
+import { barra, cuentas, diaYMes, nodo, nombreDeMes, requerir, titular, vacio } from '../piezas.js'
 import { marcarPreguntable, preguntarAlPulsar } from '../trato.js'
 
 /**
@@ -223,11 +223,11 @@ function pintarVivir(estado, periodo) {
   const caja = requerir('vivir')
   // La fórmula entera y a la vista, para que la resta se pueda seguir con el
   // dedo: saldo, más lo que entra, menos todo lo que sale con fecha.
-  caja.replaceChildren(cuentas([
-    ['Saldo al empezar', formatEuros(periodo.apertura)],
-    ['Nómina y otros ingresos', formatEuros(periodo.ingresos.total, { signo: true })],
-    ['Recibos, cuotas y traspasos', formatEuros(periodo.compromisos)],
-  ]))
+  caja.replaceChildren(
+    cuentas([['Saldo al empezar', formatEuros(periodo.apertura)]]),
+    desplegable('Nómina y otros ingresos', periodo.ingresos.total, periodo.desglose.entra, estado, true),
+    desplegable('Recibos, cuotas y traspasos', periodo.compromisos, periodo.desglose.conFecha, estado, false),
+  )
 
   const total = nodo('p', 'subtitular')
   total.append(...titular(formatEurosRedondo(queda)))
@@ -251,6 +251,49 @@ function pintarVivir(estado, periodo) {
   requerir('vivir-nota').textContent = queda <= 0
     ? `No queda nada: todo lo que gastes sale de lo que tenías.${llevas}`
     : `${formatEurosRedondo(alDia)} al día durante ${dias} días.${comparacion}${llevas}`
+}
+
+/**
+ * Una línea del bloque que se abre y enseña de dónde sale su cifra.
+ *
+ * Un total sin desglose obliga a creérselo. Con dos líneas de más —la fecha y
+ * el concepto— deja de haber nada que creerse: se comprueba.
+ *
+ * @param {string} rotulo
+ * @param {number} total
+ * @param {import('../../analisis/mensual.js').Apunte[]} apuntes
+ * @param {Estado} estado
+ * @param {boolean} conSigno
+ */
+function desplegable(rotulo, total, apuntes, estado, conSigno) {
+  const caja = document.createElement('details')
+  caja.className = 'desglose'
+  const cabeza = document.createElement('summary')
+  cabeza.append(
+    nodo('span', '', rotulo),
+    nodo('span', 'cifras', formatEuros(total, conSigno ? { signo: true } : undefined)),
+  )
+  caja.append(cabeza)
+
+  if (apuntes.length === 0) {
+    caja.append(nodo('p', 'aclaracion vacio', 'Nada en este periodo.'))
+    return caja
+  }
+
+  const ul = nodo('ul', 'desglose-lista')
+  for (const a of apuntes) {
+    const li = nodo('li', a.previsto ? 'previsto' : '')
+    li.append(
+      nodo('span', 'desglose-fecha', diaYMes(a.fecha)),
+      nodo('span', 'desglose-nombre',
+        (a.entidadId && estado.nombres.get(a.entidadId)) || a.concepto),
+      nodo('span', 'cifras', formatEuros(a.importe, { signo: true })),
+    )
+    if (a.previsto) li.append(nodo('span', 'desglose-marca', 'previsto'))
+    ul.append(li)
+  }
+  caja.append(ul)
+  return caja
 }
 
 /**

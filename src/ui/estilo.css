@@ -990,3 +990,33 @@ main {
 /* El rango del periodo en la tabla: pequeño, porque es contexto, no dato. */
 .mes-rango { margin: 0.125rem 0 0.375rem; font-size: 0.8125rem; color: var(--secundario); }
 .mes-saldos { opacity: 0.85; }
+
+/* Las líneas del bloque que se abren. El triángulo por defecto del navegador
+   se queda: es el único indicio universal de «esto se puede abrir». */
+.desglose { border-bottom: 1px solid var(--linea); }
+.desglose:last-of-type { border-bottom: 0; }
+
+.desglose > summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  cursor: pointer;
+  list-style-position: inside;
+}
+
+.desglose-lista { margin: 0 0 0.75rem; padding: 0 0 0 1.25rem; list-style: none; }
+
+.desglose-lista li {
+  display: grid;
+  grid-template-columns: 3.5rem 1fr auto;
+  gap: 0.5rem;
+  align-items: baseline;
+  padding: 0.25rem 0;
+  font-size: 0.875rem;
+}
+
+.desglose-fecha { color: var(--secundario); font-variant-numeric: tabular-nums; }
+.desglose-nombre { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.desglose-lista li.previsto { opacity: 0.7; }
+.desglose-marca { grid-column: 2 / -1; font-size: 0.75rem; color: var(--secundario); }
