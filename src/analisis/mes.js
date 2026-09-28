@@ -13,6 +13,7 @@
  */
 
 import { diasEntre, mesDe, ultimoDiaDelMes } from '../dominio/tipos.js'
+import { mesContableDe } from './cascada.js'
 
 /**
  * @typedef {import('../dominio/tipos.js').Movimiento} Movimiento
@@ -56,9 +57,13 @@ export function resumenDeMes({ movimientos, categorias, noEsGasto, eventos, mes,
   for (const m of movimientos) {
     // La tarjeta se cuenta el día que el banco la liquida, no el día de cada
     // compra: si no, el mismo dinero aparece dos veces.
-    if (m.origen === 'tarjeta' || mesDe(m.fecha) !== mes) continue
-    cuantos += 1
+    if (m.origen === 'tarjeta') continue
     const categoria = (m.entidadId && categorias.get(m.entidadId)) || 'otros'
+    // Una nómina cobrada el 25 ya es el dinero del mes que viene, igual que en
+    // la previsión. Los demás cobros —una devolución, un Bizum— se quedan en el
+    // mes natural en que entraron.
+    if (mesContableDe(m.fecha, categoria === 'nomina') !== mes) continue
+    cuantos += 1
     if (categoria === 'traspaso') {
       if (m.importe < 0) apartado += m.importe
       continue
@@ -70,7 +75,7 @@ export function resumenDeMes({ movimientos, categorias, noEsGasto, eventos, mes,
   let ingresoPrevisto = 0
   let gastoPrevisto = 0
   for (const e of eventos) {
-    if (mesDe(e.fecha) !== mes || e.fecha <= hoy) continue
+    if (mesContable(e) !== mes || e.fecha <= hoy) continue
     if (e.importe > 0) ingresoPrevisto += e.importe
     else gastoPrevisto += e.importe
   }
@@ -156,27 +161,18 @@ export function disponibleReal({ saldo, eventos, ritmoPorDia, hoy, hasta, reserv
  */
 
 /**
- * A partir de este día, un ingreso ya no es dinero de este mes: es el dinero
- * con el que se vive el siguiente. Una nómina del 25 no paga los 25 días que
- * quedan detrás, paga los 30 que vienen delante.
- */
-const DIA_DE_ADELANTO = 20
-
-/**
  * En qué mes cuenta un evento. Los gastos, en el suyo. Los ingresos de final de
  * mes, en el que abren.
  *
  * Esto no mueve el dinero: en la cuenta sigue entrando el 25 y el suelo se
  * calcula con esa fecha. Sólo cambia a qué mes se le apunta.
  *
+ * La regla vive en cascada.js, que es de donde sale el concepto de mes.
+ *
  * @param {import('./bajamar.js').Evento} evento
  */
 export function mesContable(evento) {
-  if (evento.tipo !== 'ingreso' || Number(evento.fecha.slice(8)) < DIA_DE_ADELANTO) {
-    return mesDe(evento.fecha)
-  }
-  const [anio, mes] = evento.fecha.split('-').map(Number)
-  return mes === 12 ? `${anio + 1}-01` : `${anio}-${String(mes + 1).padStart(2, '0')}`
+  return mesContableDe(evento.fecha, evento.tipo === 'ingreso')
 }
 
 /**
@@ -211,11 +207,11 @@ export function porMeses(proyeccion) {
     fila.saldoFinal = punto.saldo
   }
 
-  const dias = new Map(proyeccion.curva.map((p) => [p.fecha, true]))
-  for (const [fecha] of dias) {
-    const fila = filas.get(mesDe(fecha))
-    // El primer punto de la curva es el saldo de partida, no un día vivido.
-    if (fila && fecha !== proyeccion.desde) fila.gastos += proyeccion.ritmoPorDia
+  // Cada día aporta lo que de verdad goteó ese día: el goteo puede cambiar a lo
+  // largo del horizonte, porque el plan sólo manda dentro de su mes.
+  for (const punto of proyeccion.curva) {
+    const fila = filas.get(mesDe(punto.fecha))
+    if (fila) fila.gastos += punto.gota
   }
 
   for (const e of proyeccion.eventos) {

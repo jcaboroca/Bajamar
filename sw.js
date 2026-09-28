@@ -5,7 +5,7 @@
  * programa, que es lo único que hace falta descargar.
  */
 
-const CAU = 'bajamar-v32'
+const CAU = 'bajamar-v33'
 
 const PROGRAMA = [
   './',
@@ -26,6 +26,7 @@ const PROGRAMA = [
   './src/ui/vistas/prevision.js',
   './src/ui/vistas/patrimonio.js',
   './src/ui/vistas/ajustes.js',
+  './src/ui/simulador.js',
   './src/estado.js',
   './src/almacen/db.js',
   './src/almacen/cifrado.js',
@@ -33,9 +34,13 @@ const PROGRAMA = [
   './src/almacen/llavero.js',
   './src/almacen/preferencias.js',
   './src/analisis/bajamar.js',
+  './src/analisis/cascada.js',
   './src/analisis/compromisos.js',
   './src/analisis/fijos.js',
+  './src/analisis/fraccionados.js',
   './src/analisis/mes.js',
+  './src/analisis/plan.js',
+  './src/analisis/reparto.js',
   './src/analisis/presupuestos.js',
   './src/analisis/objetivos.js',
   './src/analisis/patrimonio.js',
@@ -43,6 +48,7 @@ const PROGRAMA = [
   './src/dominio/dinero.js',
   './src/dominio/tipos.js',
   './src/entidades/limpiar.js',
+  './src/entidades/oficios.js',
   './src/entidades/reconciliar.js',
   './src/entidades/semillas.js',
   './src/importar/biff.js',

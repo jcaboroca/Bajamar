@@ -13,7 +13,8 @@ import { describirFijos, estructura } from './analisis/fijos.js'
 import { cascadaDelMes, mesEnCurso as mesQuePagaLaNomina } from './analisis/cascada.js'
 import { cuotasPendientes } from './analisis/fraccionados.js'
 import { conGotaDiaria, disponibleReal, porMeses, resumenDeMes } from './analisis/mes.js'
-import { revisarPresupuestos } from './analisis/presupuestos.js'
+import { gastoPorCategoriaYMes, revisarPresupuestos } from './analisis/presupuestos.js'
+import { cuadre as cuadrarPlan, residuoDelMes, ritmoDelPlan } from './analisis/plan.js'
 import { balance, evolucion } from './analisis/patrimonio.js'
 import { capacidadDeAhorro } from './analisis/objetivos.js'
 import { revisar } from './analisis/alertas.js'
@@ -76,7 +77,7 @@ const HORIZONTE_LARGO = 12
  * @param {Record<string, string>} [opciones.categoriasManuales] entidadId → categoría
  * @param {string[]} [opciones.excepcionales] ids de movimientos marcados a mano
  * @param {Retoque[]} [opciones.retoques]
- * @param {import('./analisis/presupuestos.js').Presupuesto[]} [opciones.presupuestos]
+ * @param {Record<string, import('./analisis/plan.js').Plan>} [opciones.planes] mes → plan
  * @param {import('./analisis/patrimonio.js').Apunte[]} [opciones.patrimonio]
  * @param {Record<string, 'fijo' | 'suelto' | 'baja'>} [opciones.tratos] reciboId → cómo preverlo
  * @param {Record<string, string>} [opciones.apodos] reciboId → cómo lo llama el usuario
@@ -245,8 +246,36 @@ export function construirEstado(crudos, opciones = {}) {
   const hasta = ultimoDiaDelMes(sumarMeses(hoy, (opciones.meses ?? 2) - 1))
   const finLargo = ultimoDiaDelMes(sumarMeses(hoy, HORIZONTE_LARGO - 1))
 
-  const proyeccion = proyectar({ saldoInicial, desde: hoy, hasta, eventos: armar(hasta), ritmoPorDia: ritmo.porDia })
-  const proyeccionLarga = proyectar({ saldoInicial, desde: hoy, hasta: finLargo, eventos: armar(finLargo), ritmoPorDia: ritmo.porDia })
+  /*
+   * El día a día deja de ser una medida y pasa a ser una decisión. Si hay plan
+   * para el mes natural en curso, el ritmo sale de él; si no, del histórico
+   * como hasta ahora, que sigue siendo la respuesta correcta mientras no hayas
+   * decidido nada.
+   *
+   * El residuo es `disponibleReal` sin el goteo. Tenía que ser exactamente el
+   * mismo número que sale en portada, o habría dos respuestas para «cuánto me
+   * queda». Y como lo ya gastado está dentro del saldo del banco, no hay que
+   * descontarlo: recortar el día 15 se recalcula solo sobre los días que faltan.
+   */
+  const finDeMes = ultimoDiaDelMes(hoy)
+  const residuo = residuoDelMes({ saldo: saldoInicial, eventos: armar(finDeMes), hoy, hasta: finDeMes })
+  const plan = (opciones.planes ?? {})[mesDe(hoy)] ?? null
+  const gastadoPorCategoria = Object.fromEntries(
+    [...gastoPorCategoriaYMes(contables, categorias, NO_ES_GASTO)]
+      .map(([id, meses]) => [id, Math.abs(meses.get(mesDe(hoy)) ?? 0)]),
+  )
+  const ritmoEfectivo = ritmoDelPlan({ plan, gastado: gastadoPorCategoria, hoy, hasta: finDeMes }) ?? ritmo
+  const cuadre = cuadrarPlan({ plan, residuo })
+
+  // El plan manda dentro de su mes y ni un día más. Su ritmo es «lo que queda
+  // entre los días que quedan», así que extenderlo a doce meses daría cifras
+  // absurdas: un día 30 sería el presupuesto entero repartido en un solo día.
+  // A partir de fin de mes vuelve a mandar lo que sueles gastar.
+  const gota = (/** @type {string} */ fecha) =>
+    (fecha <= finDeMes ? ritmoEfectivo.porDia : ritmo.porDia)
+
+  const proyeccion = proyectar({ saldoInicial, desde: hoy, hasta, eventos: armar(hasta), ritmoPorDia: gota })
+  const proyeccionLarga = proyectar({ saldoInicial, desde: hoy, hasta: finLargo, eventos: armar(finLargo), ritmoPorDia: gota })
 
   // El mismo periodo, suponiendo que se salta todo lo que se puede saltar. No
   // es una previsión alternativa: es la medida de cuánto margen tienes.
@@ -255,7 +284,7 @@ export function construirEstado(crudos, opciones = {}) {
     desde: hoy,
     hasta,
     eventos: proyeccion.eventos.filter((e) => !e.aplazable),
-    ritmoPorDia: ritmo.porDia,
+    ritmoPorDia: gota,
   })
   const margen = holgado === null ? null : {
     suelo: holgado.suelo,
@@ -271,7 +300,7 @@ export function construirEstado(crudos, opciones = {}) {
     movimientos: contables,
     categorias,
     noEsGasto: NO_ES_GASTO,
-    presupuestos: opciones.presupuestos ?? [],
+    asignado: plan?.asignado ?? {},
     hoy,
   })
 
@@ -284,14 +313,14 @@ export function construirEstado(crudos, opciones = {}) {
       mes: mesDe(hoy),
       hoy,
     }),
-    ritmo.porDia,
+    ritmoEfectivo.porDia,
     hoy,
   )
 
   const disponible = disponibleReal({
     saldo: saldoInicial,
     eventos: proyeccion.eventos,
-    ritmoPorDia: ritmo.porDia,
+    ritmoPorDia: ritmoEfectivo.porDia,
     hoy,
     hasta: ultimoDiaDelMes(hoy),
   })
@@ -388,7 +417,13 @@ export function construirEstado(crudos, opciones = {}) {
     aplazableAlMes,
     ingresoMensual,
     ordinarios,
+    // `ritmo` es lo que sueles gastar; `ritmoEfectivo` es lo que has decidido
+    // gastar. Se devuelven los dos porque la interfaz enseña la distancia.
     ritmo,
+    ritmoEfectivo,
+    plan,
+    residuo,
+    cuadre,
     reparto: repartirGasto(ordinarios, ritmo),
     apagadas: Object.keys(apagadas).sort(),
     saldoInicial,
@@ -404,7 +439,7 @@ export function construirEstado(crudos, opciones = {}) {
       ingreso: ingresoMensual,
       // Por días y no la media mensual: si no, la cascada y la proyección dan
       // cifras distintas del mismo mes y una de las dos miente.
-      diaADia: ritmo.porDia * Number(ultimoDiaDelMes(`${mesQuePagaLaNomina(hoy)}-01`).slice(8)),
+      diaADia: ritmoEfectivo.porDia * Number(ultimoDiaDelMes(`${mesQuePagaLaNomina(hoy)}-01`).slice(8)),
       inversiones: opciones.inversiones,
       plazos,
       saltados,

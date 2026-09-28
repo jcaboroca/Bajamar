@@ -62,13 +62,28 @@ export const DIA_DE_ADELANTO = 20
  */
 
 /**
+ * A qué mes se le apunta algo. Los gastos, al mes en que caen. Los ingresos
+ * que abren mes, al siguiente.
+ *
+ * Es la única copia de esta regla. Vivía aquí y otra vez en mes.js, y había un
+ * tercer sitio que no la aplicaba, así que la misma nómina contaba en
+ * septiembre en una pantalla y en octubre en otra.
+ *
+ * @param {string} fecha         ISO
+ * @param {boolean} abreMes      si ese ingreso paga los días que vienen delante
+ */
+export function mesContableDe(fecha, abreMes) {
+  if (!abreMes || Number(fecha.slice(8)) < DIA_DE_ADELANTO) return fecha.slice(0, 7)
+  return sumarMeses(`${fecha.slice(0, 8)}01`, 1).slice(0, 7)
+}
+
+/**
  * El mes que paga la última nómina cobrada: pasado el día 20 ya se vive del
  * dinero del mes siguiente.
  * @param {string} hoy
  */
 export function mesEnCurso(hoy) {
-  if (Number(hoy.slice(8)) < DIA_DE_ADELANTO) return hoy.slice(0, 7)
-  return sumarMeses(`${hoy.slice(0, 8)}01`, 1).slice(0, 7)
+  return mesContableDe(hoy, true)
 }
 
 /**

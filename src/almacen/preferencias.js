@@ -14,6 +14,7 @@ import { VENTANA_POR_DEFECTO } from '../analisis/compromisos.js'
 /**
  * @typedef {import('../dominio/tipos.js').Retoque} Retoque
  * @typedef {import('../analisis/presupuestos.js').Presupuesto} Presupuesto
+ * @typedef {import('../analisis/plan.js').Plan} Plan
  * @typedef {import('../analisis/objetivos.js').Objetivo} Objetivo
  * @typedef {import('../analisis/patrimonio.js').Apunte} Apunte
  */
@@ -25,7 +26,8 @@ import { VENTANA_POR_DEFECTO } from '../analisis/compromisos.js'
 /**
  * @typedef {object} Preferencias
  * @property {Retoque[]} retoques
- * @property {Presupuesto[]} presupuestos
+ * @property {Presupuesto[]} presupuestos      heredado: sólo vive para migrarse
+ * @property {Record<string, Plan>} planes     mes → en qué se va el día a día
  * @property {Objetivo[]} objetivos
  * @property {Apunte[]} patrimonio
  * @property {Record<string, string>} reglas   entidadId → categoría
@@ -43,7 +45,7 @@ import { VENTANA_POR_DEFECTO } from '../analisis/compromisos.js'
 
 /** @returns {Promise<Preferencias>} */
 export async function cargar() {
-  const [retoques, presupuestos, objetivos, patrimonio, reglas, bultos, colchon, ventanaRitmo, tratos, apodos, unicos, anuales, apagadas, saltados, inversiones] = await Promise.all([
+  const [retoques, presupuestos, objetivos, patrimonio, reglas, bultos, colchon, ventanaRitmo, tratos, apodos, unicos, anuales, apagadas, saltados, inversiones, planes] = await Promise.all([
     leerTodo('retoques'),
     leerTodo('presupuestos'),
     leerTodo('objetivos'),
@@ -59,11 +61,18 @@ export async function cargar() {
     leerTodo('apagadas'),
     leerTodo('saltados'),
     leerTodo('inversiones'),
+    leerTodo('planes'),
   ])
 
   return {
     retoques,
     presupuestos,
+    planes: Object.fromEntries(planes.map((/** @type {any} */ p) => [p.id, {
+      mes: p.id,
+      asignado: p.asignado ?? {},
+      residuo: Number(p.residuo ?? 0),
+      sello: p.sello ?? '',
+    }])),
     objetivos,
     patrimonio,
     bultos,
@@ -164,12 +173,67 @@ export async function ponerInversion(reciboId, esInversion) {
 }
 
 /**
+ * Lo que asignas a una categoría dentro del plan de un mes.
+ *
+ * Se guarda junto al residuo con el que lo decidiste: es lo que después
+ * permite decir «el residuo ha bajado 40 € desde que repartiste» en vez de
+ * encoger las demás categorías por tu cuenta.
+ *
  * @param {string} categoria
- * @param {number | null} importe  céntimos positivos; null vuelve a lo propuesto
+ * @param {number | null} importe  céntimos positivos; null la saca del plan
+ * @param {object} contexto
+ * @param {string} contexto.mes      'yyyy-mm'
+ * @param {number} contexto.residuo  el que hay al cuadrar
+ * @param {string} contexto.hoy
  */
-export async function ponerPresupuesto(categoria, importe) {
-  if (importe === null) return borrar('presupuestos', categoria)
-  return escribir('presupuestos', { id: categoria, importe: Math.abs(importe) })
+export async function ponerAsignacion(categoria, importe, { mes, residuo, hoy }) {
+  const actual = /** @type {any} */ (await leer('planes', mes))
+  const asignado = { ...(actual?.asignado ?? {}) }
+  if (importe === null) delete asignado[categoria]
+  else asignado[categoria] = Math.abs(importe)
+  return escribir('planes', { id: mes, asignado, residuo, sello: hoy })
+}
+
+/** Un plan entero: la propuesta inicial, o el recuadre de un clic. */
+export async function ponerPlan(plan) {
+  return escribir('planes', {
+    id: plan.mes,
+    asignado: plan.asignado,
+    residuo: plan.residuo,
+    sello: plan.sello,
+  })
+}
+
+/**
+ * Los presupuestos por categoría no tenían mes: valían para siempre. El plan sí
+ * es de un mes concreto, así que lo que ya habías fijado se convierte en el
+ * plan del mes en curso.
+ *
+ * Los registros viejos no se borran, sólo se dejan de leer. Borrarlos aquí
+ * obligaría a poner lápidas para que la sincronización no los resucitase, y no
+ * merece la pena por un puñado de importes: una marca en los ajustes basta para
+ * no migrar dos veces.
+ *
+ * @param {object} contexto
+ * @param {string} contexto.mes
+ * @param {number} contexto.residuo
+ * @param {string} contexto.hoy
+ * @returns {Promise<boolean>} si ha migrado algo
+ */
+export async function migrarPresupuestosAlPlan({ mes, residuo, hoy }) {
+  if (await leer('ajustes', 'presupuestosMigrados')) return false
+
+  const viejos = /** @type {any[]} */ (await leerTodo('presupuestos'))
+  const yaHayPlan = await leer('planes', mes)
+  if (viejos.length > 0 && !yaHayPlan) {
+    /** @type {Record<string, number>} */
+    const asignado = {}
+    for (const p of viejos) asignado[p.id] = Math.abs(p.importe)
+    await escribir('planes', { id: mes, asignado, residuo, sello: hoy })
+  }
+
+  await escribir('ajustes', { id: 'presupuestosMigrados', valor: hoy })
+  return viejos.length > 0 && !yaHayPlan
 }
 
 /** @param {Objetivo} objetivo */

@@ -8,7 +8,7 @@
  */
 
 const NOMBRE = 'bajamar'
-const VERSION = 9
+const VERSION = 10
 
 /**
  * Todo lo que el usuario decide a mano vive separado de los movimientos: si
@@ -28,7 +28,8 @@ export const ALMACENES = [
   'bultos',      // gastos futuros anotados a mano
   'retoques',    // correcciones sobre un movimiento concreto
   'objetivos',
-  'presupuestos',
+  'presupuestos', // heredado: se migra a 'planes' y deja de escribirse
+  'planes',       // mes → en qué has decidido que se va el día a día
   'patrimonio',
   'lapidas',     // lo borrado, para que no resucite al sincronizar
 ]

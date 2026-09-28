@@ -60,14 +60,20 @@ export function gastoPorCategoriaYMes(movimientos, categorias, noEsGasto) {
  * @param {Movimiento[]} entrada.movimientos
  * @param {Map<string, string>} entrada.categorias
  * @param {Set<string>} entrada.noEsGasto
- * @param {Presupuesto[]} entrada.presupuestos
+ * @param {Record<string, number>} entrada.asignado  categoría → céntimos del plan
  * @param {string} entrada.hoy
  * @returns {LineaPresupuesto[]}
  */
-export function revisarPresupuestos({ movimientos, categorias, noEsGasto, presupuestos, hoy }) {
+export function revisarPresupuestos({ movimientos, categorias, noEsGasto, asignado = {}, hoy }) {
   const tabla = gastoPorCategoriaYMes(movimientos, categorias, noEsGasto)
   const mesActual = mesDe(hoy)
-  const fijados = new Map(presupuestos.map((p) => [p.id, p.importe]))
+
+  // Una categoría que has planificado y en la que todavía no has gastado nada
+  // tiene que salir igual: «esperado 200, real 0» es información, y esconderla
+  // hasta el primer cargo haría aparecer líneas solas a mitad de mes.
+  for (const id of Object.keys(asignado)) {
+    if (!tabla.has(id)) tabla.set(id, new Map())
+  }
 
   /** @type {LineaPresupuesto[]} */
   const lineas = []
@@ -77,7 +83,7 @@ export function revisarPresupuestos({ movimientos, categorias, noEsGasto, presup
       .map(([, v]) => Math.abs(v))
     // Con un solo mes cerrado no hay costumbre que medir, sólo una anécdota.
     const habitual = cerrados.length >= 2 ? mediana(cerrados) : 0
-    const fijado = fijados.get(id)
+    const fijado = asignado[id]
     const presupuesto = fijado ?? habitual
     const gastado = Math.abs(meses.get(mesActual) ?? 0)
 

@@ -21,6 +21,7 @@ import { BUZON } from '../../config.js'
 import { pedirClave, quiereRecordar } from './clave.js'
 import { claveRecordada, recordarClave, olvidarClave } from '../almacen/llavero.js'
 import { construirEstado } from '../estado.js'
+import { recuadrar, sellar } from '../analisis/plan.js'
 import {
   cargar as cargarPreferencias,
   nuevoId,
@@ -29,7 +30,7 @@ import {
   ponerSaltado,
   ponerVentanaRitmo,
   ponerObjetivo,
-  ponerPresupuesto,
+  ponerAsignacion,
   ponerRegla,
   ponerUnico,
   ponerAnual,
@@ -40,6 +41,8 @@ import {
   ponerApodo,
   quitarApunte,
   quitarObjetivo,
+  migrarPresupuestosAlPlan,
+  ponerPlan,
   repartirTratosViejos,
 } from '../almacen/preferencias.js'
 import { requerir } from './piezas.js'
@@ -65,6 +68,12 @@ async function arrancar() {
   if (guardados.length > 0) {
     await repartirTratosViejos()
     await refrescar({ animar: false, local: false })
+    // Los presupuestos viejos no tenían mes. Se convierten en el plan del mes
+    // en curso, y para eso hace falta el residuo, que sólo se sabe una vez
+    // construido el estado. De ahí que vaya después del primer refresco.
+    if (ultimoEstado && await migrarPresupuestosAlPlan(contextoDelPlan())) {
+      await refrescar({ animar: false, local: false })
+    }
   }
 
   for (const id of ['fichero', 'fichero-mas']) {
@@ -178,6 +187,21 @@ function montarVistas() {
       await ponerApagada(categoria, apagada)
       await refrescar()
     },
+    alAsignar: async (categoria, centimos) => {
+      if (!ultimoEstado) return
+      await ponerAsignacion(categoria, centimos, contextoDelPlan())
+      await refrescar()
+    },
+    // Con un reparto delante, lo escribe tal cual; sin él, encoge el que hay en
+    // proporción hasta que vuelva a cuadrar con el residuo de hoy.
+    alRecuadrar: async (asignado) => {
+      if (!ultimoEstado) return
+      const contexto = contextoDelPlan()
+      const nuevo = asignado
+        ?? (ultimoEstado.plan ? recuadrar(ultimoEstado.plan, contexto.residuo) : {})
+      await ponerPlan(sellar({ ...contexto, asignado: nuevo }))
+      await refrescar()
+    },
     alMarcarInversion: async (reciboId, esInversion) => {
       await ponerInversion(reciboId, esInversion)
       await refrescar()
@@ -221,7 +245,8 @@ function montarVistas() {
       decir(meses === 0 ? 'Miro todo tu historial.' : `Miro tus últimos ${meses} meses.`)
     },
     alGuardarPresupuesto: async (categoria, centimos) => {
-      await ponerPresupuesto(categoria, centimos)
+      if (!ultimoEstado) return
+      await ponerAsignacion(categoria, centimos, contextoDelPlan())
       await refrescar()
     },
     alClasificar: async (entidadId, categoria) => {
@@ -240,6 +265,18 @@ function montarVistas() {
  * `local` distingue el refresco que nace de una decisión del que sólo repinta
  * lo que ya sabíamos; sólo el primero tiene algo que contarle al otro aparato.
  */
+/** @type {ReturnType<typeof construirEstado> | null} */
+let ultimoEstado = null
+
+/** Contra qué mes y qué residuo se está cuadrando el plan ahora mismo. */
+function contextoDelPlan() {
+  return {
+    mes: ultimoEstado?.mesEnCurso.mes ?? hoyIso().slice(0, 7),
+    residuo: ultimoEstado?.residuo ?? 0,
+    hoy: hoyIso(),
+  }
+}
+
 async function refrescar({ animar = false, local = true } = {}) {
   const movimientos = await leerMovimientos()
   if (movimientos.length === 0) return
@@ -251,7 +288,7 @@ async function refrescar({ animar = false, local = true } = {}) {
     bultos: preferencias.bultos,
     categoriasManuales: preferencias.reglas,
     retoques: preferencias.retoques,
-    presupuestos: preferencias.presupuestos,
+    planes: preferencias.planes,
     patrimonio: preferencias.patrimonio,
     tratos: preferencias.tratos,
     apodos: preferencias.apodos,
@@ -263,6 +300,11 @@ async function refrescar({ animar = false, local = true } = {}) {
     ventanaRitmo: preferencias.ventanaRitmo,
     colchon: preferencias.colchon,
   })
+
+  // Los manejadores necesitan saber contra qué mes y qué residuo se está
+  // cuadrando el plan, y se disparan entre dos refrescos. Guardar el último
+  // estado es más barato que pasearlo por cada gancho de la interfaz.
+  ultimoEstado = estado
 
   bienvenida.hidden = true
   barra.hidden = false

@@ -32,8 +32,8 @@ let mesElegido = null
 /** @type {Estado | null} */
 let ultimo = null
 
-export function montarPrevision({ alCambiarTrato, alApagarCategoria, alMarcarInversion, alSaltarCobro }) {
-  montarSimulador({ alApagarCategoria })
+export function montarPrevision({ alCambiarTrato, alApagarCategoria, alMarcarInversion, alSaltarCobro, alAsignar, alRecuadrar }) {
+  montarSimulador({ alApagarCategoria, alAsignar, alRecuadrar })
   for (const caja of ['fijos', 'apartados', 'cascada']) {
     preguntarAlPulsar(requerir(caja), () => ultimo, alCambiarTrato)
   }

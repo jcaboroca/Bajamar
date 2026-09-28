@@ -35,8 +35,17 @@ import { diasEntre, sumarMeses, ultimoDiaDelMes } from '../dominio/tipos.js'
  * @property {{ fecha: string, saldo: number }} suelo
  * @property {number} saldoFinal
  * @property {Evento[]} eventos
- * @property {Array<{ fecha: string, saldo: number }>} curva
- * @property {number} ritmoPorDia
+ * @property {Array<{ fecha: string, saldo: number, gota: number }>} curva
+ * @property {number | Gota} ritmoPorDia
+ */
+
+/**
+ * El goteo puede no ser el mismo todo el horizonte. Un plan vale para su mes;
+ * más allá manda lo que sueles gastar, y extender el ritmo de un plan a doce
+ * meses daría cifras absurdas —el día 30, «lo que queda» dividido entre un día
+ * es un ritmo diario enorme—.
+ *
+ * @typedef {(fecha: string) => number} Gota
  */
 
 /**
@@ -45,10 +54,11 @@ import { diasEntre, sumarMeses, ultimoDiaDelMes } from '../dominio/tipos.js'
  * @param {string} entrada.desde       ISO
  * @param {string} [entrada.hasta]     ISO; por defecto, fin del mes siguiente
  * @param {Evento[]} entrada.eventos
- * @param {number} entrada.ritmoPorDia céntimos negativos
+ * @param {number | Gota} entrada.ritmoPorDia céntimos negativos, o cuánto ese día
  * @returns {Proyeccion}
  */
 export function proyectar({ saldoInicial, desde, hasta, eventos, ritmoPorDia }) {
+  const gotaDe = typeof ritmoPorDia === 'function' ? ritmoPorDia : () => ritmoPorDia
   const fin = hasta ?? ultimoDiaDelMes(sumarMeses(desde, 1))
   const dias = Math.max(diasEntre(desde, fin), 0)
 
@@ -68,14 +78,16 @@ export function proyectar({ saldoInicial, desde, hasta, eventos, ritmoPorDia }) 
   // lista sin bajarle el saldo a nadie.
   for (const e of porDia.get(desde) ?? []) saldo += e.importe
   let suelo = { fecha: desde, saldo }
-  /** @type {Array<{ fecha: string, saldo: number }>} */
-  const curva = [{ fecha: desde, saldo }]
+  /** @type {Array<{ fecha: string, saldo: number, gota: number }>} */
+  // El primer punto es el saldo de partida, no un día vivido: no gotea.
+  const curva = [{ fecha: desde, saldo, gota: 0 }]
 
   for (let d = 1; d <= dias; d += 1) {
     const fecha = sumarDias(desde, d)
-    saldo += ritmoPorDia
+    const gota = gotaDe(fecha)
+    saldo += gota
     for (const e of porDia.get(fecha) ?? []) saldo += e.importe
-    curva.push({ fecha, saldo })
+    curva.push({ fecha, saldo, gota })
     if (saldo < suelo.saldo) suelo = { fecha, saldo }
   }
 

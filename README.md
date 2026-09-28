@@ -19,7 +19,7 @@ petición de red. Todo ocurre y se queda en tu navegador.
 
 ```sh
 npm run dev      # sirve la aplicación en http://localhost:4173
-npm test         # 99 pruebas, sin dependencias
+npm test         # 254 pruebas, sin dependencias
 ```
 
 No hay `npm install` porque no hay nada que instalar: **cero dependencias**,
@@ -40,6 +40,10 @@ que reimportar actualiza en lugar de duplicar.
   pregunta.
 - **En qué se va.** Reparto por categorías, con lo que no encaja visible como
   «sin clasificar» en vez de escondido.
+- **Y en qué quieres que se vaya.** Lo que queda después de los recibos se
+  reparte entre categorías, y ese reparto es el que mueve la previsión. «Este
+  mes menos comer fuera» deja de ser un propósito y pasa a ser una cifra: se ve
+  al momento cuánto sube el punto más bajo.
 
 ## Dos dispositivos
 
@@ -73,7 +77,13 @@ Una advertencia que conviene leer dos veces: **no hay recuperación**. Si olvida
 la contraseña, lo que hay en el buzón no lo abre nadie, yo incluido. Esa es la
 propiedad que hace que valga la pena, y también el riesgo.
 
-## Cuatro decisiones que explican el resto
+## Cinco decisiones que explican el resto
+
+**El desajuste se enseña, no se cuadra solo.** Repartes 620 € y al día siguiente
+importas el extracto y aparece un cargo de 40 € que no esperabas. La aplicación
+no encoge tus categorías para que la suma vuelva a cuadrar: te dice que te
+quedan 40 € menos y decides tú de dónde salen. Un reparto que se corrige a tus
+espaldas es la aplicación gastando tu dinero por ti.
 
 **El importe esperado es la mediana, nunca la media.** Con 50 · 55 · 70 la media
 dice 58 y el último valor dice 70. La mediana dice 55, que es lo que de verdad
@@ -114,7 +124,7 @@ src/
   importar/    ole2.js · biff.js · xls.js · sabadell.js
   dominio/     dinero.js (céntimos enteros) · tipos.js (fechas)
   entidades/   limpiar.js · semillas.js · reconciliar.js
-  analisis/    compromisos.js · bajamar.js
+  analisis/    compromisos.js · bajamar.js · cascada.js · plan.js
   almacen/     db.js (IndexedDB) · cifrado.js · sincro.js
   ui/          app.js · lamina.js · clave.js · estilo.css
 worker/        el buzón, opcional

@@ -173,6 +173,64 @@ describe('el mes en dos mitades', () => {
   })
 })
 
+describe('las dos vistas apuntan la nómina al mismo mes', () => {
+  // La nómina del 25 de septiembre no paga septiembre: paga octubre. El resumen
+  // del mes y la previsión mes a mes tienen que decir lo mismo, o la aplicación
+  // se contradice a sí misma en dos pantallas.
+  const categorias = new Map([['n', 'nomina'], ['a', 'super'], ['d', 'otros']])
+
+  test('cobrada, cuenta en el mes que abre y no en el que cae', () => {
+    const movimientos = [mov('2026-09-25', 280_000, { entidadId: 'n' })]
+    const septiembre = resumenDeMes({
+      movimientos, categorias, noEsGasto: NO_ES_GASTO, eventos: [], mes: '2026-09', hoy: '2026-09-30',
+    })
+    const octubre = resumenDeMes({
+      movimientos, categorias, noEsGasto: NO_ES_GASTO, eventos: [], mes: '2026-10', hoy: '2026-09-30',
+    })
+    assert.equal(septiembre.ingresos.real, 0)
+    assert.equal(octubre.ingresos.real, 280_000)
+  })
+
+  test('prevista, el resumen coincide con la previsión', () => {
+    /** @type {import('../src/analisis/bajamar.js').Evento[]} */
+    const eventos = [
+      { fecha: '2026-10-25', importe: 280_000, nombre: 'Nómina', tipo: 'ingreso', seguro: false },
+    ]
+    const octubre = resumenDeMes({
+      movimientos: [], categorias, noEsGasto: NO_ES_GASTO, eventos, mes: '2026-10', hoy: '2026-10-01',
+    })
+    const noviembre = resumenDeMes({
+      movimientos: [], categorias, noEsGasto: NO_ES_GASTO, eventos, mes: '2026-11', hoy: '2026-10-01',
+    })
+    assert.equal(octubre.ingresos.previsto, 0)
+    assert.equal(noviembre.ingresos.previsto, 280_000)
+
+    // Y la previsión mes a mes, que ya usaba mesContable, dice lo mismo.
+    const filas = porMeses(proyectar({
+      saldoInicial: 0, desde: '2026-10-01', hasta: '2026-11-30', ritmoPorDia: 0, eventos,
+    }))
+    assert.equal(filas.find((f) => f.mes === '2026-10')?.ingresos, 0)
+    assert.equal(filas.find((f) => f.mes === '2026-11')?.ingresos, 280_000)
+  })
+
+  test('un cobro suelto de final de mes se queda donde cae', () => {
+    // Sólo se mueve la nómina. Una devolución el 28 es dinero de septiembre.
+    const movimientos = [mov('2026-09-28', 10_000, { entidadId: 'd' })]
+    const septiembre = resumenDeMes({
+      movimientos, categorias, noEsGasto: NO_ES_GASTO, eventos: [], mes: '2026-09', hoy: '2026-09-30',
+    })
+    assert.equal(septiembre.ingresos.real, 10_000)
+  })
+
+  test('un gasto de final de mes nunca se mueve', () => {
+    const movimientos = [mov('2026-09-28', -30_000, { entidadId: 'a' })]
+    const septiembre = resumenDeMes({
+      movimientos, categorias, noEsGasto: NO_ES_GASTO, eventos: [], mes: '2026-09', hoy: '2026-09-30',
+    })
+    assert.equal(septiembre.gastos.real, -30_000)
+  })
+})
+
 describe('disponible real', () => {
   /** @type {import('../src/analisis/bajamar.js').Evento[]} */
   const eventos = [
@@ -243,7 +301,7 @@ describe('presupuestos', () => {
     movimientos,
     categorias,
     noEsGasto: NO_ES_GASTO,
-    presupuestos: [{ id: 'restaurantes', importe: 30_000 }],
+    asignado: { restaurantes: 30_000 },
     hoy: '2026-09-20',
   })
 
@@ -270,7 +328,7 @@ describe('presupuestos', () => {
       movimientos,
       categorias,
       noEsGasto: NO_ES_GASTO,
-      presupuestos: [],
+      asignado: {},
       hoy: '2026-09-20',
     })
     assert.equal(linea.propuesto, true)
