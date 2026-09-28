@@ -62,10 +62,15 @@ export function gastoPorCategoriaYMes(movimientos, categorias, noEsGasto) {
  * @param {Set<string>} entrada.noEsGasto
  * @param {Record<string, number>} entrada.asignado  categoría → céntimos del plan
  * @param {string} entrada.hoy
+ * @param {string} [entrada.mes]  cuál se mira; por defecto, el natural de hoy
  * @returns {LineaPresupuesto[]}
  */
-export function revisarPresupuestos({ movimientos, categorias, noEsGasto, asignado = {}, hoy }) {
+export function revisarPresupuestos({ movimientos, categorias, noEsGasto, asignado = {}, hoy, mes }) {
   const tabla = gastoPorCategoriaYMes(movimientos, categorias, noEsGasto)
+  // El mes que se mira y el de hoy no son el mismo cuando miras octubre desde
+  // septiembre. Lo gastado es del mes que miras; lo habitual sale de los meses
+  // ya cerrados, que es una propiedad de tu historial y no de lo que mires.
+  const mirado = mes ?? mesDe(hoy)
   const mesActual = mesDe(hoy)
 
   // Una categoría que has planificado y en la que todavía no has gastado nada
@@ -85,7 +90,7 @@ export function revisarPresupuestos({ movimientos, categorias, noEsGasto, asigna
     const habitual = cerrados.length >= 2 ? mediana(cerrados) : 0
     const fijado = asignado[id]
     const presupuesto = fijado ?? habitual
-    const gastado = Math.abs(meses.get(mesActual) ?? 0)
+    const gastado = Math.abs(meses.get(mirado) ?? 0)
 
     lineas.push({
       id,

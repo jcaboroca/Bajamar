@@ -198,7 +198,7 @@ function montarVistas() {
       if (!ultimoEstado) return
       const contexto = contextoDelPlan()
       const nuevo = asignado
-        ?? (ultimoEstado.plan ? recuadrar(ultimoEstado.plan, contexto.residuo) : {})
+        ?? (ultimoEstado.planificando.plan ? recuadrar(ultimoEstado.planificando.plan, contexto.residuo) : {})
       await ponerPlan(sellar({ ...contexto, asignado: nuevo }))
       await refrescar()
     },
@@ -271,8 +271,8 @@ let ultimoEstado = null
 /** Contra qué mes y qué residuo se está cuadrando el plan ahora mismo. */
 function contextoDelPlan() {
   return {
-    mes: ultimoEstado?.mesEnCurso.mes ?? hoyIso().slice(0, 7),
-    residuo: ultimoEstado?.residuo ?? 0,
+    mes: ultimoEstado?.planificando.mes ?? hoyIso().slice(0, 7),
+    residuo: ultimoEstado?.planificando.residuo ?? 0,
     hoy: hoyIso(),
   }
 }

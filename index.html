@@ -35,8 +35,15 @@
       <ol id="avisos" class="avisos"></ol>
     </section>
 
+    <nav class="meses-nav" id="resumen-meses" aria-label="Mes que estás mirando">
+      <button type="button" class="mes-paso" id="mes-antes" aria-label="Mes anterior">‹</button>
+      <p class="mes-elegido" id="mes-elegido">—</p>
+      <button type="button" class="mes-paso" id="mes-despues" aria-label="Mes siguiente">›</button>
+    </nav>
+    <p class="aclaracion" id="mes-estado"></p>
+
     <section class="bloque portada">
-      <p class="rotulo">Tu bajamar · el punto más bajo</p>
+      <p class="rotulo" id="suelo-rotulo">La bajamar · el punto más bajo</p>
       <p class="titular"><span id="suelo-cifra" class="cifras">—</span></p>
       <p class="pie" id="suelo-pie"></p>
       <p class="pie pie-margen" id="suelo-margen" hidden></p>
@@ -48,19 +55,18 @@
     </section>
 
     <section class="bloque">
-      <p class="rotulo">Cuánto puedes gastar de verdad</p>
+      <p class="rotulo" id="disponible-rotulo">Cuánto puedes gastar</p>
       <div id="disponible"></div>
-      <p class="nota">El saldo del banco ya incluye todo lo que ha pasado. A eso
-        se le suma sólo lo que falta por pasar hasta fin de mes.</p>
+      <p class="nota" id="disponible-nota"></p>
     </section>
 
     <section class="bloque">
-      <p class="rotulo">Este mes</p>
+      <p class="rotulo" id="mes-resumen-rotulo">El mes</p>
       <div id="mes-resumen"></div>
     </section>
 
     <section class="bloque">
-      <p class="rotulo">Lo que viene</p>
+      <p class="rotulo" id="eventos-rotulo">Lo que viene</p>
       <ol id="eventos" class="eventos pulsables"></ol>
     </section>
 
@@ -72,12 +78,13 @@
     </section>
 
     <section class="bloque">
-      <p class="rotulo">En qué se va · al mes</p>
+      <p class="rotulo" id="categorias-rotulo">En qué se va</p>
+      <p class="aclaracion" id="categorias-nota"></p>
       <ol id="categorias" class="categorias"></ol>
     </section>
 
     <section class="bloque">
-      <p class="rotulo">Cuánto puedes ahorrar</p>
+      <p class="rotulo" id="ahorro-rotulo">Lo que ahorras</p>
       <div id="capacidad"></div>
     </section>
 

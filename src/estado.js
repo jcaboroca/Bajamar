@@ -15,6 +15,7 @@ import { cuotasPendientes } from './analisis/fraccionados.js'
 import { conGotaDiaria, disponibleReal, porMeses, resumenDeMes } from './analisis/mes.js'
 import { gastoPorCategoriaYMes, revisarPresupuestos } from './analisis/presupuestos.js'
 import { cuadre as cuadrarPlan, residuoDelMes, ritmoDelPlan } from './analisis/plan.js'
+import { detallarMeses, estaAcabado, residuoDe } from './analisis/mensual.js'
 import { balance, evolucion } from './analisis/patrimonio.js'
 import { capacidadDeAhorro } from './analisis/objetivos.js'
 import { revisar } from './analisis/alertas.js'
@@ -259,7 +260,8 @@ export function construirEstado(crudos, opciones = {}) {
    */
   const finDeMes = ultimoDiaDelMes(hoy)
   const residuo = residuoDelMes({ saldo: saldoInicial, eventos: armar(finDeMes), hoy, hasta: finDeMes })
-  const plan = (opciones.planes ?? {})[mesDe(hoy)] ?? null
+  const planes = opciones.planes ?? {}
+  const plan = planes[mesDe(hoy)] ?? null
   const gastadoPorCategoria = Object.fromEntries(
     [...gastoPorCategoriaYMes(contables, categorias, NO_ES_GASTO)]
       .map(([id, meses]) => [id, Math.abs(meses.get(mesDe(hoy)) ?? 0)]),
@@ -377,6 +379,61 @@ export function construirEstado(crudos, opciones = {}) {
     fila.ahorro = fila.ingresos + fila.gastos
   }
 
+  /*
+   * El resumen, mes a mes. Deja de haber un «este mes» que quiere decir una
+   * cosa aquí y otra allí: cada mes se cuenta entero, del 1 al último, sabe si
+   * está cerrado, en curso o por venir, y lleva su plan al lado para poder
+   * comparar lo que decidiste con lo que llevas gastado.
+   */
+  const detalleMensual = detallarMeses({
+    meses,
+    proyeccion: proyeccionLarga,
+    // Sin eventos: aquí sólo interesa lo que ya ha pasado de verdad. Lo
+    // previsto se deduce restándoselo al total, que sale de la proyección.
+    resumenDe: (mesPedido) => resumenDeMes({
+      movimientos: contables,
+      categorias,
+      noEsGasto: NO_ES_GASTO,
+      eventos: [],
+      mes: mesPedido,
+      hoy,
+      ingresosRecurrentes,
+    }),
+    hoy,
+  }).map((m) => ({
+    ...m,
+    acabado: estaAcabado(m.mes, hoy),
+    plan: planes[m.mes] ?? null,
+    lineas: revisarPresupuestos({
+      movimientos: contables,
+      categorias,
+      noEsGasto: NO_ES_GASTO,
+      asignado: planes[m.mes]?.asignado ?? {},
+      mes: m.mes,
+      hoy,
+    }),
+  }))
+
+  /*
+   * Qué mes se está planificando, que no es el mismo que se está viviendo. En
+   * cuanto entra la nómina pasas a repartir el mes que abre: el que corre ya
+   * lo repartiste el mes pasado y ahora sólo se compara con lo que va saliendo.
+   *
+   * Es el mes de la cascada. Antes esto apuntaba al mes natural, y del día 20
+   * en adelante te hacía repartir un mes al que le quedaban dos días: como no
+   * quedaba nada por pagar, el residuo salía siendo la cuenta entera.
+   */
+  const mesAPlanificar = mesQuePagaLaNomina(hoy)
+  const aPlanificar = detalleMensual.find((m) => m.mes === mesAPlanificar) ?? null
+  const planificando = {
+    mes: mesAPlanificar,
+    plan: planes[mesAPlanificar] ?? null,
+    residuo: aPlanificar === null || aPlanificar.estado === 'enCurso'
+      ? residuo
+      : residuoDe(aPlanificar, opciones.colchon ?? 0),
+  }
+  const cuadrePlanificado = cuadrarPlan({ plan: planificando.plan, residuo: planificando.residuo })
+
   const ingresoMensual = ingresos
     .filter((i) => i.periodicidad === 'mensual')
     .reduce((t, i) => t + i.importeEsperado, 0)
@@ -456,8 +513,11 @@ export function construirEstado(crudos, opciones = {}) {
     ritmo,
     ritmoEfectivo,
     plan,
+    planes,
     residuo,
     cuadre,
+    detalleMensual,
+    planificando: { ...planificando, cuadre: cuadrePlanificado },
     reparto: repartirGasto(ordinarios, ritmo),
     apagadas: Object.keys(apagadas).sort(),
     saldoInicial,

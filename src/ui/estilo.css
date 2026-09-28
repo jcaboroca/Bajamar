@@ -928,3 +928,42 @@ main {
   font-size: 0.8rem;
   color: var(--secundario);
 }
+
+/* El selector de mes del resumen. Va arriba del todo porque manda sobre todo
+   lo que hay debajo: si no se ve de qué mes se habla, no se entiende nada. */
+.meses-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin: 1rem 0 0.25rem;
+}
+
+.mes-elegido {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-align: center;
+  flex: 1;
+}
+
+.mes-paso {
+  flex: 0 0 auto;
+  width: 2.25rem;
+  height: 2.25rem;
+  font: inherit;
+  font-size: 1.25rem;
+  line-height: 1;
+  color: var(--secundario);
+  background: transparent;
+  border: 1px solid var(--linea);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.mes-paso:disabled { opacity: 0.25; cursor: default; }
+
+/* La aclaración de en qué estado está el mes va pegada al selector, no
+   flotando entre bloques: es parte de la cabecera, no un bloque más. */
+#mes-estado { margin: 0 0 1.25rem; text-align: center; }

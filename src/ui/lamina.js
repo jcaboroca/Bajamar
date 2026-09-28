@@ -69,7 +69,9 @@ export function dibujarLamina(proyeccion, opciones = {}) {
     crear('path', { class: 'trazo-agua', d: linea }),
     crear('line', { class: 'marca-suelo', x1: xSuelo, x2: xSuelo, y1: ySuelo, y2: ALTO - MARGEN_INFERIOR + 6 }),
     crear('circle', { class: 'punto-suelo', cx: xSuelo, cy: ySuelo, r: 3.5 }),
-    texto(4, ALTO - 4, `hoy · ${formatEurosRedondo(proyeccion.saldoInicial)}`),
+    // El rótulo del arranque no siempre es «hoy»: mirando un mes que aún no ha
+    // empezado, lo que hay a la izquierda es con cuánto entras en él.
+    texto(4, ALTO - 4, `${opciones.rotuloInicio ?? 'hoy'} · ${formatEurosRedondo(proyeccion.saldoInicial)}`),
     texto(
       Math.min(Math.max(xSuelo, 60), ANCHO - 60),
       ALTO - 4,
