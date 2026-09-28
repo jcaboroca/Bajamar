@@ -178,14 +178,16 @@ describe('las dos vistas apuntan la nómina al mismo mes', () => {
   // del mes y la previsión mes a mes tienen que decir lo mismo, o la aplicación
   // se contradice a sí misma en dos pantallas.
   const categorias = new Map([['n', 'nomina'], ['a', 'super'], ['d', 'otros']])
+  // Quién abre mes se decide fuera y se pasa hecho: sólo la nómina.
+  const abrenMes = new Set(['n'])
 
   test('cobrada, cuenta en el mes que abre y no en el que cae', () => {
     const movimientos = [mov('2026-09-25', 280_000, { entidadId: 'n' })]
     const septiembre = resumenDeMes({
-      movimientos, categorias, noEsGasto: NO_ES_GASTO, eventos: [], mes: '2026-09', hoy: '2026-09-30',
+      movimientos, categorias, noEsGasto: NO_ES_GASTO, eventos: [], mes: '2026-09', hoy: '2026-09-30', abrenMes,
     })
     const octubre = resumenDeMes({
-      movimientos, categorias, noEsGasto: NO_ES_GASTO, eventos: [], mes: '2026-10', hoy: '2026-09-30',
+      movimientos, categorias, noEsGasto: NO_ES_GASTO, eventos: [], mes: '2026-10', hoy: '2026-09-30', abrenMes,
     })
     assert.equal(septiembre.ingresos.real, 0)
     assert.equal(octubre.ingresos.real, 280_000)
@@ -211,6 +213,27 @@ describe('las dos vistas apuntan la nómina al mismo mes', () => {
     }))
     assert.equal(filas.find((f) => f.mes === '2026-10')?.ingresos, 0)
     assert.equal(filas.find((f) => f.mes === '2026-11')?.ingresos, 280_000)
+  })
+
+  test('un ingreso que se repite pero no es la nómina no mueve de mes', () => {
+    // Una bonificación del banco de 60 € el día 24 vuelve todos los meses,
+    // igual que la nómina. Pero no financia octubre: paga septiembre. Sin
+    // esto, cualquier cobro recurrente de final de mes se iba al siguiente.
+    const movimientos = [
+      mov('2026-09-24', 6_000, { entidadId: 'b' }),
+      mov('2026-09-25', 280_000, { entidadId: 'n' }),
+    ]
+    const conBanco = new Map([...categorias, ['b', 'banco']])
+    const septiembre = resumenDeMes({
+      movimientos, categorias: conBanco, noEsGasto: NO_ES_GASTO, eventos: [],
+      mes: '2026-09', hoy: '2026-09-30', abrenMes,
+    })
+    const octubre = resumenDeMes({
+      movimientos, categorias: conBanco, noEsGasto: NO_ES_GASTO, eventos: [],
+      mes: '2026-10', hoy: '2026-09-30', abrenMes,
+    })
+    assert.equal(septiembre.ingresos.real, 6_000)
+    assert.equal(octubre.ingresos.real, 280_000)
   })
 
   test('un cobro suelto de final de mes se queda donde cae', () => {

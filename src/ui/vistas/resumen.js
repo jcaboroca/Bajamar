@@ -326,7 +326,7 @@ function pintarEventos(estado, mes) {
    * los cobros que ya han entrado: en un mes que aún no ha empezado, esos son
    * justamente de dónde sale su dinero.
    */
-  const previstos = estado.proyeccionLarga.eventos.filter((e) => mesContable(e) === mes.mes)
+  const previstos = estado.proyeccionLarga.eventos.filter((e) => mesContable(e, estado.abrenMes) === mes.mes)
   const lista = requerir('eventos')
   if (previstos.length === 0 && mes.cobrado.length === 0) {
     lista.replaceChildren(vacio('No hay nada previsto en este mes.'))

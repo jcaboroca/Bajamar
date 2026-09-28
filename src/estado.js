@@ -306,9 +306,27 @@ export function construirEstado(crudos, opciones = {}) {
     hoy,
   })
 
-  // Quiénes son los cobros que vuelven, para saber cuáles abren mes.
-  const ingresosRecurrentes = new Set(
-    ingresos.map((i) => i.entidadId).filter((id) => typeof id === 'string'),
+  /*
+   * Quién abre mes: la nómina, y nada más.
+   *
+   * No vale con «es un ingreso que se repite». Una bonificación del banco de
+   * 60 € el día 24 se repite todos los meses igual que la nómina, y sin
+   * embargo paga el mes en que cae, no el siguiente. Lo que abre un mes es lo
+   * que lo financia entero.
+   *
+   * Y si no hay nada etiquetado como nómina, se toma el mayor ingreso que
+   * vuelva. Es la red: sin ella, un cobro que la aplicación no ha sabido
+   * etiquetar dejaba el mes siguiente sin ingresos y sin decir por qué.
+   */
+  const nominas = ingresos.filter((i) => categorias.get(i.entidadId ?? '') === 'nomina')
+  const mayorIngreso = ingresos.reduce(
+    (mejor, i) => (Math.abs(i.importeEsperado) > Math.abs(mejor?.importeEsperado ?? 0) ? i : mejor),
+    /** @type {typeof ingresos[number] | null} */ (null),
+  )
+  const abrenMes = new Set(
+    (nominas.length > 0 ? nominas : mayorIngreso ? [mayorIngreso] : [])
+      .map((i) => i.entidadId)
+      .filter((id) => typeof id === 'string'),
   )
 
   const mesEnCurso = conGotaDiaria(
@@ -319,7 +337,7 @@ export function construirEstado(crudos, opciones = {}) {
       eventos: proyeccion.eventos,
       mes: mesDe(hoy),
       hoy,
-      ingresosRecurrentes,
+      abrenMes,
     }),
     ritmoEfectivo.porDia,
     hoy,
@@ -341,7 +359,7 @@ export function construirEstado(crudos, opciones = {}) {
    * queda; el suelo y el saldo final sí vienen de la proyección, porque mirar
    * hacia atrás buscando un mínimo no sirve de nada.
    */
-  const meses = porMeses(proyeccionLarga)
+  const meses = porMeses(proyeccionLarga, abrenMes)
   if (meses[0] && meses[0].mes === mesDe(hoy)) {
     meses[0] = {
       ...meses[0],
@@ -372,7 +390,7 @@ export function construirEstado(crudos, opciones = {}) {
       eventos: [],
       mes: mesQueViene,
       hoy,
-      ingresosRecurrentes,
+      abrenMes,
     })
     fila.ingresos += yaCobrado.ingresos.real
     fila.gastos += yaCobrado.gastos.real
@@ -397,7 +415,7 @@ export function construirEstado(crudos, opciones = {}) {
       eventos: [],
       mes: mesPedido,
       hoy,
-      ingresosRecurrentes,
+      abrenMes,
     }),
     hoy,
   }).map((m) => ({
@@ -408,7 +426,7 @@ export function construirEstado(crudos, opciones = {}) {
     // en su lugar enseñaba la del 25 de octubre, que es la que paga noviembre.
     // Dos cifras iguales en la misma pantalla que son dinero distinto.
     cobrado: contables.filter((x) => x.origen !== 'tarjeta' && x.importe > 0
-      && mesDeUnMovimiento(x, x.categoria ?? 'otros', ingresosRecurrentes) === m.mes),
+      && mesDeUnMovimiento(x, abrenMes) === m.mes),
     ...curvaDelMes({
       mes: m.mes,
       movimientos: cuenta,
@@ -419,9 +437,9 @@ export function construirEstado(crudos, opciones = {}) {
       // para saber hasta dónde bajó el dinero de este mes.
       desplazados: [
         ...cuenta.filter((x) => x.importe > 0 && x.fecha.slice(0, 7) === m.mes
-          && mesDeUnMovimiento(x, x.categoria ?? 'otros', ingresosRecurrentes) !== m.mes),
+          && mesDeUnMovimiento(x, abrenMes) !== m.mes),
         ...proyeccionLarga.eventos.filter((ev) => ev.importe > 0
-          && ev.fecha.slice(0, 7) === m.mes && mesContable(ev) !== m.mes),
+          && ev.fecha.slice(0, 7) === m.mes && mesContable(ev, abrenMes) !== m.mes),
       ],
     }),
     plan: planes[m.mes] ?? null,
@@ -538,6 +556,7 @@ export function construirEstado(crudos, opciones = {}) {
     residuo,
     cuadre,
     detalleMensual,
+    abrenMes,
     planificando: { ...planificando, cuadre: cuadrePlanificado },
     reparto: repartirGasto(ordinarios, ritmo),
     apagadas: Object.keys(apagadas).sort(),

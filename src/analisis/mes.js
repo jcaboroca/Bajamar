@@ -46,10 +46,10 @@ import { mesContableDe } from './cascada.js'
  * @param {Evento[]} entrada.eventos
  * @param {string} entrada.mes
  * @param {string} entrada.hoy
- * @param {Set<string>} [entrada.ingresosRecurrentes] entidadId de los cobros que vuelven
+ * @param {Set<string>} [entrada.abrenMes] entidadId de los cobros que pagan el mes siguiente
  * @returns {ResumenMes}
  */
-export function resumenDeMes({ movimientos, categorias, noEsGasto, eventos, mes, hoy, ingresosRecurrentes }) {
+export function resumenDeMes({ movimientos, categorias, noEsGasto, eventos, mes, hoy, abrenMes }) {
   let ingresoReal = 0
   let gastoReal = 0
   let apartado = 0
@@ -60,7 +60,7 @@ export function resumenDeMes({ movimientos, categorias, noEsGasto, eventos, mes,
     // compra: si no, el mismo dinero aparece dos veces.
     if (m.origen === 'tarjeta') continue
     const categoria = (m.entidadId && categorias.get(m.entidadId)) || 'otros'
-    if (mesDeUnMovimiento(m, categoria, ingresosRecurrentes) !== mes) continue
+    if (mesDeUnMovimiento(m, abrenMes) !== mes) continue
     cuantos += 1
     if (categoria === 'traspaso') {
       if (m.importe < 0) apartado += m.importe
@@ -73,7 +73,7 @@ export function resumenDeMes({ movimientos, categorias, noEsGasto, eventos, mes,
   let ingresoPrevisto = 0
   let gastoPrevisto = 0
   for (const e of eventos) {
-    if (mesContable(e) !== mes || e.fecha <= hoy) continue
+    if (mesContable(e, abrenMes) !== mes || e.fecha <= hoy) continue
     if (e.importe > 0) ingresoPrevisto += e.importe
     else gastoPrevisto += e.importe
   }
@@ -161,28 +161,17 @@ export function disponibleReal({ saldo, eventos, ritmoPorDia, hoy, hasta, reserv
 /**
  * A qué mes se le apunta un apunte del extracto.
  *
- * Una nómina cobrada el 25 ya es el dinero del mes que viene, igual que en la
- * previsión. Los demás cobros —una devolución, un Bizum— se quedan en el mes
- * natural en que entraron.
- *
- * Se reconoce de dos maneras a propósito. Por categoría, que es lo directo
- * cuando la nómina está identificada; y porque sea un ingreso que se repite,
- * que es el mismo criterio con el que se desplazan los eventos previstos. Con
- * sólo lo primero, una nómina que la aplicación no ha sabido etiquetar dejaba
- * el mes siguiente a cero sin decir por qué.
- *
- * Vive aquí y se exporta porque hace falta en dos sitios: al sumar el mes y al
- * listar qué lo paga. Copiarla sería volver a tener dos reglas que se
- * contradicen, que es de donde venía todo esto.
+ * Una nómina cobrada el 25 ya es el dinero del mes que viene. El resto de
+ * cobros de final de mes NO: una bonificación del banco de 60 € el día 24 se
+ * repite todos los meses igual que la nómina, pero no paga octubre, paga
+ * septiembre. Por eso no vale con «es un ingreso que vuelve»: quién abre mes
+ * se decide fuera y se pasa hecho.
  *
  * @param {Movimiento} m
- * @param {string} categoria
- * @param {Set<string>} [ingresosRecurrentes]
+ * @param {Set<string>} [abrenMes] entidadId de los cobros que pagan el mes siguiente
  */
-export function mesDeUnMovimiento(m, categoria, ingresosRecurrentes) {
-  const abreMes = categoria === 'nomina'
-    || (m.importe > 0 && !!m.entidadId && ingresosRecurrentes?.has(m.entidadId) === true)
-  return mesContableDe(m.fecha, abreMes)
+export function mesDeUnMovimiento(m, abrenMes) {
+  return mesContableDe(m.fecha, m.importe > 0 && !!m.entidadId && abrenMes?.has(m.entidadId) === true)
 }
 
 /**
@@ -196,8 +185,10 @@ export function mesDeUnMovimiento(m, categoria, ingresosRecurrentes) {
  *
  * @param {import('./bajamar.js').Evento} evento
  */
-export function mesContable(evento) {
-  return mesContableDe(evento.fecha, evento.tipo === 'ingreso')
+export function mesContable(evento, abrenMes) {
+  const abre = evento.tipo === 'ingreso'
+    && (abrenMes === undefined || (!!evento.entidadId && abrenMes.has(evento.entidadId)))
+  return mesContableDe(evento.fecha, abre)
 }
 
 /**
@@ -210,7 +201,7 @@ export function mesContable(evento) {
  * @param {Proyeccion} proyeccion
  * @returns {FilaMes[]}
  */
-export function porMeses(proyeccion) {
+export function porMeses(proyeccion, abrenMes) {
   /** @type {Map<string, FilaMes>} */
   const filas = new Map()
 
@@ -240,7 +231,7 @@ export function porMeses(proyeccion) {
   }
 
   for (const e of proyeccion.eventos) {
-    const fila = filas.get(mesContable(e))
+    const fila = filas.get(mesContable(e, abrenMes))
     if (!fila) continue
     if (e.importe > 0) fila.ingresos += e.importe
     else fila.gastos += e.importe
