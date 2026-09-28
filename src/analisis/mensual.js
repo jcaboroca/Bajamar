@@ -65,6 +65,8 @@ import { diasEntre } from '../dominio/tipos.js'
  * @property {number} importe
  * @property {string} concepto
  * @property {string | null} entidadId  para poder ponerle el nombre bueno
+ * @property {string | null} reciboId   de qué recibo viene, si viene de uno
+ * @property {boolean} aplazable        el usuario dice que un mes malo se lo salta
  * @property {boolean} previsto         todavía no ha pasado
  */
 
@@ -108,6 +110,8 @@ export function detallarPeriodos({ periodos, movimientos, proyeccion, ordinarios
       importe: m.importe,
       concepto: m.nombre ?? m.conceptoRaw ?? '',
       entidadId: m.entidadId ?? null,
+      reciboId: m.reciboId ?? null,
+      aplazable: m.aplazable === true,
       previsto,
     })
 

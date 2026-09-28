@@ -376,3 +376,15 @@ test('un mes a medias prevé un mes entero de día a día, ni más ni menos', ()
     `previsto ${previsto} frente a un mes normal ${unMesNormal}`,
   )
 })
+
+test('la cascada acaba donde acaba el periodo, no en otro sitio', () => {
+  /*
+   * Eran dos cuentas del mismo mes hechas por separado: la cascada repetía por
+   * su cuenta el calendario de los recibos y así se dejó fuera la liquidación
+   * de la tarjeta y volvió a cobrar un agua ya pagada. Cuadraban las dos y no
+   * daban lo mismo, a cuatro dedos una de otra en la misma pantalla.
+   */
+  for (const estado of [armar({ holaluz: 'fijo' }), conElMesEmpezado()]) {
+    assert.equal(estado.cascada.cierre, estado.periodoActual.saldoFinal)
+  }
+})

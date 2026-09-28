@@ -481,14 +481,13 @@ export function construirEstado(crudos, opciones = {}) {
     cascada: cascadaDelPeriodo({
       periodo: enCurso ?? { id: mesDe(hoy), desde: hoy, hasta: finDelPeriodo, completo: false, natural: true },
       fijos,
-      ingreso: ingresoMensual,
-      // El día a día del periodo entero: lo que repartiste si lo hiciste, y si
-      // no, el goteo medido por sus días. Nunca el ritmo del plan multiplicado
-      // por los días del periodo: ese ritmo es «lo que queda entre los días
-      // que quedan», y estirarlo daba cifras que cerraban el mes en rojo.
-      diaADia: plan
-        ? -Object.values(plan.asignado).reduce((t, x) => t + x, 0)
-        : ritmo.porDia * (periodoActual?.dias ?? 30),
+      // Las cifras son las del periodo, no medianas: la cascada explica este
+      // mes, y si explicara uno promedio no cuadraría con el resumen ni con
+      // la gráfica, que sí miran éste.
+      conFecha: periodoActual?.desglose.conFecha ?? [],
+      apertura: periodoActual?.apertura ?? saldoInicial,
+      ingreso: periodoActual?.ingresos.total ?? ingresoMensual,
+      diaADia: periodoActual?.diaADia ?? ritmo.porDia * 30,
       inversiones: opciones.inversiones,
       plazos,
       saltados,

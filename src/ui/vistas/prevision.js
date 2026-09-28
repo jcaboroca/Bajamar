@@ -13,7 +13,7 @@
  */
 
 import { formatEuros, formatEurosRedondo } from '../../dominio/dinero.js'
-import { mesDe, ultimoDiaDelMes, sumarMeses } from '../../dominio/tipos.js'
+import { diasEntre, mesDe, ultimoDiaDelMes, sumarMeses } from '../../dominio/tipos.js'
 import { MESES_DE } from '../../analisis/fijos.js'
 import { dibujarLamina } from '../lamina.js'
 import { montarSimulador, pintarSimulador } from '../simulador.js'
@@ -160,16 +160,17 @@ function pintarCalendario(estado, meses) {
  */
 function pintarCascada(estado) {
   const c = estado.cascada
-  const anio = c.mes.slice(0, 4)
   const nombre = nombreDeMes(c.mes)
   requerir('cascada-rotulo').textContent = `Tu ${nombre.toLowerCase()}`
   requerir('cascada-entradilla').textContent = c.ingreso === 0
     ? 'Todavía no sé lo que cobras, así que esto es sólo lo que sale.'
-    : `Cobras ${formatEuros(c.ingreso)} y con eso pagas del 1 al ${ultimoDiaDelMes(`${c.mes}-01`).slice(8)} `
-      + `de ${nombre.toLowerCase()} de ${anio}.`
+    : `Cobras ${formatEuros(c.ingreso)} y con eso pagas del ${diaYMes(c.desde)} `
+      + `al ${diaYMes(c.hasta)}.`
 
-  let queda = c.ingreso
-  const filas = [encabezado('Lo que cobras', c.ingreso, queda)]
+  let queda = c.apertura
+  const filas = [encabezado('Vienes con', c.apertura, queda)]
+  queda += c.ingreso
+  filas.push(encabezado('Lo que cobras', c.ingreso, queda))
 
   /**
    * @param {string} titulo
@@ -209,7 +210,7 @@ function pintarCascada(estado) {
   dia.append(reparto)
   filas.push(dia)
 
-  filas.push(encabezado(c.resultado < 0 ? 'Te falta' : 'Te sobra', Math.abs(c.resultado), null, c.resultado < 0))
+  filas.push(encabezado('Acabas con', c.cierre, null, c.cierre < 0))
   requerir('cascada').replaceChildren(...filas)
 
   pintarSaldoDelMes(estado)
@@ -217,29 +218,18 @@ function pintarCascada(estado) {
 }
 
 /**
- * La cascada es sólo el mes. Que falten 211 € no significa nada sin saber con
- * cuánto llegas, y ahí es donde vive el punto más bajo.
+ * La cascada ya dice con cuánto llegas y con cuánto acabas. Lo que no dice es
+ * por dónde pasa el punto más bajo, que no es el final del mes casi nunca.
  * @param {Estado} estado
  */
 function pintarSaldoDelMes(estado) {
   const caja = requerir('cascada-saldo')
-  const lista = estado.detalleMensual
-  const i = lista.findIndex((m) => m.id === estado.cascada.mes)
-  const fila = lista[i]
+  const fila = estado.detalleMensual.find((m) => m.id === estado.cascada.mes)
   if (!fila) { caja.replaceChildren(); return }
 
-  // El periodo anterior cierra donde éste abre. Si ya ha empezado no hay
-  // cierre que mirar, y lo único cierto es lo que hay en el banco ahora.
-  const anterior = i > 0 ? lista[i - 1] : null
-  const partes = [
-    nodo('p', 'cascada-saldo-linea', anterior
-      ? `Llegas con ${formatEurosRedondo(anterior.saldoFinal)} y lo acabarías con ${formatEurosRedondo(fila.saldoFinal)}.`
-      : `Ahora tienes ${formatEurosRedondo(estado.saldoInicial)} y acabarías el mes con ${formatEurosRedondo(fila.saldoFinal)}.`),
-  ]
   const bajo = nodo('p', `cascada-saldo-linea${fila.suelo.saldo < 0 ? ' alarma' : ''}`)
   bajo.textContent = `Tu punto más bajo: ${formatEurosRedondo(fila.suelo.saldo)} el ${diaYMes(fila.suelo.fecha)}.`
-  partes.push(bajo)
-  caja.replaceChildren(...partes)
+  caja.replaceChildren(bajo)
 }
 
 /**
@@ -249,16 +239,11 @@ function margen(c) {
   const base = 'Toca cualquier línea para decirme qué es y si te la puedes saltar.'
   if (c.aplazable === 0) {
     return c.resultado < 0
-      ? `Con lo que cobras no llegas: la diferencia sale del saldo que ya tienes. ${base}`
+      ? `Este mes sale más de lo que entra: la diferencia se la come el saldo que traías. ${base}`
       : `Las inversiones salen de la cuenta pero no se gastan: siguen siendo tuyas. ${base}`
   }
-  const conMargen = c.resultado - c.aplazable
-  return c.resultado < 0
-    ? `Si este mes no traspasas lo que puedes saltarte, en vez de faltarte `
-      + `${formatEuros(Math.abs(c.resultado))} te ${conMargen < 0 ? 'faltan' : 'sobran'} `
-      + `${formatEuros(Math.abs(conMargen))}. ${base}`
-    : `Saltarte lo que puedes saltarte te dejaría ${formatEuros(conMargen)} en vez de `
-      + `${formatEuros(c.resultado)}. ${base}`
+  return `Si este mes no traspasas lo que puedes saltarte, acabarías con `
+    + `${formatEuros(c.cierre - c.aplazable)} en vez de ${formatEuros(c.cierre)}. ${base}`
 }
 
 /**
@@ -273,7 +258,7 @@ function margen(c) {
  * @param {import('../../analisis/cascada.js').Cascada} c
  */
 function loQueQuedaParaVivir(queda, c) {
-  const dias = Number(ultimoDiaDelMes(`${c.mes}-01`).slice(8))
+  const dias = diasEntre(c.desde, c.hasta) + 1
   const alDia = Math.round(queda / dias)
   const ritmo = Math.round(Math.abs(c.diaADia) / dias)
   const apurado = alDia < ritmo

@@ -34,12 +34,14 @@ import { MESES_DE } from './fijos.js'
  * @property {boolean} aplazable         el usuario dice que un mes malo se lo salta
  * @property {boolean} puedeSerInversion  la app duda y el usuario puede decidir
  * @property {string} [fecha]             cuándo cae, para saber de qué mes es
+ * @property {boolean} [previsto]         todavía no ha pasado
  * @property {boolean} [saltado]          este mes no se paga: se ve, pero no suma
  */
 
 /**
  * @typedef {object} Cascada
  * @property {string} mes              'yyyy-mm'
+ * @property {number} apertura        con lo que llegas al periodo
  * @property {number} ingreso          céntimos, positivo
  * @property {Escalon[]} fijos         los que se pagan todos los meses
  * @property {Escalon[]} inversiones   sale de la cuenta, pero no se gasta
@@ -52,12 +54,15 @@ import { MESES_DE } from './fijos.js'
  * @property {number} sumaPlazos
  * @property {number} aplazable        lo que darías de margen si te lo saltaras
  * @property {number} resultado        lo que sobra, o falta, al acabar el mes
+ * @property {number} cierre           con lo que acabas: la apertura más el mes
  */
 
 /**
  * @param {object} entrada
  * @param {import('./periodos.js').Periodo} entrada.periodo
  * @param {Fijo[]} entrada.fijos              ya descritos
+ * @param {import('./mensual.js').Apunte[]} [entrada.conFecha] lo que sale con fecha, ya contado
+ * @param {number} [entrada.apertura]         céntimos con los que llegas
  * @param {number} entrada.ingreso            céntimos positivos
  * @param {number} entrada.diaADia            goteo mensual, céntimos negativos
  * @param {Record<string, boolean>} [entrada.inversiones] reciboId → es inversión
@@ -65,39 +70,89 @@ import { MESES_DE } from './fijos.js'
  * @param {Record<string, true>} [entrada.saltados] reciboId|mes que no se paga
  * @returns {Cascada}
  */
-export function cascadaDelPeriodo({ periodo, fijos, ingreso, diaADia, inversiones = {}, plazos = [], saltados = {} }) {
+export function cascadaDelPeriodo({
+  periodo, fijos, conFecha = [], apertura = 0, ingreso, diaADia,
+  inversiones = {}, plazos = [], saltados = {},
+}) {
+  const vivos = fijos.filter((f) => f.estado !== 'extinto')
+  const porRecibo = new Map(vivos.map((f) => [f.reciboId, f]))
+  // Un cobro ya pagado llega con el concepto en bruto del banco. Si su cobrador
+  // tiene ficha se le pone el nombre bueno, salvo que cobre dos cosas distintas
+  // —MyInvestor cobra una aportación y la letra de una furgoneta—.
+  const porEntidad = new Map()
+  for (const f of vivos) {
+    if (!f.entidadId) continue
+    porEntidad.set(f.entidadId, porEntidad.has(f.entidadId) ? null : f)
+  }
+  // Las cuotas no traen reciboId, así que se reconocen por dónde y cuánto.
+  const cuotas = new Map(plazos.map((c) => [`${c.fecha}|${c.importe}`, c]))
+
   /** @type {Escalon[]} */
   const listaFijos = []
   /** @type {Escalon[]} */
   const listaInversiones = []
   /** @type {Escalon[]} */
   const listaToca = []
+  /** @type {Escalon[]} */
+  const listaPlazos = []
 
-  for (const fijo of fijos) {
-    if (fijo.estado === 'extinto') continue
-    const inversion = esInversion(fijo, inversiones)
-    // El interruptor sólo aparece donde hay duda: un traspaso a tu propio
-    // bolsillo puede ser una aportación o la cuota de un préstamo.
-    const puedeSerInversion = fijo.categoria === 'traspaso' || fijo.reciboId in inversiones
+  /*
+   * Los escalones salen de lo que el periodo ya tiene contado, no de repetir
+   * aquí el calendario de los recibos. Haciéndolo por separado la cascada se
+   * dejaba fuera la liquidación de la tarjeta y volvía a cobrar el agua que ya
+   * se había pagado: dos cifras del mismo mes a cuatro dedos de distancia.
+   */
+  for (const a of conFecha) {
+    const fijo = (a.reciboId ? porRecibo.get(a.reciboId) : null)
+      ?? (a.entidadId ? porEntidad.get(a.entidadId) : null)
+    const cuota = cuotas.get(`${a.fecha}|${a.importe}`)
+    const inversion = fijo ? esInversion(fijo, inversiones) : false
+    /** @type {Escalon} */
+    const escalon = {
+      nombre: fijo?.nombre ?? a.concepto,
+      importe: a.importe,
+      detalle: detalleDe(a, fijo ?? null, cuota ?? null),
+      reciboId: a.reciboId ?? '',
+      categoria: fijo?.categoria ?? (cuota ? 'tarjeta' : 'otros'),
+      inversion,
+      aplazable: a.aplazable === true,
+      // El interruptor sólo aparece donde hay duda: un traspaso a tu propio
+      // bolsillo puede ser una aportación o la cuota de un préstamo.
+      puedeSerInversion: fijo
+        ? fijo.categoria === 'traspaso' || fijo.reciboId in inversiones
+        : false,
+      fecha: a.fecha,
+      previsto: a.previsto,
+      saltado: false,
+    }
+    if (inversion) listaInversiones.push(escalon)
+    else if (cuota) listaPlazos.push(escalon)
+    else if (fijo && fijo.periodicidad !== 'mensual') listaToca.push(escalon)
+    else listaFijos.push(escalon)
+  }
+
+  // Lo saltado ya no está en el periodo —se descontó al armar la previsión—,
+  // pero tiene que verse para poder deshacerlo.
+  for (const fijo of vivos) {
     for (const fecha of vecesEn(fijo, periodo)) {
+      if (saltados[`${fijo.reciboId}|${fecha.slice(0, 7)}`] !== true) continue
+      /** @type {Escalon} */
       const escalon = {
         nombre: fijo.nombre,
         importe: fijo.importeEsperado,
         detalle: fijo.periodicidad === 'mensual' ? diaDe(fecha) : `${diaDe(fecha)} · ${cada(fijo)}`,
         reciboId: fijo.reciboId,
         categoria: fijo.categoria,
-        inversion,
+        inversion: esInversion(fijo, inversiones),
         aplazable: fijo.aplazable === true,
-        puedeSerInversion,
+        puedeSerInversion: fijo.categoria === 'traspaso' || fijo.reciboId in inversiones,
         fecha,
-        // La clave es el mes en que CAE el cobro, no el mes de la cascada: un
-        // cobro del 28 de septiembre se enseña en octubre, y si se buscara por
-        // octubre la previsión y la cascada dirían cosas distintas.
-        saltado: saltados[`${fijo.reciboId}|${fecha.slice(0, 7)}`] === true,
+        previsto: true,
+        saltado: true,
       }
-      if (inversion) listaInversiones.push(escalon)
-      else if (fijo.periodicidad === 'mensual') listaFijos.push(escalon)
-      else listaToca.push(escalon)
+      if (escalon.inversion) listaInversiones.push(escalon)
+      else if (fijo.periodicidad !== 'mensual') listaToca.push(escalon)
+      else listaFijos.push(escalon)
     }
   }
 
@@ -105,22 +160,7 @@ export function cascadaDelPeriodo({ periodo, fijos, ingreso, diaADia, inversione
   listaFijos.sort(porImporte)
   listaInversiones.sort(porImporte)
   listaToca.sort(porImporte)
-
-  /** @type {Escalon[]} */
-  const listaPlazos = plazos
-    .filter((c) => c.fecha >= periodo.desde && c.fecha <= periodo.hasta)
-    .map((c) => ({
-      nombre: c.nombre,
-      importe: c.importe,
-      detalle: `cuota ${c.plazo} de ${PLAZOS} · aplazaste ${formatEuros(c.total)}`,
-      reciboId: '',
-      categoria: 'tarjeta',
-      inversion: false,
-      aplazable: false,
-      puedeSerInversion: false,
-      fecha: c.fecha,
-    }))
-    .sort(porImporte)
+  listaPlazos.sort(porImporte)
 
   // Lo saltado sigue en la lista para poder deshacerlo, pero no cuenta: si
   // desapareciera sin dejar rastro, se olvidaría que se saldó.
@@ -135,6 +175,7 @@ export function cascadaDelPeriodo({ periodo, fijos, ingreso, diaADia, inversione
     mes: periodo.id,
     desde: periodo.desde,
     hasta: periodo.hasta,
+    apertura,
     ingreso,
     fijos: listaFijos,
     inversiones: listaInversiones,
@@ -152,7 +193,23 @@ export function cascadaDelPeriodo({ periodo, fijos, ingreso, diaADia, inversione
     aplazable: [...listaFijos, ...listaInversiones, ...listaToca]
       .reduce((t, e) => (e.aplazable && !e.saltado ? t + e.importe : t), 0),
     resultado: ingreso + sumaFijos + sumaInversiones + diaADia + sumaToca + sumaPlazos,
+    // Con lo que acabas. Es la cifra que da nombre a la aplicación, así que
+    // tiene que salir de aquí igual que del resumen y de la gráfica.
+    cierre: apertura + ingreso + sumaFijos + sumaInversiones + diaADia + sumaToca + sumaPlazos,
   }
+}
+
+/**
+ * @param {import('./mensual.js').Apunte} apunte
+ * @param {Fijo | null} fijo
+ * @param {import('./fraccionados.js').Cuota | null} cuota
+ */
+function detalleDe(apunte, fijo, cuota) {
+  if (cuota) return `cuota ${cuota.plazo} de ${PLAZOS} · aplazaste ${formatEuros(cuota.total)}`
+  const dia = diaDe(apunte.fecha)
+  if (!apunte.previsto) return `${dia} · ya pagado`
+  if (fijo && fijo.periodicidad !== 'mensual') return `${dia} · ${cada(fijo)}`
+  return dia
 }
 
 /**

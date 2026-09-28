@@ -446,7 +446,7 @@ describe('el mes empieza con la nómina', () => {
   })
 
   test('la cascada resta de la nómina en orden y cuadra', () => {
-    const c = cascadaDelPeriodo({ periodo: octubre, fijos, ingreso: 282249, diaADia: -121757 })
+    const c = cascadaDelPeriodo({ periodo: octubre, fijos, conFecha: deOctubre(), ingreso: 282249, diaADia: -121757 })
     assert.equal(c.ingreso, 282249)
     // El fondo y el préstamo salen por el mismo sitio: los dos son traspaso.
     assert.equal(c.sumaInversiones, -96800)
@@ -461,7 +461,7 @@ describe('el mes empieza con la nómina', () => {
 
   test('el préstamo se puede sacar de las inversiones', () => {
     const c = cascadaDelPeriodo({
-      periodo: octubre, fijos, ingreso: 282249, diaADia: -121757,
+      periodo: octubre, fijos, conFecha: deOctubre(), ingreso: 282249, diaADia: -121757,
       inversiones: { prestamo: false },
     })
     assert.deepEqual(c.inversiones.map((i) => i.nombre), ['MyInvestor'])
@@ -473,7 +473,10 @@ describe('el mes empieza con la nómina', () => {
 
   test('lo que puedes saltarte se mide aparte, sin salir de la cuenta', () => {
     const conSuelto = fijos.map((f) => (f.reciboId === 'fondo' ? { ...f, aplazable: true } : f))
-    const c = cascadaDelPeriodo({ periodo: octubre, fijos: conSuelto, ingreso: 282249, diaADia: -121757 })
+    const c = cascadaDelPeriodo({
+      periodo: octubre, fijos: conSuelto, ingreso: 282249, diaADia: -121757,
+      conFecha: deOctubre().map((a) => (a.reciboId === 'fondo' ? { ...a, aplazable: true } : a)),
+    })
     assert.equal(c.aplazable, -50000)
     // Saltárselo es una posibilidad, no un hecho: el resultado no lo descuenta.
     assert.equal(c.sumaInversiones, -96800)
@@ -485,7 +488,10 @@ describe('el mes empieza con la nómina', () => {
       cortes: ['2026-08-25', '2026-09-25', '2026-10-25', '2026-11-25'],
       desde: '2026-08-25', hasta: '2026-12-31',
     })
-    const c = cascadaDelPeriodo({ periodo: noviembre, fijos, ingreso: 282249, diaADia: -121757 })
+    const c = cascadaDelPeriodo({
+      periodo: noviembre, fijos, ingreso: 282249, diaADia: -121757,
+      conFecha: [apunte('2026-11-01', -5300, 'fibra')],
+    })
     assert.deepEqual(c.toca, [])
     assert.equal(c.sumaToca, 0)
   })
@@ -499,7 +505,10 @@ describe('el mes empieza con la nómina', () => {
       desde: '2026-08-25', hasta: '2026-11-30',
     })
     const seguro = fijo('mapfre', 'MAPFRE', -58237, 'anual', '2026-09-27', 'seguros')
-    const c = cascadaDelPeriodo({ periodo: octubreSolo, fijos: [seguro], ingreso: 282249, diaADia: 0 })
+    const c = cascadaDelPeriodo({
+      periodo: octubreSolo, fijos: [seguro], ingreso: 282249, diaADia: 0,
+      conFecha: [apunte('2026-09-27', -58237, 'mapfre')],
+    })
     assert.deepEqual(c.toca.map((x) => x.fecha), ['2026-09-27'])
     assert.equal(c.resultado, 282249 - 58237)
   })
@@ -551,7 +560,10 @@ describe('saltarse un mes no es darse de baja', () => {
   })
 
   test('lo saltado no suma, pero sigue a la vista para poder deshacerlo', () => {
-    const normal = cascadaDelPeriodo({ periodo: octubre, fijos: [fijo], ingreso: 282249, diaADia: 0 })
+    const normal = cascadaDelPeriodo({
+      periodo: octubre, fijos: [fijo], ingreso: 282249, diaADia: 0,
+      conFecha: [{ ...apunte('2026-10-20', -50000, 'myinvestor#500'), aplazable: true }],
+    })
     assert.equal(normal.sumaInversiones + normal.sumaFijos, -50000)
 
     const saltada = cascadaDelPeriodo({
@@ -570,7 +582,10 @@ describe('saltarse un mes no es darse de baja', () => {
     // El pie de la cascada dice «saltarte lo que puedes saltarte te dejaría X».
     // Si lo saltado siguiera contando ahí, ofrecería por segunda vez los mismos
     // 500 € que ya has decidido no invertir, y la cifra saldría inflada.
-    const normal = cascadaDelPeriodo({ periodo: octubre, fijos: [fijo], ingreso: 282249, diaADia: 0 })
+    const normal = cascadaDelPeriodo({
+      periodo: octubre, fijos: [fijo], ingreso: 282249, diaADia: 0,
+      conFecha: [{ ...apunte('2026-10-20', -50000, 'myinvestor#500'), aplazable: true }],
+    })
     assert.equal(normal.aplazable, -50000)
 
     const saltada = cascadaDelPeriodo({
@@ -586,6 +601,7 @@ describe('saltarse un mes no es darse de baja', () => {
     const siguiente = cascadaDelPeriodo({
       periodo: noviembre, fijos: [{ ...fijo, proximaPrevista: '2026-11-20' }],
       ingreso: 282249, diaADia: 0,
+      conFecha: [apunte('2026-11-20', -50000, 'myinvestor#500')],
       saltados: { 'myinvestor#500|2026-10': true },
     })
     assert.equal(siguiente.sumaInversiones + siguiente.sumaFijos, -50000)
@@ -705,3 +721,27 @@ describe('con qué cerró cada día', () => {
     assert.equal(cierres.get('2026-09-03'), 49800)
   })
 })
+
+
+/**
+ * Lo que la previsión le entrega a la cascada. La cascada ya no repite el
+ * calendario de los recibos: desglosa lo que el periodo tiene contado, y por
+ * eso los cobros se le dan hechos.
+ * @param {string} fecha
+ * @param {number} importe
+ * @param {string} reciboId
+ */
+function apunte(fecha, importe, reciboId) {
+  return { fecha, importe, concepto: reciboId, entidadId: null, reciboId, aplazable: false, previsto: true }
+}
+
+/** Los cinco cobros que caen en el periodo que abre la nómina del 25 de septiembre. */
+function deOctubre() {
+  return [
+    apunte('2026-09-27', -58237, 'seguro'),
+    apunte('2026-10-01', -5300, 'fibra'),
+    apunte('2026-10-01', -45987, 'ibi'),
+    apunte('2026-10-10', -46800, 'prestamo'),
+    apunte('2026-10-20', -50000, 'fondo'),
+  ]
+}
