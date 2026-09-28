@@ -11,4 +11,8 @@ node_modules/
 icono-512.png
 
 # Diagnóstico personal: nombres e importes reales. Se queda en el disco.
-docs/
+docs/*
+# Los diseños sí: no llevan un solo importe tuyo, y explican por qué la
+# aplicación hace lo que hace. Sin ellos, dentro de un año no hay manera de
+# saber qué se decidió ni contra qué.
+!docs/diseno/
