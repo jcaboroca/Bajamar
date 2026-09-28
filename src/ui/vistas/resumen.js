@@ -365,11 +365,17 @@ function pintarComoVas(periodo) {
   const mayor = Math.max(...desviadas.map((l) => Math.max(l.presupuesto, l.gastado)), 1)
   lista.replaceChildren(...desviadas.map((l) => {
     const li = nodo('li', l.disponible < 0 ? 'en-rojo' : '')
+    // El exceso va debajo del nombre: en una línea con la cifra no cabe en un
+    // teléfono, y una cifra partida en dos renglones no se lee.
+    const medio = nodo('span', 'evento-nombre')
+    medio.append(nodo('span', '', l.nombre))
+    if (l.disponible < 0) {
+      medio.append(nodo('span', 'evento-detalle', `te has pasado ${formatEurosRedondo(-l.disponible)}`))
+    }
     li.append(
-      nodo('span', '', l.nombre),
-      nodo('span', 'evento-importe', l.disponible < 0
-        ? `${formatEurosRedondo(-l.gastado)} de ${formatEurosRedondo(-l.presupuesto)} · te has pasado ${formatEurosRedondo(-l.disponible)}`
-        : `${formatEurosRedondo(-l.gastado)} de ${formatEurosRedondo(-l.presupuesto)}`),
+      medio,
+      nodo('span', 'evento-importe',
+        `${formatEurosRedondo(-l.gastado)} de ${formatEurosRedondo(-l.presupuesto)}`),
       barra((l.gastado / mayor) * 100),
     )
     return li

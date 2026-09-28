@@ -369,7 +369,9 @@ main {
 
 .categorias li {
   display: grid;
-  grid-template-columns: 1fr auto;
+  /* El nombre cede antes que la cifra: partir un importe en dos renglones no
+     se lee, y un nombre largo sí aguanta. */
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 1rem 1rem;
   align-items: baseline;
   padding: 0.75rem 0;
@@ -382,6 +384,8 @@ main {
   border-radius: 1px;
   overflow: hidden;
 }
+/* Haberse pasado es el aviso, no una aclaración al pie. */
+.categorias .en-rojo .evento-detalle { color: var(--alarma); }
 .categorias .barra i,
 .barra i {
   display: block;
