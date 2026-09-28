@@ -1020,3 +1020,8 @@ main {
 .desglose-nombre { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .desglose-lista li.previsto { opacity: 0.7; }
 .desglose-marca { grid-column: 2 / -1; font-size: 0.75rem; color: var(--secundario); }
+
+/* Una cuenta no es un saldo. Va debajo de la cifra de verdad y en ámbar, que
+   aquí quiere decir «esto todavía no ha pasado». */
+.datos.previsto { margin-top: 0.75rem; }
+.datos.previsto dt, .datos.previsto dd { color: var(--acento); }

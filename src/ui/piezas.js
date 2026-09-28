@@ -98,9 +98,10 @@ export function barra(porcentaje) {
 /**
  * Dos columnas: concepto a la izquierda, cifra a la derecha.
  * @param {Array<[string, string, string?]>} pares  [concepto, cifra, clase]
+ * @param {string} [clase]  para el bloque entero
  */
-export function cuentas(pares) {
-  const dl = nodo('dl', 'datos')
+export function cuentas(pares, clase) {
+  const dl = nodo('dl', `datos ${clase ?? ''}`.trim())
   for (const [concepto, cifra, clase] of pares) {
     dl.append(nodo('dt', '', concepto), nodo('dd', `cifras ${clase ?? ''}`.trim(), cifra))
   }

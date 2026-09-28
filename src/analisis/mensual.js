@@ -81,6 +81,7 @@ export function detallarPeriodos({ periodos, movimientos, proyeccion, ordinarios
   const orden = [...movimientos].sort((a, b) => a.fecha.localeCompare(b.fecha))
   const cierres = cierresPorDia(orden)
   const saldoPrevisto = new Map(proyeccion.curva.map((p) => [p.fecha, p.saldo]))
+  const desdePrevisto = proyeccion.desde
   const gotaPorDia = new Map(proyeccion.curva.map((p) => [p.fecha, p.gota]))
 
   return periodos.map((periodo) => {
@@ -122,8 +123,15 @@ export function detallarPeriodos({ periodos, movimientos, proyeccion, ordinarios
       else { conFecha += m.importe; anotar('conFecha', m, false) }
     }
 
+    /*
+     * La frontera entre lo real y lo previsto la pone la proyección, no el
+     * calendario. Un recibo que vence hoy y todavía no ha llegado al extracto
+     * es previsión para ella, y filtrar aquí por «después de hoy» lo dejaba
+     * fuera de la cuenta mientras la curva sí lo bajaba: la resta y el
+     * gráfico acababan diciendo cosas distintas.
+     */
     const futuros = proyeccion.eventos.filter(
-      (e) => e.fecha > hoy && e.fecha >= periodo.desde && e.fecha <= periodo.hasta,
+      (e) => e.fecha >= periodo.desde && e.fecha <= periodo.hasta,
     )
     const entraPrevisto = suma(futuros, (i) => i > 0)
     const conFechaPrevisto = suma(futuros, (i) => i < 0)
@@ -132,9 +140,9 @@ export function detallarPeriodos({ periodos, movimientos, proyeccion, ordinarios
       lista.sort((a, b) => a.fecha.localeCompare(b.fecha))
     }
 
-    const { curva, apertura } = curvaEntre({ periodo, cierres, saldoPrevisto, hoy })
+    const { curva, apertura } = curvaEntre({ periodo, cierres, saldoPrevisto, desdePrevisto })
     let goteoPrevisto = 0
-    for (const p of curva) if (p.fecha > hoy) goteoPrevisto += gotaPorDia.get(p.fecha) ?? 0
+    for (const p of curva) if (p.fecha > desdePrevisto) goteoPrevisto += gotaPorDia.get(p.fecha) ?? 0
 
     const ingresos = repartir(entra + entraPrevisto, entra)
     const compromisos = conFecha + conFechaPrevisto
@@ -239,10 +247,10 @@ export function cierresPorDia(movimientos) {
  * @param {Periodo} entrada.periodo
  * @param {Map<string, number>} entrada.cierres  con cuánto cerró cada día vivido
  * @param {Map<string, number>} entrada.saldoPrevisto
- * @param {string} entrada.hoy
+ * @param {string} entrada.desdePrevisto  primer día que ya no sale del extracto
  * @returns {{ curva: Punto[], apertura: number }}
  */
-function curvaEntre({ periodo, cierres, saldoPrevisto, hoy }) {
+function curvaEntre({ periodo, cierres, saldoPrevisto, desdePrevisto }) {
   let arrastre = 0
   /** @type {Map<string, number>} */
   const realPorDia = new Map()
@@ -261,7 +269,7 @@ function curvaEntre({ periodo, cierres, saldoPrevisto, hoy }) {
   /** @type {Punto[]} */
   const curva = []
   for (let fecha = periodo.desde; fecha <= periodo.hasta; fecha = siguienteDia(fecha)) {
-    arrastre = (fecha <= hoy ? realPorDia.get(fecha) : saldoPrevisto.get(fecha)) ?? arrastre
+    arrastre = (fecha < desdePrevisto ? realPorDia.get(fecha) : saldoPrevisto.get(fecha)) ?? arrastre
     curva.push({ fecha, saldo: arrastre })
   }
   return { curva, apertura }

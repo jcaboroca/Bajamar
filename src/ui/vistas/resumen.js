@@ -262,6 +262,15 @@ function pintarVivir(estado, periodo) {
     return
   }
 
+  // La cifra de arriba es dinero que existe; ésta es una cuenta. Van separadas
+  // y en ámbar para que no se confundan, y la de abajo crece sola según van
+  // llegando los apuntes al extracto.
+  const porVenir = periodo.diaADia - periodo.diaADiaGastado
+  caja.append(cuentas([
+    ['Lo que te queda por gastar, a tu ritmo', formatEuros(porVenir)],
+    [`Acabarías el ${diaYMes(periodo.hasta)} con`, formatEuros(restante + porVenir)],
+  ], 'previsto'))
+
   // El ritmo que queda es sobre los días que quedan: los ya vividos tienen su
   // gasto puesto arriba y contarlos otra vez infla lo que se puede gastar.
   const quedanDias = Math.max(diasEntre(estado.hoy, periodo.hasta), 0) + 1

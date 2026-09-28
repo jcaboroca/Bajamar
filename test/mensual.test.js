@@ -238,3 +238,46 @@ describe('un euro que entra es un ingreso, venga de donde venga', () => {
     )
   })
 })
+
+describe('un recibo que vence hoy y aún no ha llegado al banco', () => {
+  /*
+   * La proyección lo descuenta desde su primer día, porque el saldo del
+   * extracto todavía no lo lleva. Si la cascada lo dejaba fuera por no ser
+   * «posterior a hoy», la resta y el gráfico decían cosas distintas: en un
+   * caso real fueron 717 € de diferencia entre lo que ponía el bloque y lo
+   * que dibujaba la lámina.
+   */
+  const movs = [
+    mov('2026-09-24', -19_152, 104_866, 'super'),
+    mov('2026-09-25', 280_000, 384_866, 'nomina'),
+    mov('2026-09-28', -10_000, 374_866, 'super'),
+  ]
+  const conRecibo = proyectar({
+    saldoInicial: 374_866,
+    desde: HOY,
+    hasta: '2026-10-24',
+    ritmoPorDia: 0,
+    eventos: [
+      { fecha: HOY, importe: -58_237, nombre: 'MAPFRE' },
+      { fecha: '2026-10-10', importe: -46_800, nombre: 'Crédito furgoneta' },
+    ],
+  })
+  const [octubre] = detallarPeriodos({
+    periodos: periodosEntre({ cortes: ['2026-09-25'], desde: '2026-09-25', hasta: '2026-10-24' }),
+    movimientos: movs,
+    proyeccion: conRecibo,
+    ordinarios: ordinariosDe(movs),
+    hoy: HOY,
+  })
+
+  test('cuenta entre lo que sale con fecha, igual que lo cuenta la curva', () => {
+    assert.equal(octubre.compromisos, -(58_237 + 46_800))
+  })
+
+  test('la resta del bloque da lo mismo que el final de la lámina', () => {
+    assert.equal(
+      octubre.apertura + octubre.ingresos.total + octubre.gastos.total,
+      octubre.saldoFinal,
+    )
+  })
+})
