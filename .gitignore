@@ -16,3 +16,6 @@ docs/*
 # aplicación hace lo que hace. Sin ellos, dentro de un año no hay manera de
 # saber qué se decidió ni contra qué.
 !docs/diseno/
+
+# Caché local de wrangler: lleva el id de cuenta y el correo de Cloudflare.
+worker/.wrangler/
