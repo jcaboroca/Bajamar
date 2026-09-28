@@ -79,8 +79,6 @@ function repintar() {
   const estado = ultimo
   const hasta = ultimoDiaDelMes(sumarMeses(estado.hoy, horizonte - 1))
   const proyeccion = recortar(estado.proyeccionLarga, hasta)
-  // La vista de cuenta no mueve la nómina: cada cobro en el mes en que cae.
-  const meses = estado.detalleMensual.filter((f) => f.desde <= hasta)
 
   requerir('lamina-larga').replaceChildren(dibujarLamina(proyeccion, { marca: 'largo' }))
 
@@ -89,7 +87,6 @@ function repintar() {
     + 'De aquí en adelante sólo hay recibos que se repiten y tu ritmo de gasto medido: '
     + 'cuanto más lejos, menos seguro.'
 
-  pintarCalendario(estado, meses)
   pintarCascada(estado)
   pintarSimulador(estado)
   pintarFijos(estado)
@@ -116,42 +113,6 @@ function recortar(proyeccion, hasta) {
     eventos: proyeccion.eventos.filter((e) => e.fecha <= hasta),
   }
 }
-/**
- * Día a día del mes elegido, con el saldo que queda después de cada apunte.
- * @param {Estado} estado
- * @param {import('../../analisis/mes.js').FilaMes[]} meses
- */
-function pintarCalendario(estado, meses) {
-  const mes = estado.periodoActual?.id ?? meses[0]?.id ?? mesDe(estado.hoy)
-  requerir('calendario-rotulo').textContent = `Día a día · ${nombreDeMes(mes)}`
-
-  const saldos = new Map(estado.proyeccionLarga.curva.map((p) => [p.fecha, p.saldo]))
-  const eventos = estado.proyeccionLarga.eventos.filter((e) => mesDe(e.fecha) === mes)
-  const lista = requerir('calendario')
-
-  if (eventos.length === 0) {
-    lista.replaceChildren(vacio('Ningún recibo ni ingreso previsto en este mes. Sólo el gasto del día a día.'))
-    return
-  }
-
-  /** @type {Node[]} */
-  const filas = []
-  let anterior = ''
-  for (const e of eventos) {
-    const saldo = saldos.get(e.fecha)
-    const li = linea({
-      marca: e.fecha === anterior ? '' : diaYMes(e.fecha),
-      nombre: e.nombre,
-      detalle: saldo === undefined ? undefined : `quedan ${formatEurosRedondo(saldo)}`,
-      importe: formatEuros(e.importe, { signo: true }),
-      clase: `${e.seguro ? 'confirmado' : 'previsto'}${saldo !== undefined && saldo < 0 ? ' urgente' : ''}`,
-    })
-    anterior = e.fecha
-    filas.push(li)
-  }
-  lista.replaceChildren(...filas)
-}
-
 /**
  * El mes de arriba abajo: la nómina entera y de ella van saliendo cosas, en el
  * orden en que se deciden. Cada escalón deja a la derecha lo que queda, que es
