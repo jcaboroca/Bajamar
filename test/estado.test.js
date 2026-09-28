@@ -324,3 +324,55 @@ test('la cascada y el resumen no pueden dar cifras distintas del mismo mes', () 
     + `frente a un goteo medido de ${estado.ritmo.porMes}`,
   )
 })
+
+/**
+ * Siete meses de compras sueltas y hoy a dos días de empezar el último: dos
+ * compras ya han pasado y las demás no. Es la situación de cualquier día 3.
+ *
+ * Cada compra es de un sitio distinto a propósito: si el mismo comercio
+ * cobrara todos los meses, dejaría de ser día a día y se volvería un recibo.
+ */
+function conElMesEmpezado() {
+  const movimientos = []
+  let saldo = 300000
+  for (let i = 0; i < 7; i += 1) {
+    const mes = String(3 + i).padStart(2, '0')
+    saldo += 200000
+    movimientos.push(fila(`n${i}`, `2026-${mes}-25`, 'TRANSFERENCIA NOMINA ACME', 200000, saldo))
+    for (let j = 0; j < 5; j += 1) {
+      const dia = 26 + j
+      // Hoy es el 27: del último periodo sólo han pasado dos compras.
+      if (i === 6 && dia > 27) continue
+      const importe = -(2000 + ((i * 7 + j * 13) % 9) * 500)
+      saldo += importe
+      movimientos.push(fila(`g${i}-${j}`, `2026-${mes}-${dia}`, `COMPRA TARJ TIENDA ${i}${j}`, importe, saldo))
+    }
+  }
+  return construirEstado(movimientos, { hoy: '2026-09-27', meses: 3 })
+}
+
+test('lo ya gastado descuenta de lo que queda por gastar, no se suma a ello', () => {
+  const estado = conElMesEmpezado()
+  const yaGastado = Math.abs(estado.periodoActual.diaADiaGastado)
+  assert.ok(yaGastado > 0, 'el periodo en curso tiene que llevar gasto')
+  assert.equal(
+    Math.abs(estado.ritmoEfectivo.porMes),
+    Math.max(Math.abs(estado.ritmo.porMes) - yaGastado, 0),
+  )
+})
+
+test('un mes a medias prevé un mes entero de día a día, ni más ni menos', () => {
+  /*
+   * Gotear la mediana diaria hasta el final hacía que el periodo en curso
+   * previera menos gasto cuanto más avanzado estuviera, y la bajamar salía
+   * optimista justo cuando más se mira. Se pierde hasta un céntimo por día
+   * al repartir el resto, y nada más.
+   */
+  const estado = conElMesEmpezado()
+  const previsto = Math.abs(estado.periodoActual.diaADia)
+  const unMesNormal = Math.abs(estado.ritmo.porMes)
+  assert.ok(
+    Math.abs(previsto - unMesNormal) <= estado.periodoActual.dias,
+    `previsto ${previsto} frente a un mes normal ${unMesNormal}`,
+  )
+})

@@ -20,7 +20,7 @@ import { cortesDeNomina, periodoDe, periodosEntre } from './analisis/periodos.js
 import { balance, evolucion } from './analisis/patrimonio.js'
 import { capacidadDeAhorro } from './analisis/objetivos.js'
 import { revisar } from './analisis/alertas.js'
-import { hoyIso, mesDe, sumarMeses, ultimoDiaDelMes } from './dominio/tipos.js'
+import { hoyIso, diasEntre, mesDe, sumarMeses, ultimoDiaDelMes } from './dominio/tipos.js'
 import { limpiarConcepto } from './entidades/limpiar.js'
 import { indicePorAlias, reconciliar } from './entidades/reconciliar.js'
 import { CATEGORIAS } from './entidades/semillas.js'
@@ -308,7 +308,12 @@ export function construirEstado(crudos, opciones = {}) {
     )],
   )
   const finDelPeriodo = enCurso?.hasta ?? ultimoDiaDelMes(hoy)
-  const ritmoEfectivo = ritmoDelPlan({ plan, gastado: gastadoPorCategoria, hoy, hasta: finDelPeriodo }) ?? ritmo
+  const gastadoDiaADia = ordinarios.reduce(
+    (t, m) => (enCurso && m.fecha >= enCurso.desde && m.fecha <= enCurso.hasta ? t + m.importe : t),
+    0,
+  )
+  const ritmoEfectivo = ritmoDelPlan({ plan, gastado: gastadoPorCategoria, hoy, hasta: finDelPeriodo })
+    ?? loQueQuedaDelMes({ habitualPorMes: ritmo.porMes, gastado: gastadoDiaADia, hoy, hasta: finDelPeriodo })
 
   // El plan manda dentro de su periodo y ni un día más. Su ritmo es «lo que
   // queda entre los días que quedan», así que extenderlo a doce meses daría
@@ -590,4 +595,29 @@ function porRecibo(guardados, recibos, dudosos) {
     if (suyos.length === 1) puestos[suyos[0].reciboId] = trato
   }
   return puestos
+}
+
+/**
+ * El ritmo de lo que queda de periodo cuando todavía no has repartido nada.
+ *
+ * Gotear la mediana diaria hasta el final salía barato de más: el periodo en
+ * curso acababa previendo menos gasto que un mes normal, porque los días ya
+ * vividos no descontaban de nada. Lo que se sabe es cuánto sale en un mes
+ * entero; lo ya gastado lo consume y el resto se reparte entre los días que
+ * faltan, que es lo mismo que hace un plan.
+ *
+ * Como con un plan, pasarse no devuelve dinero: si ya te has ido por encima
+ * de tu mes normal, lo que queda por prever es cero.
+ *
+ * @param {object} entrada
+ * @param {number} entrada.habitualPorMes  céntimos negativos
+ * @param {number} entrada.gastado         céntimos negativos, lo que llevas
+ * @param {string} entrada.hoy
+ * @param {string} entrada.hasta
+ * @returns {{ porDia: number, porMes: number, restante: number }}
+ */
+function loQueQuedaDelMes({ habitualPorMes, gastado, hoy, hasta }) {
+  const restante = Math.max(Math.abs(habitualPorMes) - Math.abs(gastado), 0)
+  const dias = Math.max(diasEntre(hoy, hasta), 0)
+  return { restante, porMes: -restante, porDia: dias === 0 ? 0 : -Math.round(restante / dias) }
 }
