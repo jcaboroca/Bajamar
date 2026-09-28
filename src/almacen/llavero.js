@@ -33,3 +33,23 @@ export function olvidarClave() {
     // Si no se puede borrar, tampoco se pudo guardar.
   }
 }
+
+// Cuándo entró o salió algo de verdad. No viaja con los datos: es de aquí.
+const SELLO = 'bajamar:sincro'
+
+export function marcarSincro() {
+  try {
+    localStorage.setItem(SELLO, new Date().toISOString())
+  } catch {
+    // Sin sitio donde anotarlo, sólo se pierde el aviso de Ajustes.
+  }
+}
+
+/** @returns {string} */
+export function ultimaSincro() {
+  try {
+    return localStorage.getItem(SELLO) ?? ''
+  } catch {
+    return ''
+  }
+}

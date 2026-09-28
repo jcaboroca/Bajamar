@@ -19,7 +19,7 @@ import { bajar, subir, aFichero, desdeFichero, hacerMaleta, SinBuzon } from '../
 import { ContrasenaInvalida } from '../almacen/cifrado.js'
 import { BUZON } from '../../config.js'
 import { pedirClave, quiereRecordar } from './clave.js'
-import { claveRecordada, recordarClave, olvidarClave } from '../almacen/llavero.js'
+import { claveRecordada, recordarClave, olvidarClave, marcarSincro, ultimaSincro } from '../almacen/llavero.js'
 import { construirEstado } from '../estado.js'
 import { recuadrar, sellar } from '../analisis/plan.js'
 import {
@@ -329,6 +329,7 @@ async function refrescar({ animar = false, local = true } = {}) {
   pintarPrevision(estado)
   pintarPatrimonio(estado, preferencias.objetivos)
   pintarAjustes(estado, preferencias.colchon, preferencias.ventanaRitmo)
+  pintarSincro()
 }
 
 /**
@@ -345,13 +346,19 @@ async function ponerseAlDia() {
     await guardarMovimientos(maleta.movimientos)
     const cambios = await mezclarDecisiones(maleta.decisiones ?? {})
     const ahora = (await leerMovimientos()).length
-    if (ahora === antes && cambios === 0) return
+    marcarSincro()
+    if (ahora === antes && cambios === 0) return pintarSincro()
     await refrescar({ animar: antes === 0, local: false })
     if (ahora !== antes) decir(`Traídos ${ahora - antes} movimientos del otro dispositivo.`)
     else decir('Actualizado con lo que cambiaste en el otro dispositivo.')
-  } catch {
-    // Sin buzón todavía, sin red o contraseña cambiada: no es momento de dar la
-    // lata. Los botones de Ajustes siguen ahí.
+  } catch (fallo) {
+    // Un buzón vacío teniendo datos aquí no es un fallo ajeno: es que lo de
+    // aquí nunca llegó a salir. Sólo se subía al importar o al decidir algo,
+    // así que si aquella vez falló, los dos aparatos se quedaban esperando
+    // para siempre, cada uno con lo suyo y creyendo que estaban al día.
+    if (fallo instanceof SinBuzon && (await leerMovimientos()).length > 0) publicar()
+    // Sin red o contraseña cambiada: no es momento de dar la lata. Los botones
+    // de Ajustes siguen ahí.
   }
 }
 
@@ -381,6 +388,8 @@ function publicar() {
         if (!(fallo instanceof SinBuzon)) throw fallo
       }
       await subir(BUZON, hacerMaleta(await leerMovimientos(), await leerDecisiones()), clave)
+      marcarSincro()
+      pintarSincro()
     } catch {
       // El cambio ya está guardado aquí. Viajará con el siguiente, o al volver
       // a abrir la app: no hay nada que el usuario pueda hacer con este aviso.
@@ -410,6 +419,8 @@ async function contarloAlOtro() {
 
   try {
     await subir(BUZON, hacerMaleta(await leerMovimientos(), await leerDecisiones()), clave)
+    marcarSincro()
+    pintarSincro()
     decir('Enviado. Al abrir la app en el otro dispositivo aparecerá allí.')
   } catch {
     decir('Guardado aquí, pero no he podido avisar al otro dispositivo.')
@@ -451,6 +462,24 @@ function decir(texto) {
   recadoPendiente = setTimeout(() => visible.classList.remove('visible'), 6000)
 }
 
+/**
+ * Lo que hay aquí y cuándo se juntó por última vez con el otro aparato.
+ *
+ * Sin esto, tener la contraseña puesta parecía estar sincronizado, y se podían
+ * pasar meses con dos aparatos distintos sin que nada lo dijera.
+ */
+async function pintarSincro() {
+  const donde = document.getElementById('huella-sincro')
+  if (!donde) return
+  const cuantos = (await leerMovimientos()).length
+  const cuando = ultimaSincro()
+  const fecha = cuando
+    ? new Date(cuando).toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+    : ''
+  donde.textContent = `${cuantos} movimientos en este dispositivo. `
+    + (fecha ? `Lo último que se juntó con el otro: ${fecha}.` : 'Todavía no se ha juntado con ningún otro.')
+}
+
 async function enviar() {
   const guardados = await leerMovimientos()
   if (guardados.length === 0) return decir('Todavía no hay nada que enviar.')
@@ -469,6 +498,8 @@ async function enviar() {
   try {
     if (BUZON) {
       await subir(BUZON, maleta, clave)
+      marcarSincro()
+      pintarSincro()
       decir('Enviado. Ábrelo en el otro dispositivo con esa contraseña.')
     } else {
       const via = await aFichero(maleta, clave)
@@ -506,6 +537,8 @@ async function traer(fichero) {
       await mezclarDecisiones(maleta.decisiones ?? {})
       if (quiereRecordar()) recordarClave(clave)
       await refrescar({ animar: true, local: false })
+      marcarSincro()
+      pintarSincro()
       decir(`Traídos ${maleta.movimientos.length} movimientos.`)
       return
     } catch (fallo) {
