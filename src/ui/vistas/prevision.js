@@ -149,6 +149,16 @@ function pintarMeses(meses, estado) {
       nodo('span', `mes-ahorro cifras${f.ahorro < 0 ? ' en-rojo' : ''}`, formatEuros(f.ahorro, { signo: true })),
     )
 
+    // El rango, porque un periodo llamado octubre que empieza el 25 de
+    // septiembre parece un error si no se dice.
+    // Los cortados hay que marcarlos: el primero del extracto empieza donde
+    // empiezan los datos y el último acaba donde acaba la previsión. Sin
+    // decirlo, un periodo de un día parece un fallo de la aplicación.
+    const rango = f.natural
+      ? `del 1 al ${Number(f.hasta.slice(8))}`
+      : `del ${diaYMes(f.desde)} al ${diaYMes(f.hasta)} · ${f.dias} ${f.dias === 1 ? 'día' : 'días'}`
+    const cuando = nodo('p', 'mes-rango', f.completo ? rango : `${rango} · cortado`)
+
     const detalle = nodo('div', 'mes-detalle')
     detalle.append(
       nodo('span', '', `entra ${formatEurosRedondo(f.ingresos.total)}`),
@@ -156,7 +166,15 @@ function pintarMeses(meses, estado) {
       nodo('span', f.suelo.saldo < 0 ? 'en-rojo' : '', `suelo ${formatEurosRedondo(f.suelo.saldo)}`),
     )
 
-    li.append(cabecera, detalle)
+    // Con cuánto entras y con cuánto acabas: sin eso, «entra 2.860 y salen
+    // 1.519» no dice si el mes te deja mejor o peor de lo que estabas.
+    const saldos = nodo('div', 'mes-detalle mes-saldos')
+    saldos.append(
+      nodo('span', '', `entras con ${formatEurosRedondo(f.apertura)}`),
+      nodo('span', f.saldoFinal < 0 ? 'en-rojo' : '', `acabas con ${formatEurosRedondo(f.saldoFinal)}`),
+    )
+
+    li.append(cabecera, cuando, detalle, saldos)
     if (f.ahorro < 0) {
       li.append(nodo('p', 'mes-aviso', `En ${nombreDeMes(f.id).toLowerCase()} se va más de lo que entra.`))
     }

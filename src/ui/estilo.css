@@ -986,3 +986,7 @@ main {
   font-size: 0.9375rem;
   color: var(--secundario);
 }
+
+/* El rango del periodo en la tabla: pequeño, porque es contexto, no dato. */
+.mes-rango { margin: 0.125rem 0 0.375rem; font-size: 0.8125rem; color: var(--secundario); }
+.mes-saldos { opacity: 0.85; }
