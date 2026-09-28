@@ -12,10 +12,12 @@
  * previsión y la bajamar. El histórico deja de mandar y pasa a ser la
  * propuesta de partida.
  *
- * El reparto es de arriba abajo: hay un residuo y se trocea. Subir una barra
- * consume de «sin repartir», y cuando no queda, la barra no sube más. Lo que
- * no se hace es encoger las otras categorías por tu cuenta para que cuadre:
- * eso sería la aplicación gastando tu dinero por ti.
+ * El reparto es de arriba abajo: hay un residuo y se trocea. Todas las barras
+ * comparten el mismo techo y no se mueve, así que la posición de cada pulgar
+ * dice algo y se puede comparar con la de al lado. Pasarse del residuo no lo
+ * impide una pared: se avisa y la bajamar baja, que es la respuesta honesta.
+ * Lo que no se hace es encoger las otras categorías por tu cuenta para que
+ * cuadre: eso sería la aplicación gastando tu dinero por ti.
  */
 
 import { formatEuros, formatEurosRedondo } from '../dominio/dinero.js'
@@ -45,6 +47,9 @@ const SIN_BARRA = new Set(['tarjeta'])
 /** Lo que se está repartiendo ahora mismo: categoría → céntimos positivos. */
 /** @type {Record<string, number>} */
 let borrador = {}
+
+/** El tope de todas las barras, en céntimos. Se fija al pintar y no se toca. */
+let techo = 0
 
 /** @type {Estado | null} */
 let ultimo = null
@@ -108,10 +113,10 @@ export function pintarSimulador(estado) {
     return
   }
 
-  const sinRepartir = estado.residuo - repartido()
+  techo = techoComun(estado)
   lista.replaceChildren(
     cabeceraDelCuadre(estado),
-    ...conBarra.map((categoria) => palanca(categoria, sinRepartir)),
+    ...conBarra.map((categoria) => palanca(categoria)),
     ...apagadas,
   )
 
@@ -146,6 +151,18 @@ function repartoDePartida(estado) {
     limpio[categoria] = importe
   }
   return limpio
+}
+
+/**
+ * El tope de las barras. Es el mismo para todas y no depende de lo repartido,
+ * así que mover una no recoloca el pulgar de las demás. Con un techo por barra
+ * —lo suyo más lo que quedara suelto— las trece bailaban a cada arrastre, y en
+ * cuanto no quedaba nada suelto ninguna subía sin decir por qué.
+ * @param {Estado} estado
+ */
+function techoComun(estado) {
+  const alto = Math.max(estado.residuo, ...Object.values(borrador), PASO)
+  return Math.ceil(alto / PASO) * PASO
 }
 
 /** Lo repartido ahora mismo, en céntimos. */
@@ -235,9 +252,8 @@ function interruptor(categoria, nombre, marcado) {
 }
 /**
  * @param {string} categoria
- * @param {number} sinRepartir  lo que queda suelto, para saber hasta dónde sube
  */
-function palanca(categoria, sinRepartir) {
+function palanca(categoria) {
   const li = nodo('li', 'palanca')
   const nombre = CATEGORIAS[categoria] ?? categoria
 
@@ -254,7 +270,7 @@ function palanca(categoria, sinRepartir) {
   barra.step = String(PASO)
   // El techo va antes que el valor: un range nace con max 100, y asignarle
   // primero el importe en céntimos lo recortaría a cero sin avisar.
-  barra.max = String((borrador[categoria] ?? 0) + Math.max(sinRepartir, 0))
+  barra.max = String(techo)
   barra.value = String(borrador[categoria] ?? 0)
   // El paso redondea el valor que acabamos de poner. Se relee para que la
   // cifra de al lado diga exactamente lo mismo que la barra.
@@ -267,9 +283,7 @@ function palanca(categoria, sinRepartir) {
 }
 
 /**
- * La cuenta del módulo: lo repartido marca el ritmo, el ritmo marca el suelo, y
- * el techo de cada barra es lo suyo más lo que quede sin repartir —que es lo
- * que impide repartir más de lo que hay sin decidir de dónde sale—.
+ * La cuenta del módulo: lo repartido marca el ritmo y el ritmo marca el suelo.
  * @param {Estado} estado
  */
 function refrescarCifras(estado) {
@@ -279,10 +293,6 @@ function refrescarCifras(estado) {
   for (const [categoria, importe] of Object.entries(borrador)) {
     const cifra = lista.querySelector(`[data-cifra="${categoria}"]`)
     if (cifra) cifra.textContent = formatEuros(-importe)
-    const barra = lista.querySelector(`[data-categoria="${categoria}"]`)
-    if (barra instanceof HTMLInputElement) {
-      barra.max = String(importe + Math.max(sinRepartir, 0))
-    }
   }
 
   const suelto = lista.querySelector('[data-cifra=":sinRepartir"]')
