@@ -15,7 +15,7 @@
 import { hoyIso } from '../dominio/tipos.js'
 import { importarXls } from '../importar/sabadell.js'
 import { guardarMovimientos, leerDecisiones, leerMovimientos, mezclarDecisiones, vaciar } from '../almacen/db.js'
-import { bajar, subir, aFichero, desdeFichero, hacerMaleta, SinBuzon } from '../almacen/sincro.js'
+import { bajar, subir, aFichero, desdeFichero, hacerMaleta, buzonDesde, SinBuzon } from '../almacen/sincro.js'
 import { ContrasenaInvalida } from '../almacen/cifrado.js'
 import { BUZON } from '../../config.js'
 import { pedirClave, quiereRecordar } from './clave.js'
@@ -565,6 +565,19 @@ async function pintarSincro() {
     + (fecha ? `Lo último que se juntó con el otro: ${fecha}.` : 'Todavía no se ha juntado con ningún otro.')
     + ` Programa ${await versionInstalada()}.`
     + (decisiones ? ` Decidido a mano: ${decisiones}.` : ' Nada decidido a mano.')
+    + ` ${await buzonPuesto()}`
+}
+
+// Sale de la contraseña, así que dos aparatos que no lo compartan no se están
+// hablando por mucho que cada uno diga que se ha puesto al día.
+async function buzonPuesto() {
+  const clave = claveRecordada()
+  if (!clave) return 'Sin contraseña puesta: este aparato no se junta con ninguno.'
+  try {
+    return `Buzón ${(await buzonDesde(clave)).slice(0, 8)}.`
+  } catch {
+    return ''
+  }
 }
 
 /**
