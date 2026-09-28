@@ -23,7 +23,7 @@ import { proyectar } from '../analisis/bajamar.js'
 import { proponerAsignado, ritmoDelPlan } from '../analisis/plan.js'
 import { ultimoDiaDelMes } from '../dominio/tipos.js'
 import { CATEGORIAS } from '../entidades/semillas.js'
-import { nodo, nombreDeMes, requerir } from './piezas.js'
+import { nodo, requerir } from './piezas.js'
 
 /**
  * @typedef {ReturnType<typeof import('../estado.js').construirEstado>} Estado
@@ -111,7 +111,6 @@ export function pintarSimulador(estado) {
   const sinRepartir = estado.residuo - repartido()
   lista.replaceChildren(
     cabeceraDelCuadre(estado),
-    fijos(estado),
     ...conBarra.map((categoria) => palanca(categoria, sinRepartir)),
     ...apagadas,
   )
@@ -155,22 +154,13 @@ function repartido() {
 }
 
 /**
- * La línea que dice cuánto hay, cuánto has repartido y cuánto queda suelto.
- * Va la primera porque es la cifra contra la que se mueve todo lo demás.
+ * La línea que dice cuánto queda suelto. Va la primera porque es la cifra
+ * contra la que se mueve todo lo demás. El total del que sale ya está arriba,
+ * en el escalón de la cascada que contiene esta lista.
  * @param {Estado} estado
  */
 function cabeceraDelCuadre(estado) {
   const li = nodo('li', 'palanca palanca-fija')
-  const cabecera = nodo('div', 'mes-cabecera')
-  // Con el nombre del mes delante, porque no siempre es el que estás
-  // viviendo: en cuanto entra la nómina se reparte el que abre.
-  cabecera.append(nodo('span', 'mes-nombre',
-    `Para el día a día de ${nombreDeMes(estado.periodoActual?.id ?? '').toLowerCase()}`))
-  const cifra = nodo('span', 'cifras', formatEuros(estado.residuo))
-  cifra.dataset.cifra = ':residuo'
-  cabecera.append(cifra)
-  li.append(cabecera)
-
   const sobrante = nodo('p', 'mes-aviso')
   sobrante.dataset.cifra = ':sinRepartir'
   li.append(sobrante)
@@ -243,24 +233,6 @@ function interruptor(categoria, nombre, marcado) {
     : 'Quitarlo de la previsión: no toca esta temporada'))
   return etiqueta
 }
-
-/**
- * Los recibos abren la lista aunque no se puedan arrastrar: sin ellos delante,
- * parecería que el mes se decide a base de cañas.
- * @param {Estado} estado
- */
-function fijos(estado) {
-  const li = nodo('li', 'palanca palanca-fija')
-  const cabecera = nodo('div', 'mes-cabecera')
-  cabecera.append(nodo('span', 'mes-nombre', 'Recibos fijos'))
-  cabecera.append(nodo('span', 'cifras', formatEuros(-Math.abs(estado.costes.costeMensual))))
-  li.append(cabecera)
-  li.append(nodo('p', 'mes-aviso', estado.aplazableAlMes === 0
-    ? 'No se arrastran: un recibo se quita dándolo de baja, en la lista de abajo.'
-    : `No se arrastran: se quitan dándolos de baja, abajo. ${formatEuros(Math.abs(estado.aplazableAlMes))} son saltables.`))
-  return li
-}
-
 /**
  * @param {string} categoria
  * @param {number} sinRepartir  lo que queda suelto, para saber hasta dónde sube

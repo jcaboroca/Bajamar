@@ -112,30 +112,25 @@
     </section>
 
     <section class="bloque">
-      <p class="rotulo">La cuenta, mes a mes</p>
-      <p class="aclaracion">Cada cobro en el mes en que cae, como lo ve el banco.
-        Para leer un mes por dentro —con la nómina pagando el mes que abre— está
-        el Resumen.</p>
-      <ol id="meses-tabla" class="meses"></ol>
-    </section>
-
-    <section class="bloque">
       <p class="rotulo" id="calendario-rotulo">Día a día</p>
       <p class="aclaracion">Cada línea deja el saldo que quedaría después. Pulsa un
         mes de arriba para mirar otro.</p>
       <ol id="calendario" class="eventos"></ol>
     </section>
 
-    <section class="bloque">
-      <p class="rotulo">Qué pasaría si gastaras menos</p>
-      <p class="titular"><span id="simulador-suelo" class="cifras">—</span></p>
-      <p class="aclaracion" id="simulador-efecto">—</p>
+    <!-- La cascada lo adopta dentro de su escalón «Día a día»: se reparte donde
+         se ve lo que hay que repartir. Vive aquí para que sus oyentes se pongan
+         una sola vez y sobrevivan a los repintados. -->
+    <div id="reparto" hidden>
+      <p class="cascada-queda">Tu punto más bajo con este reparto:
+        <span id="simulador-suelo" class="cifras">—</span></p>
+      <p class="cascada-vivir-lectura" id="simulador-efecto">—</p>
       <ol id="simulador" class="palancas"></ol>
       <div class="acciones">
         <button type="button" id="simulador-reset" class="boton boton-sobrio" hidden>Volver a como estás</button>
       </div>
       <p class="nota" id="simulador-pie"></p>
-    </section>
+    </div>
 
     <section class="bloque" id="bloque-preguntas" hidden>
       <p class="rotulo">No lo sé</p>

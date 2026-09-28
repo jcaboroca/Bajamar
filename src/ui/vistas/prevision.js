@@ -26,8 +26,6 @@ import { marcarPreguntable, preguntarAlPulsar, rotuloDe } from '../trato.js'
  */
 
 let horizonte = 3
-/** @type {string | null} */
-let mesElegido = null
 
 /** @type {Estado | null} */
 let ultimo = null
@@ -68,20 +66,11 @@ export function montarPrevision({ alCambiarTrato, alApagarCategoria, alMarcarInv
     }
     repintar()
   })
-
-  requerir('meses-tabla').addEventListener('click', (e) => {
-    const li = e.target instanceof Element ? e.target.closest('li[data-mes]') : null
-    if (!(li instanceof HTMLElement)) return
-    mesElegido = li.dataset.mes ?? null
-    repintar()
-    requerir('calendario-rotulo').scrollIntoView({ behavior: 'smooth', block: 'start' })
-  })
 }
 
 /** @param {Estado} estado */
 export function pintarPrevision(estado) {
   ultimo = estado
-  mesElegido = null
   repintar()
 }
 
@@ -100,7 +89,6 @@ function repintar() {
     + 'De aquí en adelante sólo hay recibos que se repiten y tu ritmo de gasto medido: '
     + 'cuanto más lejos, menos seguro.'
 
-  pintarMeses(meses, estado)
   pintarCalendario(estado, meses)
   pintarCascada(estado)
   pintarSimulador(estado)
@@ -128,73 +116,13 @@ function recortar(proyeccion, hasta) {
     eventos: proyeccion.eventos.filter((e) => e.fecha <= hasta),
   }
 }
-
-/**
- * @param {import('../../analisis/mes.js').FilaMes[]} meses
- * @param {Estado} estado
- */
-function pintarMeses(meses, estado) {
-  const lista = requerir('meses-tabla')
-  const actual = mesElegido ?? estado.periodoActual?.id
-
-  lista.replaceChildren(...meses.map((f) => {
-    const li = nodo('li', `mes${f.id === actual ? ' elegido' : ''}${f.ahorro < 0 ? ' apretado' : ''}`)
-    li.dataset.mes = f.id
-    li.tabIndex = 0
-    li.setAttribute('role', 'button')
-
-    const cabecera = nodo('div', 'mes-cabecera')
-    cabecera.append(
-      nodo('span', 'mes-nombre', nombreDeMes(f.id)),
-      nodo('span', `mes-ahorro cifras${f.ahorro < 0 ? ' en-rojo' : ''}`, formatEuros(f.ahorro, { signo: true })),
-    )
-
-    // El rango, porque un periodo llamado octubre que empieza el 25 de
-    // septiembre parece un error si no se dice.
-    // Los cortados hay que marcarlos: el primero del extracto empieza donde
-    // empiezan los datos y el último acaba donde acaba la previsión. Sin
-    // decirlo, un periodo de un día parece un fallo de la aplicación.
-    const rango = f.natural
-      ? `del 1 al ${Number(f.hasta.slice(8))}`
-      : `del ${diaYMes(f.desde)} al ${diaYMes(f.hasta)} · ${f.dias} ${f.dias === 1 ? 'día' : 'días'}`
-    const cuando = nodo('p', 'mes-rango', f.completo ? rango : `${rango} · cortado`)
-
-    const detalle = nodo('div', 'mes-detalle')
-    detalle.append(
-      nodo('span', '', `entra ${formatEurosRedondo(f.ingresos.total)}`),
-      nodo('span', '', `sale ${formatEurosRedondo(Math.abs(f.gastos.total))}`),
-      nodo('span', f.suelo.saldo < 0 ? 'en-rojo' : '', `suelo ${formatEurosRedondo(f.suelo.saldo)}`),
-    )
-
-    // Con cuánto entras y con cuánto acabas: sin eso, «entra 2.860 y salen
-    // 1.519» no dice si el mes te deja mejor o peor de lo que estabas.
-    const saldos = nodo('div', 'mes-detalle mes-saldos')
-    saldos.append(
-      nodo('span', '', `entras con ${formatEurosRedondo(f.apertura)}`),
-      nodo('span', f.saldoFinal < 0 ? 'en-rojo' : '', `acabas con ${formatEurosRedondo(f.saldoFinal)}`),
-    )
-
-    li.append(cabecera, cuando, detalle, saldos)
-    if (f.ahorro < 0) {
-      li.append(nodo('p', 'mes-aviso', `En ${nombreDeMes(f.id).toLowerCase()} se va más de lo que entra.`))
-    }
-    li.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault()
-        li.click()
-      }
-    })
-    return li
-  }))
-}
-
 /**
  * Día a día del mes elegido, con el saldo que queda después de cada apunte.
  * @param {Estado} estado
  * @param {import('../../analisis/mes.js').FilaMes[]} meses
  */
 function pintarCalendario(estado, meses) {
-  const mes = mesElegido ?? meses[0]?.id ?? mesDe(estado.hoy)
+  const mes = estado.periodoActual?.id ?? meses[0]?.id ?? mesDe(estado.hoy)
   requerir('calendario-rotulo').textContent = `Día a día · ${nombreDeMes(mes)}`
 
   const saldos = new Map(estado.proyeccionLarga.curva.map((p) => [p.fecha, p.saldo]))
@@ -274,7 +202,11 @@ function pintarCascada(estado) {
 
   queda += c.diaADia
   const dia = encabezado('Día a día', c.diaADia, queda)
-  dia.append(desgloseDiaADia(estado, c.diaADia))
+  // Las barras van aquí y no en un bloque aparte: se reparte en el mismo sitio
+  // donde se ve cuánto queda por repartir.
+  const reparto = requerir('reparto')
+  reparto.hidden = false
+  dia.append(reparto)
   filas.push(dia)
 
   filas.push(encabezado(c.resultado < 0 ? 'Te falta' : 'Te sobra', Math.abs(c.resultado), null, c.resultado < 0))
@@ -427,49 +359,6 @@ function botonDeSaltar(e) {
   boton.dataset.puesto = e.saltado ? 'si' : 'no'
   boton.textContent = e.saltado ? 'Volver a contarlo' : 'Este mes no'
   return boton
-}
-
-/**
- * De dónde sale el goteo. El total es la mediana de los meses completos, así
- * que las partes van en esa proporción: si las líneas no sumaran la cifra de
- * arriba, el desglose no explicaría nada.
- * @param {Estado} estado
- * @param {number} total
- */
-function desgloseDiaADia(estado, total) {
-  const reparto = estado.reparto.filter((r) => r.alMes < 0)
-  const caja = nodo('div', 'cascada-detalle')
-  if (reparto.length === 0) {
-    caja.append(nodo('p', 'cascada-vacio', 'Compra, gasolina, restaurantes… al ritmo al que vienes gastando.'))
-    return caja
-  }
-  const suma = reparto.reduce((t, r) => t + r.alMes, 0)
-  const visibles = reparto.slice(0, 6)
-  const ul = nodo('ul')
-  let mostrado = 0
-  for (const r of visibles) {
-    const parte = Math.round(total * (r.alMes / suma))
-    mostrado += parte
-    const li = nodo('li')
-    li.append(
-      nodo('span', 'cascada-nombre', r.nombre),
-      nodo('span', 'cascada-cuando', `${r.cuantos} apuntes`),
-      nodo('span', 'cifras', formatEuros(parte)),
-    )
-    ul.append(li)
-  }
-  if (reparto.length > visibles.length) {
-    const li = nodo('li')
-    li.append(
-      nodo('span', 'cascada-nombre', `Otras ${reparto.length - visibles.length} categorías`),
-      nodo('span', 'cascada-cuando', ''),
-      nodo('span', 'cifras', formatEuros(total - mostrado)),
-    )
-    ul.append(li)
-  }
-  caja.append(ul, nodo('p', 'cascada-vacio',
-    `Es la mediana de tus últimos ${estado.ritmo.meses} meses: en la mitad gastaste más y en la otra mitad, menos.`))
-  return caja
 }
 
 /** @param {import('../../analisis/cascada.js').Escalon} e */
