@@ -95,6 +95,7 @@ async function arrancar() {
   })
 
   requerir('enviar').addEventListener('click', enviar)
+  requerir('rehacer').addEventListener('click', rehacer)
   requerir('traer').addEventListener('click', () => traer())
 
   const sobre = document.getElementById('fichero-sobre')
@@ -326,6 +327,7 @@ async function refrescar({ animar = false, local = true } = {}) {
  * con lo de aquí por la hora en que se decidió.
  */
 async function ponerseAlDia({ aMano = false } = {}) {
+  if (forzando) return
   if (!BUZON) {
     if (aMano) decir('Esta copia no tiene buzón donde mirar.')
     return
@@ -441,6 +443,9 @@ function tirarParaBuscar() {
 
 /** @type {ReturnType<typeof setTimeout> | undefined} */
 let envioPendiente
+// Mientras se rehace el aparato entero, nada de fondo puede colarse a subir lo
+// que está a medio borrar.
+let forzando = false
 
 /**
  * Cada decisión viaja sola, sin botón de por medio.
@@ -451,7 +456,7 @@ let envioPendiente
  * buzón lo que el otro dispositivo dejó mientras tanto.
  */
 function publicar() {
-  if (!BUZON || !claveRecordada()) return
+  if (!BUZON || forzando || !claveRecordada()) return
   clearTimeout(envioPendiente)
   envioPendiente = setTimeout(async () => {
     const clave = claveRecordada()
@@ -582,6 +587,47 @@ async function buzonPuesto() {
  * atrás enseñando cuentas viejas con datos nuevos. Sin poder comparar las dos
  * versiones, eso parece un error de cálculo.
  */
+
+/**
+ * Cuando dos aparatos han ido cada uno por su lado, fundirlos deja una mezcla
+ * que no es la de ninguno. Esto renuncia a mezclar: manda el buzón y aquí no
+ * queda nada de antes.
+ */
+async function rehacer() {
+  if (!BUZON) return decir('Esta copia no tiene buzón del que traer nada.')
+
+  const mios = (await leerMovimientos()).length
+  const aviso = mios > 0
+    ? `Se borran los ${mios} movimientos de este dispositivo y todo lo que hayas decidido aquí, y se pone en su lugar lo del otro. No hay vuelta atrás.`
+    : 'Se trae todo lo que haya guardado en el otro dispositivo.'
+  if (!confirm(aviso)) return
+
+  const clave = claveRecordada() || await pedirClave({
+    aceptar: 'Traer',
+    pie: 'La misma contraseña que tienes puesta en el otro dispositivo.',
+  })
+  if (!clave) return
+
+  forzando = true
+  decir('Trayendo…')
+  try {
+    const maleta = await bajar(BUZON, clave)
+    await vaciar()
+    await guardarMovimientos(maleta.movimientos)
+    await mezclarDecisiones(maleta.decisiones ?? {})
+    if (quiereRecordar()) recordarClave(clave)
+    marcarSincro()
+    await refrescar({ animar: true, local: false })
+    pintarSincro()
+    decir(`Este dispositivo es ahora igual que el otro: ${maleta.movimientos.length} movimientos.`)
+  } catch (fallo) {
+    if (fallo instanceof ContrasenaInvalida) decir('Esa contraseña no abre lo que hay guardado, así que no he borrado nada.')
+    else if (fallo instanceof SinBuzon) decir('No hay nada guardado con esa contraseña, así que no he borrado nada.')
+    else decir(`No he podido traerlo, y no he borrado nada: ${fallo instanceof Error ? fallo.message : fallo}`)
+  } finally {
+    forzando = false
+  }
+}
 
 async function enviar() {
   const guardados = await leerMovimientos()
