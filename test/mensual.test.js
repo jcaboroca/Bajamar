@@ -281,3 +281,32 @@ describe('un recibo que vence hoy y aún no ha llegado al banco', () => {
     )
   })
 })
+
+describe('los periodos encajan uno detrás de otro', () => {
+  // Dos meses que aún no han llegado, uno detrás del otro. La apertura salía del
+  // último saldo real del extracto, así que los dos arrancaban con el saldo de
+  // hoy: el segundo borraba al primero y la previsión larga no acumulaba nada.
+  const largos = periodosEntre({
+    cortes: ['2026-08-25', '2026-09-25', '2026-10-25', '2026-11-25'],
+    desde: '2026-08-25',
+    hasta: '2026-12-24',
+  })
+  const lejos = proyectar({
+    saldoInicial: 374_866,
+    desde: HOY,
+    hasta: '2026-12-24',
+    ritmoPorDia: -1000,
+    eventos: [],
+  })
+  const conFuturo = detallarPeriodos({ periodos: largos, movimientos, proyeccion: lejos, ordinarios: ordinariosDe(movimientos), hoy: HOY })
+
+  test('cada uno abre con lo que cerró el anterior, también los que aún no han llegado', () => {
+    for (let i = 1; i < conFuturo.length; i += 1) {
+      assert.equal(conFuturo[i].apertura, conFuturo[i - 1].saldoFinal, `${conFuturo[i].id} no encaja con ${conFuturo[i - 1].id}`)
+    }
+  })
+
+  test('hay meses de verdad por delante', () => {
+    assert.ok(conFuturo.filter((p) => p.estado === 'futuro').length >= 2)
+  })
+})

@@ -268,6 +268,15 @@ function curvaEntre({ periodo, cierres, saldoPrevisto, desdePrevisto }) {
    * día ya la lleva dentro: tomarlo como apertura la contaba dos veces, una
    * en «empiezas con» y otra en «lo que entra».
    */
+  if (periodo.desde >= desdePrevisto) {
+    // Un mes que aún no ha empezado no arranca con el saldo de hoy: arranca con
+    // lo que la previsión diga que quedará la víspera. Si no, cada mes futuro
+    // borraba el anterior y la previsión larga nunca acumulaba nada.
+    let vispera = ''
+    for (const [fecha, saldo] of saldoPrevisto) {
+      if (fecha < periodo.desde && fecha > vispera) { vispera = fecha; arrastre = saldo }
+    }
+  }
   const apertura = arrastre
 
   /** @type {Punto[]} */
