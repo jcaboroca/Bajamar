@@ -49,6 +49,7 @@ import {
 } from '../almacen/preferencias.js'
 import { requerir } from './piezas.js'
 import { arrancarNavegacion } from './nav.js'
+import { vigilarVersion } from './actualizacion.js'
 import { montarResumen, pintarResumen } from './vistas/resumen.js'
 import { montarMovimientos, pintarMovimientos } from './vistas/movimientos.js'
 import { montarPrevision, pintarPrevision } from './vistas/prevision.js'
@@ -134,6 +135,7 @@ async function arrancar() {
     navigator.serviceWorker.register('sw.js').catch(() => {})
   }
 
+  vigilarVersion(requerir('hay-version'))
   ponerseAlDia()
   tirarParaBuscar()
 

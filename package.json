@@ -8,6 +8,7 @@
     "node": ">=22"
   },
   "scripts": {
+    "pretest": "node scripts/sellar.mjs",
     "test": "node --test",
     "dev": "node scripts/servir.mjs",
     "buzon": "node scripts/buzon.mjs"

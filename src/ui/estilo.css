@@ -809,6 +809,26 @@ details.grupo > summary::marker { color: var(--secundario); }
 .recado.visible { opacity: 1; transform: translate(-50%, 0); }
 @media (min-width: 46rem) { .recado { bottom: 1.5rem; } }
 
+.hay-version {
+  position: fixed;
+  left: 50%;
+  bottom: calc(4.5rem + env(safe-area-inset-bottom));
+  z-index: 9;
+  width: min(24rem, calc(100vw - 2rem));
+  padding: 0.75rem 1rem;
+  transform: translateX(-50%);
+  background: var(--superficie);
+  border: 1px solid var(--acento);
+  border-radius: 0.625rem;
+  font: inherit;
+  font-size: 0.875rem;
+  color: var(--acento);
+  cursor: pointer;
+}
+.hay-version[hidden] { display: none; }
+.hay-version:active { transform: translateX(-50%) scale(0.97); }
+@media (min-width: 46rem) { .hay-version { bottom: 1.5rem; } }
+
 .recordar {
   display: flex;
   gap: 0.6rem;
