@@ -23,6 +23,13 @@ import { marcarPreguntable, preguntarAlPulsar, rotuloDe } from '../trato.js'
 /** @type {Estado | null} */
 let ultimo = null
 
+/**
+ * Qué grupos has plegado. Cualquier decisión repinta la pestaña entera, así que
+ * si no se recuerda aquí se te vuelven a abrir todos en cuanto tocas algo.
+ * @type {Set<string>}
+ */
+const cerrados = new Set()
+
 export function montarCategorias({ alCambiarTrato, alMarcarAnual }) {
   for (const caja of ['fijos', 'apartados']) {
     preguntarAlPulsar(requerir(caja), () => ultimo, alCambiarTrato)
@@ -55,8 +62,21 @@ function pintarFijos(estado) {
    */
   const grupo = (titulo, explicacion, lista) => {
     if (lista.length === 0) return null
-    const div = nodo('div', 'grupo')
-    div.append(nodo('p', 'rotulo rotulo-menor', titulo), nodo('p', 'aclaracion', explicacion))
+    const div = nodo('details', 'grupo')
+    // Se abren todos la primera vez: plegar es para quitar de en medio lo que
+    // no interesa, no para esconder de entrada lo que antes se veía.
+    div.open = !cerrados.has(titulo)
+    div.addEventListener('toggle', () => {
+      if (div.open) cerrados.delete(titulo)
+      else cerrados.add(titulo)
+    })
+    const suma = lista.reduce((t, f) => t + f.mensualEquivalente, 0)
+    const cabeza = nodo('summary', 'grupo-cabecera')
+    cabeza.append(
+      nodo('span', 'rotulo rotulo-menor', titulo),
+      nodo('span', 'cifras grupo-suma', `${formatEuros(suma)} al mes`),
+    )
+    div.append(cabeza, nodo('p', 'aclaracion', explicacion))
     const ol = nodo('ol', 'eventos pulsables')
     for (const f of lista) {
       const cada = f.periodicidad === 'mensual' ? 'al mes' : `cada ${MESES_DE[f.periodicidad]} meses`

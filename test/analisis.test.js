@@ -511,3 +511,66 @@ describe('un recibo que llega tarde', () => {
     assert.equal(compromisos[0].estado, 'activo')
   })
 })
+
+describe('un cobrador con más de una cosa dentro', () => {
+  const NOMBRES_APPLE = new Map([['e', 'Apple']])
+
+  // Caso real: la cuota de 9,99 al mes, la licencia de desarrollador de 99 al
+  // año y varias compras sueltas, todo bajo el mismo nombre.
+  const APPLE = [
+    ['2025-01-07', -699], ['2025-06-04', -2249], ['2025-07-04', -2249],
+    ['2025-08-04', -2249], ['2025-08-27', -9900], ['2025-11-17', -1299],
+    ['2026-01-07', -999], ['2026-02-09', -999], ['2026-03-09', -999],
+    ['2026-04-07', -999], ['2026-05-07', -999], ['2026-06-08', -999],
+    ['2026-07-07', -999], ['2026-08-07', -999], ['2026-09-07', -999],
+  ]
+
+  test('la cuota se separa de las compras sueltas', () => {
+    const { compromisos } = detectarCompromisos(
+      APPLE.map(([f, v]) => mov(f, v)),
+      NOMBRES_APPLE,
+      { hoy: '2026-09-29' },
+    )
+    const cuota = compromisos.filter((c) => c.importeEsperado === -999)
+    assert.equal(cuota.length, 1, 'la cuota mensual tiene que salir')
+    assert.equal(cuota[0].periodicidad, 'mensual')
+    assert.ok(cuota[0].observaciones < APPLE.length, 'no puede llevarse todo dentro')
+  })
+
+  test('una licencia de 99 € no es ruido de una cuota de 9,99', () => {
+    // Daba igual dónde se cortara: con un 30 % de holgura, el cargo grande
+    // colaba como si fuera la misma cuota con otro redondeo.
+    const { compromisos } = detectarCompromisos(
+      APPLE.map(([f, v]) => mov(f, v)),
+      NOMBRES_APPLE,
+      { hoy: '2026-09-29' },
+    )
+    const todoJunto = compromisos.some((c) => c.observaciones === APPLE.length)
+    assert.equal(todoJunto, false)
+  })
+
+  test('una suscripción que sube de precio dos veces sigue siendo una', () => {
+    // Netflix: 13,99 hasta junio de 2025, 6,99 hasta abril de 2026 y 8,99
+    // desde entonces. Tres tramos planos, no tres cosas distintas.
+    const fechas = [
+      '2025-01-02', '2025-01-31', '2025-02-28', '2025-03-31', '2025-04-30',
+      '2025-06-02', '2025-06-30', '2025-07-31', '2025-09-01', '2025-09-30',
+      '2025-10-31', '2025-12-01', '2025-12-31', '2026-02-02', '2026-03-02',
+      '2026-03-31', '2026-04-30', '2026-06-01', '2026-06-30', '2026-07-31',
+      '2026-08-31',
+    ]
+    const importes = [
+      -1399, -1399, -1399, -1399, -1399, -1399, -1399,
+      -699, -699, -699, -699, -699, -699, -699, -699, -699, -699,
+      -899, -899, -899, -899,
+    ]
+    const { compromisos } = detectarCompromisos(
+      fechas.map((f, i) => mov(f, importes[i])),
+      new Map([['e', 'Netflix']]),
+      { hoy: '2026-09-29' },
+    )
+    assert.equal(compromisos.length, 1)
+    assert.equal(compromisos[0].periodicidad, 'mensual')
+    assert.equal(compromisos[0].importeEsperado, -899, 'vale lo que vale ahora')
+  })
+})

@@ -27,6 +27,9 @@ export const MESES_DE = { mensual: 1, bimestral: 2, trimestral: 3, semestral: 6,
  */
 const UMBRAL_VARIABLE = 0.18
 
+/** Cuántos cobros recientes deciden si el importe se puede dar por sabido. */
+const ULTIMOS = 6
+
 /**
  * @typedef {object} Fijo
  * @property {string} entidadId
@@ -64,12 +67,18 @@ export function describirFijos(compromisos, movimientos, categorias) {
     // dispersión es real. Si tiene varias —el ayuntamiento cobra tres recibos
     // distintos— hay que quedarse con los importes que se parecen a este, o la
     // luz saldría «variable» por culpa del agua.
+    // Tener un solo recibo tampoco basta: Apple cobra 9,99 al mes y además
+    // vende aplicaciones sueltas, que no son parte de la cuota. El reciboId
+    // sólo se aparta del entidadId cuando hubo que separar algo.
     const conMismoCobrador = compromisos.filter((otro) => otro.entidadId === c.entidadId).length
     const todos = serie.get(c.entidadId) ?? []
-    const cercanos = conMismoCobrador === 1
+    const cercanos = conMismoCobrador === 1 && (c.reciboId ?? c.entidadId) === c.entidadId
       ? todos
       : todos.filter((v) => Math.abs(v - c.importeEsperado) <= Math.abs(c.importeEsperado) * 0.4)
-    const variacion = dispersion(cercanos, c.importeEsperado)
+    // Sólo cuenta lo reciente. Netflix subió de precio dos veces en año y medio
+    // y eso no lo vuelve impredecible: lleva cuatro meses clavado, y la
+    // pregunta es si hoy se puede dar por sabido lo que vale.
+    const variacion = dispersion(cercanos.slice(-ULTIMOS), c.importeEsperado)
     return {
       entidadId: c.entidadId,
       reciboId: c.reciboId,

@@ -149,7 +149,11 @@ function casiIguales(importes) {
   const tipico = mediana(importes)
   const holgura = Math.max(10, tipico * 0.02)
   const dentro = importes.filter((v) => Math.abs(v - tipico) <= holgura).length
-  return dentro >= Math.ceil(importes.length * 0.7)
+  if (dentro < Math.ceil(importes.length * 0.7)) return false
+  // Se tolera que alguno se salga, pero no que se dispare. Una licencia de 99 €
+  // entre nueve cuotas de 9,99 no es la misma cuota redondeada de otra manera,
+  // y colarla aquí hacía pasar a Apple entero por un solo recibo.
+  return importes.every((v) => Math.abs(v - tipico) <= Math.max(100, tipico * 0.5))
 }
 
 /**
@@ -161,12 +165,32 @@ function casiIguales(importes) {
 function tienenElMismoPrecio(serie) {
   const importes = serie.map((m) => Math.abs(m.importe))
   if (casiIguales(importes)) return true
-  // Una subida de precio deja dos tramos planos, uno detrás del otro. Un montón
-  // de compras parecidas no deja ninguno.
-  for (let corte = 2; corte <= importes.length - 2; corte += 1) {
-    if (casiIguales(importes.slice(0, corte)) && casiIguales(importes.slice(corte))) return true
+  // Cada precio deja un tramo plano y seguido. Y los precios cambian más de una
+  // vez: Netflix pasó de 13,99 a 6,99 y de ahí a 8,99 en año y medio. Se van
+  // mordiendo tramos lo más largos posible; si alguno sale de uno solo, esto no
+  // son precios sino compras sueltas.
+  let desde = 0
+  let tramos = 0
+  while (desde < importes.length) {
+    let hasta = importes.length
+    while (hasta > desde && !casiIguales(importes.slice(desde, hasta))) hasta -= 1
+    if (hasta - desde < 2) return false
+    desde = hasta
+    tramos += 1
   }
-  return false
+  return tramos <= 4
+}
+
+/**
+ * La racha final de importes iguales. Un cobro viejo y suelto le rompe el ritmo
+ * a una serie que lleva nueve meses clavada, y entonces se pierde entera.
+ * @param {Movimiento[]} serie  ordenada por fecha ascendente
+ * @returns {Movimiento[]}
+ */
+function rachaFinal(serie) {
+  let desde = serie.length - 1
+  while (desde > 0 && casiIguales(serie.slice(desde - 1).map((m) => Math.abs(m.importe)))) desde -= 1
+  return serie.slice(desde)
 }
 
 /**
@@ -175,8 +199,7 @@ function tienenElMismoPrecio(serie) {
  * mes a otro y no debe trocearse, pero el ayuntamiento sí.
  * @param {Movimiento[]} lista
  * @returns {Movimiento[][]}
- */
-function separarPorImporte(lista) {
+ */function separarPorImporte(lista) {
   const orden = [...lista].sort((a, b) => Math.abs(a.importe) - Math.abs(b.importe))
   /** @type {Movimiento[][]} */
   const grupos = []
@@ -338,9 +361,12 @@ export function detectarCompromisos(movimientos, nombres, opciones = {}) {
     const nombre = nombres.get(entidadId) ?? entidadId
     const orden = [...lista].sort((a, b) => a.fecha.localeCompare(b.fecha))
 
-    // Primer intento: el cobrador entero como una sola serie.
+    // Primer intento: el cobrador entero como una sola serie. Aunque tenga
+    // ritmo, si sus importes no son el mismo precio puede ser un cobrador con
+    // dos cosas a la vez —una cuota al mes y una licencia al año— y entonces
+    // hay que mirar dentro antes de darlo por un solo recibo.
     const entera = periodicidadDe(orden)
-    if (entera) {
+    if (entera && tienenElMismoPrecio(orden)) {
       compromisos.push(construir(entidadId, nombre, orden, entera))
       continue
     }
@@ -348,24 +374,48 @@ export function detectarCompromisos(movimientos, nombres, opciones = {}) {
     // Segundo intento: varias series distintas bajo el mismo cobrador.
     let encontrada = false
     const usados = new Set()
+    /** @type {Compromiso[]} */
+    const sueltas = []
+    let cubiertos = 0
     if (orden.length >= 5) {
       for (const serie of separarPorImporte(orden)) {
         if (serie.length < 2) continue
         const cronologica = [...serie].sort((a, b) => a.fecha.localeCompare(b.fecha))
-        const ritmo = periodicidadDe(cronologica)
+        let candidata = cronologica
+        let ritmo = periodicidadDe(candidata)
+        if (!ritmo) {
+          const racha = rachaFinal(cronologica)
+          if (racha.length >= 3) {
+            candidata = racha
+            ritmo = periodicidadDe(candidata)
+          }
+        }
         if (!ritmo) continue
-        if (!tienenElMismoPrecio(cronologica)) continue
+        if (!tienenElMismoPrecio(candidata)) continue
         // Dos préstamos del mismo banco salen como dos líneas con el mismo
         // nombre. No se les pega el importe al nombre: ya está en su columna,
         // y repetirlo sólo consigue que el nombre no quepa en una línea.
-        const recibo = construir(entidadId, nombre, cronologica, ritmo, true)
+        const recibo = construir(entidadId, nombre, candidata, ritmo, true)
         // Dos series con el mismo importe compartirían identidad, y entonces
         // contestar por una contestaría por la otra sin avisar.
         while (usados.has(recibo.reciboId)) recibo.reciboId += '+'
         usados.add(recibo.reciboId)
-        compromisos.push(recibo)
+        sueltas.push(recibo)
+        cubiertos += candidata.length
         encontrada = true
       }
+    }
+
+    // Trocear sólo compensa si lo troceado explica al cobrador. Con la luz
+    // salen dos meses parecidos por casualidad y el resto queda huérfano: más
+    // vale un recibo variable entero que dos trozos y un agujero.
+    if (encontrada && (!entera || cubiertos * 2 >= orden.length)) {
+      compromisos.push(...sueltas)
+      continue
+    }
+    if (entera) {
+      compromisos.push(construir(entidadId, nombre, orden, entera))
+      continue
     }
     if (!encontrada) {
       // Tercer intento: una factura al año. No se mete antes porque cualquier

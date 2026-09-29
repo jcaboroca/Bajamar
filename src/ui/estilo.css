@@ -580,6 +580,13 @@ main {
   border-bottom: 1px solid var(--linea);
 }
 .grupo-cabecera .rotulo { margin: 0; }
+
+/* Mismo gesto y mismo marcador nativo que los desplegables del Resumen y de
+   Previsión. Plegado, el grupo sigue diciendo lo que cuesta al mes. */
+details.grupo > summary { cursor: pointer; list-style-position: inside; }
+details.grupo > summary::marker { color: var(--secundario); }
+.grupo-suma { color: var(--secundario); font-size: 0.875rem; }
+
 .destacado { color: var(--texto); font-weight: 500; }
 
 /* ── Ajustes ────────────────────────────────────────────────────────────── */
