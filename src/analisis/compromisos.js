@@ -543,6 +543,33 @@ export function detectarCompromisos(movimientos, nombres, opciones = {}) {
 }
 
 /**
+ * Los recibos que el banco te cobra y te devuelve el mismo día, como la
+ * comisión de mantenimiento y su bonificación. No es dinero tuyo yendo a
+ * ninguna parte, pero cada uno por su lado se lee como un gasto trimestral de
+ * 60 € que no existe.
+ *
+ * Se exige que coincida todo —mismo cobrador, mismo ritmo, mismo día y la suma
+ * exacta cero— porque anular un gasto de verdad sería mucho peor que enseñar
+ * uno de más.
+ * @param {Compromiso[]} gastos
+ * @param {Compromiso[]} ingresos
+ * @returns {Set<string>} los reciboId de los que se anulan entre sí
+ */
+export function loQueSeAnula(gastos, ingresos) {
+  /** @param {Compromiso} c @param {Compromiso[]} otros */
+  const tieneGemelo = (c, otros) => otros.some((o) => (
+    o.entidadId === c.entidadId
+    && o.periodicidad === c.periodicidad
+    && o.proximaPrevista === c.proximaPrevista
+    && o.importeEsperado === -c.importeEsperado
+  ))
+  const fuera = new Set()
+  for (const c of gastos) if (tieneGemelo(c, ingresos)) fuera.add(c.reciboId)
+  for (const c of ingresos) if (tieneGemelo(c, gastos)) fuera.add(c.reciboId)
+  return fuera
+}
+
+/**
  * La nómina y demás ingresos que se repiten.
  * @param {Movimiento[]} movimientos
  * @param {Map<string, string>} nombres

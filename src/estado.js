@@ -7,7 +7,7 @@
  * lo que necesitan y se devuelve un objeto plano.
  */
 
-import { detectarCompromisos, detectarIngresos, gastoOrdinario, ritmoOrdinario } from './analisis/compromisos.js'
+import { detectarCompromisos, detectarIngresos, gastoOrdinario, loQueSeAnula, ritmoOrdinario } from './analisis/compromisos.js'
 import { eventosDesde, proyectar } from './analisis/bajamar.js'
 import { describirFijos, estructura, MESES_DE } from './analisis/fijos.js'
 import { cascadaDelPeriodo } from './analisis/cascada.js'
@@ -242,7 +242,12 @@ export function construirEstado(crudos, opciones = {}) {
     [...compromisosTodos, ...ingresosTodos],
     new Set(deteccion.dudosos.map((d) => d.entidadId)),
   )
-  const deBaja = new Set(Object.keys(tratos).filter((id) => tratos[id] === 'baja'))
+  const deBaja = new Set([
+    ...Object.keys(tratos).filter((id) => tratos[id] === 'baja'),
+    // Un cobro y su devolución del mismo día se tratan como una baja: ni se
+    // prevén ni sus apuntes cuentan como gasto del día a día.
+    ...loQueSeAnula(compromisosTodos, ingresosTodos),
+  ])
   const aplazables = new Set(Object.keys(tratos).filter((id) => tratos[id] === 'suelto'))
 
   const compromisos = compromisosTodos.filter((c) => !deBaja.has(c.reciboId))

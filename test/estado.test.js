@@ -415,3 +415,22 @@ test('la cascada acaba donde acaba el periodo, no en otro sitio', () => {
     assert.equal(estado.cascada.cierre, estado.periodoActual.saldoFinal)
   }
 })
+
+test('un cobro y su devolución del mismo día no son un gasto', () => {
+  // El banco cobra 60 € de comisión cada trimestre y el mismo día te los
+  // bonifica. Cada apunte por su lado se leía como un recibo trimestral, y
+  // Categorías enseñaba un gasto de 20 € al mes que no existe.
+  const movimientos = extracto()
+  const saldo = 900000
+  for (const fecha of ['2025-03-24', '2025-06-24', '2025-09-24', '2025-12-24', '2026-03-24', '2026-06-24', '2026-09-24']) {
+    movimientos.push(fila(`com-${fecha}`, fecha, 'INTERESES Y/O COMISIONES CUENTA', -6000, saldo - 6000))
+    movimientos.push(fila(`bon-${fecha}`, fecha, 'BONIFIC. COMISION MANT. CUENTA', 6000, saldo))
+  }
+  const e = construirEstado(movimientos, { hoy: HOY, meses: 3 })
+
+  const deComisiones = (/** @type {{ nombre: string }} */ c) => /comision/i.test(c.nombre)
+  assert.equal(e.compromisos.filter(deComisiones).length, 0, 'la comisión no se prevé')
+  assert.equal(e.ingresos.filter(deComisiones).length, 0, 'ni su bonificación')
+  // Y no se cuelan en el goteo por la puerta de atrás: no es dinero que gastes.
+  assert.equal(e.ordinarios.filter((m) => m.id.startsWith('com-')).length, 0)
+})
