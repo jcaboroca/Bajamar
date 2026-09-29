@@ -35,6 +35,7 @@ import {
   ponerUnico,
   ponerAnual,
   ponerRitmo,
+  ponerManual,
   ponerApagada,
   ponerInversion,
   ponerRetoque,
@@ -184,6 +185,11 @@ function montarVistas() {
 
   montarCategorias({
     alCambiarTrato,
+    alApuntarRecibo: async (manual) => {
+      await ponerManual(manual)
+      await refrescar()
+      decir(`Hecho: ${manual.nombre} entra en la previsión.`)
+    },
     alMarcarAnual: async (entidadId, esAnual) => {
       await ponerAnual(entidadId, esAnual)
       await refrescar()
@@ -304,6 +310,7 @@ async function refrescar({ animar = false, local = true } = {}) {
     unicos: preferencias.unicos,
     anuales: preferencias.anuales,
     ritmos: preferencias.ritmos,
+    manuales: preferencias.manuales,
     apagadas: preferencias.apagadas,
     inversiones: preferencias.inversiones,
     saltados: preferencias.saltados,

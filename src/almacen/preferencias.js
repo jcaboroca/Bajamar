@@ -36,6 +36,7 @@ import { VENTANA_POR_DEFECTO } from '../analisis/compromisos.js'
  * @property {Record<string, true>} unicos     entidadId → no va a repetirse
  * @property {Record<string, true>} anuales    entidadId → vuelve cada año
  * @property {Record<string, string>} ritmos   reciboId → cada cuánto llega, dicho por ti
+ * @property {import('../dominio/tipos.js').Manual[]} manuales recibos que no pasan por la cuenta
  * @property {Record<string, true>} apagadas   categoría → no toca esta temporada
  * @property {Record<string, true>} saltados   reciboId|mes → este mes no se paga
  * @property {Record<string, boolean>} inversiones reciboId → es inversión, no gasto
@@ -46,7 +47,7 @@ import { VENTANA_POR_DEFECTO } from '../analisis/compromisos.js'
 
 /** @returns {Promise<Preferencias>} */
 export async function cargar() {
-  const [retoques, presupuestos, objetivos, patrimonio, reglas, bultos, colchon, ventanaRitmo, tratos, apodos, unicos, anuales, apagadas, saltados, inversiones, planes, ritmos] = await Promise.all([
+  const [retoques, presupuestos, objetivos, patrimonio, reglas, bultos, colchon, ventanaRitmo, tratos, apodos, unicos, anuales, apagadas, saltados, inversiones, planes, ritmos, manuales] = await Promise.all([
     leerTodo('retoques'),
     leerTodo('presupuestos'),
     leerTodo('objetivos'),
@@ -64,6 +65,7 @@ export async function cargar() {
     leerTodo('inversiones'),
     leerTodo('planes'),
     leerTodo('ritmos'),
+    leerTodo('manuales'),
   ])
 
   return {
@@ -84,6 +86,7 @@ export async function cargar() {
     unicos: Object.fromEntries(unicos.map((/** @type {any} */ u) => [u.id, true])),
     anuales: Object.fromEntries(anuales.map((/** @type {any} */ a) => [a.id, true])),
     ritmos: Object.fromEntries(ritmos.map((/** @type {any} */ r) => [r.id, r.cada])),
+    manuales,
     apagadas: Object.fromEntries(apagadas.map((/** @type {any} */ a) => [a.id, true])),
     saltados: Object.fromEntries(saltados.map((/** @type {any} */ s) => [s.id, true])),
     inversiones: Object.fromEntries(inversiones.map((/** @type {any} */ i) => [i.id, i.esInversion])),
@@ -164,6 +167,21 @@ export async function ponerAnual(entidadId, esAnual) {
 export async function ponerRitmo(reciboId, cada) {
   if (cada === '') return borrar('ritmos', reciboId)
   return escribir('ritmos', { id: reciboId, cada })
+}
+
+/**
+ * Un recibo que no pasa por la cuenta. El premium del GPS del perro se paga con
+ * el saldo de PayPal y en el extracto no hay ni rastro: existe, se cobra cada
+ * año y hunde la previsión el día que llega, pero yo no puedo verlo.
+ * @param {import('../dominio/tipos.js').Manual} manual
+ */
+export async function ponerManual(manual) {
+  return escribir('manuales', manual)
+}
+
+/** @param {string} id */
+export async function quitarManual(id) {
+  return borrar('manuales', id)
 }
 
 /**

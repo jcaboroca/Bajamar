@@ -68,6 +68,16 @@
  */
 
 /**
+ * @typedef {object} Manual
+ * @property {string} id
+ * @property {string} nombre
+ * @property {number} importe          céntimos, negativo
+ * @property {string} categoria
+ * @property {'mensual' | 'bimestral' | 'trimestral' | 'semestral' | 'anual'} cada
+ * @property {string} proxima         ISO, el próximo cobro
+ */
+
+/**
  * @typedef {object} Bulto
  * @property {string} id
  * @property {string} nombre

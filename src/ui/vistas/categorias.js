@@ -12,6 +12,8 @@
  */
 
 import { formatEuros, formatEurosRedondo } from '../../dominio/dinero.js'
+import { CATEGORIAS } from '../../entidades/semillas.js'
+import { pedirDatos } from '../hoja.js'
 import { diaYMes, linea, nodo, nombreDeMes, requerir, vacio } from '../piezas.js'
 import { marcarPreguntable, preguntarAlPulsar, rotuloDe } from '../trato.js'
 
@@ -38,10 +40,34 @@ const CADA_CUANTO = {
   anual: 'una vez al año',
 }
 
-export function montarCategorias({ alCambiarTrato, alMarcarAnual }) {
+export function montarCategorias({ alCambiarTrato, alMarcarAnual, alApuntarRecibo }) {
   for (const caja of ['fijos', 'apartados']) {
     preguntarAlPulsar(requerir(caja), () => ultimo, alCambiarTrato)
   }
+  requerir('apuntar-recibo').addEventListener('click', async () => {
+    const datos = await pedirDatos({
+      titulo: 'Un recibo que no veo',
+      aceptar: 'Apuntarlo',
+      campos: [
+        { nombre: 'nombre', etiqueta: '¿Qué es?', tipo: 'texto', valor: '' },
+        { nombre: 'importe', etiqueta: '¿Cuánto cuesta?', tipo: 'numero', valor: '', pista: 'En euros.' },
+        { nombre: 'proxima', etiqueta: '¿Cuándo es el próximo?', tipo: 'fecha', valor: '' },
+        { nombre: 'cada', etiqueta: '¿Cada cuánto llega?', tipo: 'lista', valor: 'anual', opciones: Object.entries(CADA_CUANTO).map(([id, texto]) => [id, texto]) },
+        { nombre: 'categoria', etiqueta: '¿De qué tipo?', tipo: 'lista', valor: 'suscripciones', opciones: Object.entries(CATEGORIAS) },
+      ],
+    })
+    if (datos === null || datos === 'borrar') return
+    const euros = Number(String(datos.importe).replace(',', '.'))
+    if (!datos.nombre || !datos.proxima || !Number.isFinite(euros) || euros === 0) return
+    await alApuntarRecibo({
+      id: `mano:${Date.now()}`,
+      nombre: String(datos.nombre).slice(0, 40),
+      importe: -Math.abs(Math.round(euros * 100)),
+      proxima: String(datos.proxima),
+      cada: String(datos.cada),
+      categoria: String(datos.categoria),
+    })
+  })
   requerir('preguntas').addEventListener('change', (e) => {
     const casilla = e.target
     if (!(casilla instanceof HTMLInputElement) || !casilla.dataset.anual) return

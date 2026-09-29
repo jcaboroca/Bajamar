@@ -9,7 +9,7 @@
 
 import { detectarCompromisos, detectarIngresos, gastoOrdinario, ritmoOrdinario } from './analisis/compromisos.js'
 import { eventosDesde, proyectar } from './analisis/bajamar.js'
-import { describirFijos, estructura } from './analisis/fijos.js'
+import { describirFijos, estructura, MESES_DE } from './analisis/fijos.js'
 import { cascadaDelPeriodo } from './analisis/cascada.js'
 import { cuotasPendientes } from './analisis/fraccionados.js'
 import { disponibleReal } from './analisis/mes.js'
@@ -96,6 +96,37 @@ function fechasPrevistas(compromiso, hasta) {
 const HORIZONTE_LARGO = 12
 
 /**
+ * Un recibo dictado a mano vale lo mismo que uno detectado: no sale de ningún
+ * movimiento porque no pasa por la cuenta, pero se cobra igual.
+ * @param {import('./dominio/tipos.js').Manual[]} manuales
+ * @param {string} hoy
+ * @returns {Compromiso[]}
+ */
+function deManuales(manuales, hoy) {
+  return manuales.map((m) => {
+    const meses = MESES_DE[m.cada] ?? 1
+    let proxima = m.proxima
+    let vueltas = 0
+    while (proxima < hoy && vueltas < 24) {
+      proxima = sumarMeses(proxima, meses)
+      vueltas += 1
+    }
+    return {
+      entidadId: m.id,
+      reciboId: m.id,
+      nombre: m.nombre,
+      periodicidad: m.cada,
+      importeEsperado: m.importe,
+      ultimaVista: sumarMeses(proxima, -meses),
+      proximaPrevista: proxima,
+      observaciones: 1,
+      cobros: [],
+      estado: /** @type {const} */ ('activo'),
+    }
+  })
+}
+
+/**
  * @param {Movimiento[]} crudos
  * @param {object} [opciones]
  * @param {string} [opciones.hoy]
@@ -110,6 +141,7 @@ const HORIZONTE_LARGO = 12
  * @param {Record<string, true>} [opciones.unicos] entidadId → pasó una vez y no volverá
  * @param {Record<string, true>} [opciones.anuales] entidadId → pasó una vez y vuelve cada año
  * @param {Record<string, string>} [opciones.ritmos] reciboId → cada cuánto llega, dicho por el usuario
+ * @param {import('./dominio/tipos.js').Manual[]} [opciones.manuales] recibos que no pasan por la cuenta
  * @param {Record<string, true>} [opciones.apagadas] categoría → no toca esta temporada
  * @param {Record<string, boolean>} [opciones.inversiones] reciboId → es inversión, no gasto
  * @param {number} [opciones.colchon] céntimos por debajo de los cuales avisar
@@ -130,6 +162,13 @@ export function construirEstado(crudos, opciones = {}) {
 
   for (const [entidadId, categoria] of Object.entries(opciones.categoriasManuales ?? {})) {
     categorias.set(entidadId, categoria)
+  }
+
+  // Los recibos dictados a mano no salen de ningún movimiento, así que nadie les
+  // ha puesto nombre ni categoría antes de llegar aquí.
+  for (const m of opciones.manuales ?? []) {
+    categorias.set(m.id, m.categoria)
+    nombres.set(m.id, m.nombre)
   }
 
   /** @type {Movimiento[]} */
@@ -196,7 +235,7 @@ export function construirEstado(crudos, opciones = {}) {
   const apodar = (/** @type {Compromiso} */ c) => (
     apodos[c.reciboId] ? { ...c, nombre: apodos[c.reciboId] } : c
   )
-  const compromisosTodos = deteccion.compromisos.map(apodar)
+  const compromisosTodos = [...deteccion.compromisos, ...deManuales(opciones.manuales ?? [], hoy)].map(apodar)
   const ingresosTodos = detectarIngresos(cuenta, nombres, { hoy, categorias }).map(apodar)
   const tratos = porRecibo(
     opciones.tratos ?? {},
