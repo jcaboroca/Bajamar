@@ -262,6 +262,33 @@ test('una categoría apagada sale del goteo y de las barras', () => {
   assert.deepEqual(sin.apagadas, [gorda.categoria])
 })
 
+test('apagar una categoría no borra lo que ya te cobraron de ella', () => {
+  // Apagar dice «esto no lo voy a volver a gastar», no «esto no lo gasté». El
+  // cargo del taller salía del día a día y reaparecía entre los recibos, como
+  // si fuese a repetirse, y el cierre del mes cambiaba solo.
+  const sueltos = []
+  let saldo = 300000
+  for (const [i, mes] of ['05', '06', '07', '08'].entries()) {
+    saldo -= 4000 + i * 100
+    sueltos.push(fila(`c${i}`, `2026-${mes}-07`, `COMPRA BAZAR NUMERO ${i}`, -(4000 + i * 100), saldo))
+  }
+  // El cargo gordo va dentro del periodo que se está viviendo: es justo el que
+  // desaparecía al apagar la categoría.
+  saldo -= 60914
+  sueltos.push(fila('taller', '2026-09-20', 'COMPRA BAZAR NUMERO TALLER', -60914, saldo))
+  const armado = (apagadas) => construirEstado(sueltos, { hoy: HOY, meses: 3, apagadas })
+
+  const normal = armado(undefined)
+  const sin = armado({ vehiculos: true })
+
+  const mesDe = (e) => e.detalleMensual.find((m) => m.id === '2026-09')
+  assert.ok(mesDe(normal).diaADiaGastado <= -60914, 'el cargo gordo cae en el mes en curso')
+  assert.equal(mesDe(sin).diaADiaGastado, mesDe(normal).diaADiaGastado)
+  assert.equal(mesDe(sin).compromisos, mesDe(normal).compromisos)
+  // Lo que sí tiene que cambiar: deja de contar como costumbre.
+  assert.ok(Math.abs(sin.ritmo.porMes) < Math.abs(normal.ritmo.porMes))
+})
+
 test('cada periodo lleva dentro la nómina que lo paga', () => {
   // Con meses naturales, el mes siguiente salía siempre con cero ingresos: su
   // nómina había caído en el mes anterior y hacía falta un parche para

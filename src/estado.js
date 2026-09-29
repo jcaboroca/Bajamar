@@ -270,8 +270,11 @@ export function construirEstado(crudos, opciones = {}) {
     compromisos,
     new Set([...FUERA_DEL_GOTEO, ...cubiertas]),
     categorias,
-  ).filter((m) => !apagadas[m.categoria ?? 'otros'])
-  const ritmo = ritmoOrdinario(ordinarios, opciones.ventanaRitmo)
+  )
+  // Apagar una categoría dice «esto no lo voy a volver a gastar», no «esto no lo
+  // gasté»: sólo sale de lo que se prevé. Lo ya cobrado sigue siendo día a día.
+  const habituales = ordinarios.filter((m) => !apagadas[m.categoria ?? 'otros'])
+  const ritmo = ritmoOrdinario(habituales, opciones.ventanaRitmo)
 
   const ultimaFecha = cuenta.reduce((mayor, m) => (m.fecha > mayor ? m.fecha : mayor), cuenta[0]?.fecha ?? '')
   const ultimo = cuenta.findLast((m) => m.fecha === ultimaFecha)
@@ -499,7 +502,7 @@ export function construirEstado(crudos, opciones = {}) {
     sinClasificar: sinCajon(contables, nombres),
     aplazableAlMes,
     ingresoMensual,
-    ordinarios,
+    ordinarios: habituales,
     // `ritmo` es lo que sueles gastar; `ritmoEfectivo` es lo que has decidido
     // gastar. Se devuelven los dos porque la interfaz enseña la distancia.
     ritmo,
@@ -511,7 +514,7 @@ export function construirEstado(crudos, opciones = {}) {
     detalleMensual,
     periodos,
     periodoActual,
-    reparto: repartirGasto(ordinarios, ritmo),
+    reparto: repartirGasto(habituales, ritmo),
     apagadas: Object.keys(apagadas).sort(),
     saldoInicial,
     pendienteTarjeta,
