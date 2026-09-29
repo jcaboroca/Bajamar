@@ -35,6 +35,7 @@ import { VENTANA_POR_DEFECTO } from '../analisis/compromisos.js'
  * @property {Record<string, string>} apodos   reciboId → cómo lo llama el usuario
  * @property {Record<string, true>} unicos     entidadId → no va a repetirse
  * @property {Record<string, true>} anuales    entidadId → vuelve cada año
+ * @property {Record<string, string>} ritmos   reciboId → cada cuánto llega, dicho por ti
  * @property {Record<string, true>} apagadas   categoría → no toca esta temporada
  * @property {Record<string, true>} saltados   reciboId|mes → este mes no se paga
  * @property {Record<string, boolean>} inversiones reciboId → es inversión, no gasto
@@ -45,7 +46,7 @@ import { VENTANA_POR_DEFECTO } from '../analisis/compromisos.js'
 
 /** @returns {Promise<Preferencias>} */
 export async function cargar() {
-  const [retoques, presupuestos, objetivos, patrimonio, reglas, bultos, colchon, ventanaRitmo, tratos, apodos, unicos, anuales, apagadas, saltados, inversiones, planes] = await Promise.all([
+  const [retoques, presupuestos, objetivos, patrimonio, reglas, bultos, colchon, ventanaRitmo, tratos, apodos, unicos, anuales, apagadas, saltados, inversiones, planes, ritmos] = await Promise.all([
     leerTodo('retoques'),
     leerTodo('presupuestos'),
     leerTodo('objetivos'),
@@ -62,6 +63,7 @@ export async function cargar() {
     leerTodo('saltados'),
     leerTodo('inversiones'),
     leerTodo('planes'),
+    leerTodo('ritmos'),
   ])
 
   return {
@@ -81,6 +83,7 @@ export async function cargar() {
     apodos: Object.fromEntries(apodos.map((/** @type {any} */ a) => [a.id, a.nombre])),
     unicos: Object.fromEntries(unicos.map((/** @type {any} */ u) => [u.id, true])),
     anuales: Object.fromEntries(anuales.map((/** @type {any} */ a) => [a.id, true])),
+    ritmos: Object.fromEntries(ritmos.map((/** @type {any} */ r) => [r.id, r.cada])),
     apagadas: Object.fromEntries(apagadas.map((/** @type {any} */ a) => [a.id, true])),
     saltados: Object.fromEntries(saltados.map((/** @type {any} */ s) => [s.id, true])),
     inversiones: Object.fromEntries(inversiones.map((/** @type {any} */ i) => [i.id, i.esInversion])),
@@ -149,6 +152,18 @@ export async function ponerUnico(entidadId, esUnico) {
 export async function ponerAnual(entidadId, esAnual) {
   if (!esAnual) return borrar('anuales', entidadId)
   return escribir('anuales', { id: entidadId })
+}
+
+/**
+ * Cada cuánto llega un recibo, cuando tú lo sabes mejor que yo. Entre las
+ * compras de Amazon hay una que es Prime, y no hay forma de distinguirla por el
+ * importe: cuesta lo mismo que cualquier otra cosa que compres allí.
+ * @param {string} reciboId
+ * @param {string} cada '' para volver a deducirlo
+ */
+export async function ponerRitmo(reciboId, cada) {
+  if (cada === '') return borrar('ritmos', reciboId)
+  return escribir('ritmos', { id: reciboId, cada })
 }
 
 /**

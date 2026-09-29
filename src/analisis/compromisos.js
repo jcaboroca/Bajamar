@@ -331,6 +331,7 @@ function anualesDeDosVistas(orden, hoy) {
  * @param {'gasto' | 'ingreso'} [opciones.signo]
  * @param {Map<string, string>} [opciones.categorias] entidadId → categoría
  * @param {Record<string, true>} [opciones.anuales]   entidadId → el usuario dice que vuelve cada año
+ * @param {Record<string, string>} [opciones.ritmos]  reciboId → cada cuánto llega, dicho por el usuario
  * @returns {Deteccion}
  */
 export function detectarCompromisos(movimientos, nombres, opciones = {}) {
@@ -338,6 +339,7 @@ export function detectarCompromisos(movimientos, nombres, opciones = {}) {
   const ignorar = opciones.ignorar ?? new Set()
   const categorias = opciones.categorias ?? new Map()
   const confirmadosAnuales = opciones.anuales ?? {}
+  const ritmos = opciones.ritmos ?? {}
   const buscaIngresos = opciones.signo === 'ingreso'
 
   /** @type {Map<string, Movimiento[]>} */
@@ -460,13 +462,26 @@ export function detectarCompromisos(movimientos, nombres, opciones = {}) {
   }
 
   /**
+   * Lo que tú hayas dicho manda sobre lo que yo deduzca, pero el recibo sigue
+   * llamándose igual: si al cambiarle el ritmo cambiara de nombre, tu decisión
+   * dejaría de encontrarlo al instante siguiente.
    * @param {string} entidadId
    * @param {string} nombre
    * @param {Movimiento[]} orden
    * @param {Compromiso['periodicidad']} periodicidad
    * @param {boolean} [separado] una de varias series del mismo cobrador
+   * @param {{ importeEsperado: number, cobros: string[], sufijo: string }} [factura]
    * @returns {Compromiso}
    */
+  function construir(entidadId, nombre, orden, periodicidad, separado = false, factura) {
+    const deducido = construirCon(entidadId, nombre, orden, periodicidad, separado, factura)
+    const pedido = ritmos[deducido.reciboId]
+    if (!pedido || pedido === periodicidad) return deducido
+    const tuyo = construirCon(entidadId, nombre, orden, /** @type {Compromiso['periodicidad']} */ (pedido), separado, factura)
+    tuyo.reciboId = deducido.reciboId
+    return tuyo
+  }
+
   /**
    * @param {string} entidadId
    * @param {string} nombre
@@ -474,8 +489,9 @@ export function detectarCompromisos(movimientos, nombres, opciones = {}) {
    * @param {Compromiso['periodicidad']} periodicidad
    * @param {boolean} [separado]
    * @param {{ importeEsperado: number, cobros: string[], sufijo: string }} [factura]
+   * @returns {Compromiso}
    */
-  function construir(entidadId, nombre, orden, periodicidad, separado = false, factura) {
+  function construirCon(entidadId, nombre, orden, periodicidad, separado = false, factura) {
     const periodo = PERIODOS.find((p) => p.nombre === periodicidad)
     const meses = periodo?.meses ?? 1
     const ultima = orden[orden.length - 1].fecha

@@ -21,15 +21,25 @@ const OPCIONES = /** @type {Array<[string, string]>} */ ([
   ['baja', 'Ya no lo pago'],
 ])
 
+const RITMOS = /** @type {Array<[string, string]>} */ ([
+  ['', 'Como lo vea por las fechas'],
+  ['mensual', 'Cada mes'],
+  ['bimestral', 'Cada dos meses'],
+  ['trimestral', 'Cada tres meses'],
+  ['semestral', 'Cada seis meses'],
+  ['anual', 'Una vez al año'],
+])
+
 /**
  * @param {object} p
  * @param {string} p.nombre
  * @param {Trato} [p.actual]
  * @param {string} [p.apodo]
  * @param {string} [p.categoria]
- * @returns {Promise<{ trato: Trato, apodo: string, categoria: string } | null>}  null si se arrepiente
+ * @param {string} [p.ritmo]
+ * @returns {Promise<{ trato: Trato, apodo: string, categoria: string, ritmo: string } | null>}  null si se arrepiente
  */
-export async function preguntarTrato({ nombre, actual = 'fijo', apodo = '', categoria = 'otros' }) {
+export async function preguntarTrato({ nombre, actual = 'fijo', apodo = '', categoria = 'otros', ritmo = '' }) {
   const respuesta = await pedirDatos({
     titulo: nombre,
     aceptar: 'Guardar',
@@ -49,6 +59,13 @@ export async function preguntarTrato({ nombre, actual = 'fijo', apodo = '', cate
       // suelta, y no son lo mismo.
       pista: 'Sólo para este recibo, no para todo lo que cobre el mismo sitio.',
     }, {
+      nombre: 'ritmo',
+      etiqueta: '¿Cada cuánto llega?',
+      tipo: 'lista',
+      valor: ritmo,
+      opciones: RITMOS,
+      pista: 'Normalmente lo deduzco de las fechas, pero a veces me equivoco: entre muchas compras del mismo sitio, la cuota se camufla.',
+    }, {
       nombre: 'trato',
       etiqueta: '¿Lo vas a seguir pagando?',
       tipo: 'lista',
@@ -63,6 +80,7 @@ export async function preguntarTrato({ nombre, actual = 'fijo', apodo = '', cate
     trato: elegido === 'suelto' || elegido === 'baja' ? elegido : 'fijo',
     apodo: String(respuesta.apodo ?? ''),
     categoria: String(respuesta.categoria ?? categoria),
+    ritmo: String(respuesta.ritmo ?? ''),
   }
 }
 
@@ -99,8 +117,8 @@ export function marcarPreguntable(fila, reciboId, rotulo, categoria) {
  * Escucha una lista entera en vez de cada fila: las filas se repintan en cada
  * cambio y sus escuchadores morirían con ellas.
  * @param {HTMLElement} caja
- * @param {() => { nombres: Map<string, string>, tratos: Record<string, Trato>, apodos: Record<string, string> } | null} mirarEstado
- * @param {(cambio: { reciboId: string, trato: Trato, apodo: string, categoria: string, cambiaTrato: boolean }) => unknown} alCambiar
+ * @param {() => { nombres: Map<string, string>, tratos: Record<string, Trato>, apodos: Record<string, string>, ritmos?: Record<string, string> } | null} mirarEstado
+ * @param {(cambio: { reciboId: string, trato: Trato, apodo: string, categoria: string, ritmo: string, cambiaTrato: boolean }) => unknown} alCambiar
  */
 export function preguntarAlPulsar(caja, mirarEstado, alCambiar) {
   const abrir = async (/** @type {Element} */ objetivo) => {
@@ -117,10 +135,11 @@ export function preguntarAlPulsar(caja, mirarEstado, alCambiar) {
     const actual = estado.tratos[reciboId] ?? 'fijo'
     const apodo = estado.apodos[reciboId] ?? ''
     const categoria = fila.dataset.categoria ?? 'otros'
+    const ritmo = estado.ritmos?.[reciboId] ?? ''
     const nombre = fila.dataset.rotulo ?? estado.nombres.get(reciboId.split('#')[0]) ?? reciboId
-    const elegido = await preguntarTrato({ nombre, actual, apodo, categoria })
+    const elegido = await preguntarTrato({ nombre, actual, apodo, categoria, ritmo })
     if (elegido === null) return
-    if (elegido.trato === actual && elegido.apodo === apodo && elegido.categoria === categoria) return
+    if (elegido.trato === actual && elegido.apodo === apodo && elegido.categoria === categoria && elegido.ritmo === ritmo) return
     await alCambiar({ reciboId, ...elegido, cambiaTrato: elegido.trato !== actual })
   }
 

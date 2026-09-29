@@ -95,7 +95,7 @@ function pintarFijos(estado) {
         importe: formatEuros(f.importeEsperado),
         clase: f.estado === 'retrasado' ? 'apagado' : '',
       })
-      marcarPreguntable(fila, f.reciboId, rotuloDe(f.reciboId, f.nombre, f.importeEsperado))
+      marcarPreguntable(fila, f.reciboId, rotuloDe(f.reciboId, f.nombre, f.importeEsperado), f.categoria)
       ol.append(fila)
     }
     div.append(ol)

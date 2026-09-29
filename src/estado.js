@@ -109,6 +109,7 @@ const HORIZONTE_LARGO = 12
  * @param {Record<string, string>} [opciones.apodos] reciboId → cómo lo llama el usuario
  * @param {Record<string, true>} [opciones.unicos] entidadId → pasó una vez y no volverá
  * @param {Record<string, true>} [opciones.anuales] entidadId → pasó una vez y vuelve cada año
+ * @param {Record<string, string>} [opciones.ritmos] reciboId → cada cuánto llega, dicho por el usuario
  * @param {Record<string, true>} [opciones.apagadas] categoría → no toca esta temporada
  * @param {Record<string, boolean>} [opciones.inversiones] reciboId → es inversión, no gasto
  * @param {number} [opciones.colchon] céntimos por debajo de los cuales avisar
@@ -188,7 +189,7 @@ export function construirEstado(crudos, opciones = {}) {
    * Todo esto va por RECIBO, no por cobrador: del mismo banco pueden salir la
    * aportación que uno se salta y la letra de la furgoneta que no.
    */
-  const deteccion = detectarCompromisos(cuenta, nombres, { hoy, categorias, anuales: opciones.anuales })
+  const deteccion = detectarCompromisos(cuenta, nombres, { hoy, categorias, anuales: opciones.anuales, ritmos: opciones.ritmos })
   // El apodo se pone aquí y no en cada vista: así el nombre que puso el usuario
   // viaja solo hasta los eventos, los avisos y los fijos.
   const apodos = opciones.apodos ?? {}
@@ -429,6 +430,7 @@ export function construirEstado(crudos, opciones = {}) {
     apodos,
     unicos,
     anuales: opciones.anuales ?? {},
+    ritmos: opciones.ritmos ?? {},
     // Lo apartado se busca en la detección sin filtrar: es la única que aún
     // sabe cómo se llamaba y cuánto costaba lo que el usuario dio de baja.
     apartados: [
