@@ -434,3 +434,23 @@ test('un cobro y su devolución del mismo día no son un gasto', () => {
   // Y no se cuelan en el goteo por la puerta de atrás: no es dinero que gastes.
   assert.equal(e.ordinarios.filter((m) => m.id.startsWith('com-')).length, 0)
 })
+
+test('bautizar un plazo bautiza todos los del mismo recibo', () => {
+  const movimientos = extracto()
+  for (const fecha of ['2025-05-02', '2025-07-01', '2025-10-01', '2026-05-04', '2026-07-01']) {
+    movimientos.push(fila(`ibi-${fecha}`, fecha, 'IMPUESTOS AJ. GAVA', -33071, 800000))
+    movimientos.push(fila(`bas-${fecha}`, fecha, 'IMPUESTOS AJ. GAVA', -8025, 800000))
+  }
+  const apodos = {}
+  const sinNombre = construirEstado(movimientos, { hoy: HOY, meses: 3 })
+  const plazos = sinNombre.compromisos.filter((c) => Math.abs(c.importeEsperado) === 33071)
+  assert.ok(plazos.length >= 3, 'el IBI va en varios plazos')
+  apodos[plazos[0].reciboId] = 'IBI Martirs'
+  const e = construirEstado(movimientos, { hoy: HOY, meses: 3, apodos })
+  const bautizados = e.compromisos.filter((c) => c.nombre === 'IBI Martirs')
+  assert.equal(bautizados.length, plazos.length, 'el nombre viaja a los demás plazos')
+  assert.ok(
+    e.compromisos.some((c) => Math.abs(c.importeEsperado) === 8025 && c.nombre !== 'IBI Martirs'),
+    'pero no se lleva por delante a la basura, que cuesta otra cosa',
+  )
+})

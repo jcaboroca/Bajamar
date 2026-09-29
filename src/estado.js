@@ -232,11 +232,26 @@ export function construirEstado(crudos, opciones = {}) {
   // El apodo se pone aquí y no en cada vista: así el nombre que puso el usuario
   // viaja solo hasta los eventos, los avisos y los fijos.
   const apodos = opciones.apodos ?? {}
-  const apodar = (/** @type {Compromiso} */ c) => (
-    apodos[c.reciboId] ? { ...c, nombre: apodos[c.reciboId] } : c
-  )
-  const compromisosTodos = [...deteccion.compromisos, ...deManuales(opciones.manuales ?? [], hoy)].map(apodar)
-  const ingresosTodos = detectarIngresos(cuenta, nombres, { hoy, categorias }).map(apodar)
+  /**
+   * Los cuatro plazos del IBI son un recibo troceado, no cuatro recibos: quien
+   * bautiza uno bautiza los cuatro. Se reconocen por cobrador y precio, que es
+   * lo mismo que los distinguió de los demás recibos del mismo día.
+   * @param {Compromiso[]} lista
+   */
+  const apodar = (lista) => {
+    const bautizados = lista.filter((c) => apodos[c.reciboId])
+    return lista.map((c) => {
+      const propio = apodos[c.reciboId]
+      const hermano = propio ? null : bautizados.find((b) => (
+        b.entidadId === c.entidadId
+        && Math.abs(Math.abs(b.importeEsperado) - Math.abs(c.importeEsperado)) <= 5
+      ))
+      const nombre = propio ?? (hermano ? apodos[hermano.reciboId] : null)
+      return nombre ? { ...c, nombre } : c
+    })
+  }
+  const compromisosTodos = apodar([...deteccion.compromisos, ...deManuales(opciones.manuales ?? [], hoy)])
+  const ingresosTodos = apodar(detectarIngresos(cuenta, nombres, { hoy, categorias }))
   const tratos = porRecibo(
     opciones.tratos ?? {},
     [...compromisosTodos, ...ingresosTodos],
