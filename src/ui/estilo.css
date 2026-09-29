@@ -893,6 +893,11 @@ details.grupo > summary::marker { color: var(--secundario); }
 .cascada-titulo { font-weight: 600; }
 .cascada-queda { margin: 0.125rem 0 0; font-size: 0.8125rem; color: var(--secundario); text-align: right; }
 
+/* Lo que ya se gastó es un hecho y va en el color del texto; lo que falta es
+   una cuenta y va en ámbar, el mismo que usa el Resumen para lo previsto. */
+.cascada-fila.previsto .cascada-titulo,
+.cascada-fila.previsto .cascada-cabeza .cifras { color: var(--acento); }
+
 /* Los escalones con detalle se abren. El importe y el «quedan» se leen
    siempre; el desglose sólo cuando se pide. Mismo marcador nativo que los
    desplegables del Resumen: son el mismo gesto. */

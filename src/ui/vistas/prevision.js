@@ -72,6 +72,14 @@ function pintarCascada(estado) {
     : `Cobras ${formatEuros(c.ingreso)} y con eso pagas del ${diaYMes(c.desde)} `
       + `al ${diaYMes(c.hasta)}.`
 
+  // El mes en curso ya tiene día a día vivido, y eso no es una previsión: es
+  // dinero que se fue. Se separa de lo que falta para que las dos cifras no se
+  // lean como una sola promesa.
+  const periodo = estado.detalleMensual.find((m) => m.id === c.mes)
+  const enCurso = periodo !== undefined && periodo.estado === 'enCurso'
+  const gastado = enCurso && periodo ? periodo.diaADiaGastado : c.diaADia
+  const porVenir = c.diaADia - gastado
+
   let queda = c.apertura
   const filas = [encabezado('Vienes con', c.apertura, queda)]
   queda += c.ingreso
@@ -84,10 +92,11 @@ function pintarCascada(estado) {
    * @param {number} suma
    * @param {import('../../analisis/cascada.js').Escalon[]} lista
    * @param {HTMLElement} [extra]
+   * @param {string} [clase]
    */
-  const escalon = (clave, titulo, cuandoNoHay, suma, lista, extra) => {
+  const escalon = (clave, titulo, cuandoNoHay, suma, lista, extra, clase = '') => {
     queda += suma
-    const li = nodo('li', 'cascada-fila')
+    const li = nodo('li', `cascada-fila ${clase}`.trim())
     const caja = plegable(clave, titulo, suma)
     if (lista.length > 0) caja.append(desglose(lista))
     else if (!extra) caja.append(nodo('p', 'cascada-vacio', cuandoNoHay))
@@ -110,13 +119,19 @@ function pintarCascada(estado) {
   )
   escalon('inversiones', 'Inversiones', 'Este mes no apartas nada.', c.sumaInversiones, c.inversiones)
 
-  filas.push(loQueQuedaParaVivir(queda, c))
+  filas.push(loQueQuedaParaVivir(queda, c, estado, enCurso ? gastado : null))
 
   // Las barras van dentro del escalón y no en un bloque aparte: se reparte en
   // el mismo sitio donde se ve cuánto queda por repartir.
   const reparto = requerir('reparto')
   reparto.hidden = false
-  escalon('diaadia', 'Día a día', '', c.diaADia, [], reparto)
+  if (enCurso) {
+    queda += gastado
+    filas.push(encabezado('Día a día, hasta hoy', gastado, queda))
+    escalon('diaadia', 'Lo que te queda a tu ritmo', '', porVenir, [], reparto, 'previsto')
+  } else {
+    escalon('diaadia', 'Día a día', '', c.diaADia, [], reparto)
+  }
 
   filas.push(encabezado('Acabas con', c.cierre, null, c.cierre < 0))
   requerir('cascada').replaceChildren(...filas)
@@ -188,14 +203,22 @@ function margen(c) {
  *
  * @param {number} queda
  * @param {import('../../analisis/cascada.js').Cascada} c
+ * @param {Estado} estado
+ * @param {number | null} gastado lo que ya se ha ido, si el mes está en curso
  */
-function loQueQuedaParaVivir(queda, c) {
-  const dias = diasEntre(c.desde, c.hasta) + 1
-  const alDia = Math.round(queda / dias)
-  const ritmo = Math.round(Math.abs(c.diaADia) / dias)
+function loQueQuedaParaVivir(queda, c, estado, gastado) {
+  // Lo ya vivido tiene su gasto puesto más abajo: repartir el mes entero entre
+  // todos sus días decía «vas holgado» el día 29 con el dinero ya gastado.
+  const enCurso = gastado !== null
+  const restante = enCurso ? queda - Math.abs(gastado) : queda
+  const dias = enCurso
+    ? Math.max(diasEntre(estado.hoy, c.hasta), 0) + 1
+    : diasEntre(c.desde, c.hasta) + 1
+  const alDia = Math.round(restante / dias)
+  const ritmo = Math.round(Math.abs(estado.ritmo.porMes) / 30.4)
   const apurado = alDia < ritmo
 
-  const li = nodo('li', `cascada-fila cascada-vivir${queda < 0 || apurado ? ' alarma' : ''}`)
+  const li = nodo('li', `cascada-fila cascada-vivir${restante < 0 || apurado ? ' alarma' : ''}`)
   const cabeza = nodo('div', 'cascada-cabeza')
   cabeza.append(
     nodo('span', 'cascada-titulo', 'Te queda para el día a día'),
@@ -203,14 +226,18 @@ function loQueQuedaParaVivir(queda, c) {
   )
   li.append(cabeza)
 
-  if (queda <= 0) {
+  if (restante <= 0) {
     li.append(nodo('p', 'cascada-vivir-lectura', 'No queda nada. Todo lo que gastes sale del colchón.'))
     return li
   }
+  const plazo = enCurso ? `los ${dias} días que faltan` : `${dias} días`
+  // La cifra de arriba es la del mes entero; sin decir lo ya gastado, la
+  // división no cuadra a ojo y parece un error.
+  const llevas = enCurso ? `Te has gastado ${formatEurosRedondo(Math.abs(gastado))}. Con lo que queda, ` : ''
   li.append(nodo('p', 'cascada-vivir-lectura',
-    `${formatEurosRedondo(alDia)} al día durante ${dias} días. `
+    `${llevas}${formatEurosRedondo(alDia)} al día durante ${plazo}. `
     + (apurado
-      ? `Sueles gastar ${formatEurosRedondo(ritmo)}, así que este mes toca apretar.`
+      ? `Sueles gastar ${formatEurosRedondo(ritmo)}, así que toca apretar.`
       : `Sueles gastar ${formatEurosRedondo(ritmo)}, así que vas holgado.`)))
   return li
 }
