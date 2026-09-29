@@ -1066,8 +1066,21 @@ details.grupo > summary::marker { color: var(--secundario); }
 
 .desglose-fecha { color: var(--secundario); font-variant-numeric: tabular-nums; }
 .desglose-nombre { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.desglose-lista li.previsto { opacity: 0.7; }
-.desglose-marca { grid-column: 2 / -1; font-size: 0.75rem; color: var(--secundario); }
+/* Lo que todavía no ha pasado va en ámbar, como la cuenta de abajo. Bajarle la
+   opacidad sólo lo hacía costar de leer, y no decía de qué iba. */
+.desglose-lista li.previsto .desglose-fecha,
+.desglose-lista li.previsto .desglose-nombre,
+.desglose-lista li.previsto .cifras { color: var(--acento); }
+/* La palabra se queda para quien no distingue el color, pero repetida en doce
+   líneas seguidas doblaba el alto de la lista sin añadir nada. */
+.desglose-marca {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 
 /* Una cuenta no es un saldo. Va debajo de la cifra de verdad y en ámbar, que
    aquí quiere decir «esto todavía no ha pasado». */
