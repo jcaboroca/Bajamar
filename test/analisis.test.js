@@ -43,6 +43,21 @@ describe('periodicidad', () => {
     assert.equal(compromisos[0].estado, 'activo')
   })
 
+  test('una nómina que sube de sueldo y trae paga extra sigue siendo una sola', () => {
+    // Quien te paga es uno solo. Trocear la nómina por el importe la partía en
+    // dos, adelantaba el cobro un mes y metía dos nóminas en el mismo periodo.
+    const meses = ['2025-08', '2025-09', '2025-10', '2025-11', '2025-12', '2026-01', '2026-02', '2026-03', '2026-04', '2026-05', '2026-06', '2026-07', '2026-08', '2026-09']
+    const nomina = meses.map((m, i) => {
+      if (m === '2026-07') return mov(`${m}-25`, 560000)
+      return mov(`${m}-25`, i >= 12 ? 288812 : 282249)
+    })
+    const { compromisos } = detectarCompromisos(nomina, NOMBRES, { hoy: '2026-09-29', signo: 'ingreso' })
+    assert.equal(compromisos.length, 1)
+    assert.equal(compromisos[0].periodicidad, 'mensual')
+    assert.equal(compromisos[0].proximaPrevista, '2026-10-25')
+    assert.equal(compromisos[0].observaciones, 14)
+  })
+
   test('una racha estacional en días dispersos no es una mensualidad', () => {
     // Cinco compras en meses seguidos de invierno: los intervalos parecen
     // mensuales, pero los días del mes no se parecen en nada.

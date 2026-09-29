@@ -199,7 +199,8 @@ function rachaFinal(serie) {
  * mes a otro y no debe trocearse, pero el ayuntamiento sí.
  * @param {Movimiento[]} lista
  * @returns {Movimiento[][]}
- */function separarPorImporte(lista) {
+ */
+function separarPorImporte(lista) {
   const orden = [...lista].sort((a, b) => Math.abs(a.importe) - Math.abs(b.importe))
   /** @type {Movimiento[][]} */
   const grupos = []
@@ -366,9 +367,11 @@ export function detectarCompromisos(movimientos, nombres, opciones = {}) {
     // Primer intento: el cobrador entero como una sola serie. Aunque tenga
     // ritmo, si sus importes no son el mismo precio puede ser un cobrador con
     // dos cosas a la vez —una cuota al mes y una licencia al año— y entonces
-    // hay que mirar dentro antes de darlo por un solo recibo.
+    // hay que mirar dentro antes de darlo por un solo recibo. Con quien te paga
+    // no: una nómina sube de sueldo y trae pagas extra sin dejar de ser la
+    // misma nómina, y trocearla la partía en dos y adelantaba el cobro un mes.
     const entera = periodicidadDe(orden)
-    if (entera && tienenElMismoPrecio(orden)) {
+    if (entera && (buscaIngresos || tienenElMismoPrecio(orden))) {
       compromisos.push(construir(entidadId, nombre, orden, entera))
       continue
     }
