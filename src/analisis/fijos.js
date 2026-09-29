@@ -43,6 +43,7 @@ const ULTIMOS = 6
  * @property {string} categoria
  * @property {boolean} estable
  * @property {Compromiso['estado']} estado
+ * @property {string} [devuelto] quién te lo devuelve
  * @property {boolean} [aplazable] el usuario dice que puede saltárselo un mes
  */
 
@@ -91,6 +92,7 @@ export function describirFijos(compromisos, movimientos, categorias) {
       categoria: categorias.get(c.reciboId) ?? categorias.get(c.entidadId) ?? 'otros',
       estable: variacion <= UMBRAL_VARIABLE,
       estado: c.estado,
+      devuelto: c.devuelto,
     }
   })
 }

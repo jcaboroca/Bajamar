@@ -41,6 +41,7 @@ import {
   ponerRetoque,
   ponerTrato,
   ponerApodo,
+  ponerDevuelto,
   quitarApunte,
   quitarObjetivo,
   migrarPresupuestosAlPlan,
@@ -158,15 +159,17 @@ async function arrancar() {
  * manejadores en silencio hasta que un clic hiciera cinco cosas.
  */
 function montarVistas() {
-  /** @param {{ reciboId: string, trato: import('./trato.js').Trato, apodo: string, categoria: string, ritmo: string, cambiaTrato: boolean }} cambio */
-  const alCambiarTrato = async ({ reciboId, trato, apodo, categoria, ritmo, cambiaTrato }) => {
+  /** @param {{ reciboId: string, trato: import('./trato.js').Trato, apodo: string, categoria: string, ritmo: string, devuelto: string, cambiaTrato: boolean }} cambio */
+  const alCambiarTrato = async ({ reciboId, trato, apodo, categoria, ritmo, devuelto, cambiaTrato }) => {
     await ponerApodo(reciboId, apodo)
     await ponerTrato(reciboId, trato)
     await ponerRitmo(reciboId, ritmo)
+    await ponerDevuelto(reciboId, devuelto)
     // La regla se guarda bajo el recibo, no bajo el cobrador: del mismo PayPal
     // salen dos suscripciones y una compra suelta.
     if (categoria) await ponerRegla(reciboId, categoria)
     await refrescar()
+    if (devuelto) return decir(`Hecho: sigue saliendo de tu cuenta, pero te lo devuelve ${devuelto}.`)
     if (!cambiaTrato) return decir(apodo === '' ? 'Hecho.' : `Hecho: ahora se llama ${apodo}.`)
     decir(trato === 'baja'
       ? 'Hecho: deja de contar para el futuro.'
@@ -312,6 +315,7 @@ async function refrescar({ animar = false, local = true } = {}) {
     unicos: preferencias.unicos,
     anuales: preferencias.anuales,
     ritmos: preferencias.ritmos,
+    devueltos: preferencias.devueltos,
     manuales: preferencias.manuales,
     apagadas: preferencias.apagadas,
     inversiones: preferencias.inversiones,

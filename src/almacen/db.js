@@ -8,7 +8,7 @@
  */
 
 const NOMBRE = 'bajamar'
-const VERSION = 12
+const VERSION = 13
 
 /**
  * Todo lo que el usuario decide a mano vive separado de los movimientos: si
@@ -27,6 +27,7 @@ export const ALMACENES = [
   'apagadas',    // categoría → no toca esta temporada, fuera del goteo
   'saltados',    // reciboId|mes → este mes concreto no se paga
   'inversiones', // reciboId → sale de la cuenta pero no se gasta (o lo contrario)
+  'devueltos',   // reciboId → quién te devuelve este recibo
   'bultos',      // gastos futuros anotados a mano
   'retoques',    // correcciones sobre un movimiento concreto
   'objetivos',

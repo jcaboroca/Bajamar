@@ -37,9 +37,10 @@ const RITMOS = /** @type {Array<[string, string]>} */ ([
  * @param {string} [p.apodo]
  * @param {string} [p.categoria]
  * @param {string} [p.ritmo]
- * @returns {Promise<{ trato: Trato, apodo: string, categoria: string, ritmo: string } | null>}  null si se arrepiente
+ * @param {string} [p.devuelto]
+ * @returns {Promise<{ trato: Trato, apodo: string, categoria: string, ritmo: string, devuelto: string } | null>}  null si se arrepiente
  */
-export async function preguntarTrato({ nombre, actual = 'fijo', apodo = '', categoria = 'otros', ritmo = '' }) {
+export async function preguntarTrato({ nombre, actual = 'fijo', apodo = '', categoria = 'otros', ritmo = '', devuelto = '' }) {
   const respuesta = await pedirDatos({
     titulo: nombre,
     aceptar: 'Guardar',
@@ -71,7 +72,13 @@ export async function preguntarTrato({ nombre, actual = 'fijo', apodo = '', cate
       tipo: 'lista',
       valor: actual,
       opciones: OPCIONES,
-      pista: 'Si ya no lo pagas, desaparece de la previsión. Lo que ya pagaste no se toca. Si te lo puedes saltar, lo sigo previendo —porque casi todos los meses sale— pero te digo cuánto margen te daría saltarlo en un mes apurado.',
+      pista: 'Si ya no lo pagas, desaparece de la previsión. Lo que ya pagaste no se toca. Si te lo puedes saltar, lo sigo previendo —porque casi todos los meses sale— pero te digo cuánto margen te daría saltártelo en un mes apurado.',
+    }, {
+      nombre: 'devuelto',
+      etiqueta: '¿Te lo devuelve alguien?',
+      tipo: 'texto',
+      valor: devuelto,
+      pista: 'Escribe quién. Sigue saliendo de tu cuenta el día que toca —ahí no te engaño—, pero deja de contar como gasto tuyo del mes.',
     }],
   })
   if (respuesta === null || respuesta === 'borrar') return null
@@ -81,6 +88,7 @@ export async function preguntarTrato({ nombre, actual = 'fijo', apodo = '', cate
     apodo: String(respuesta.apodo ?? ''),
     categoria: String(respuesta.categoria ?? categoria),
     ritmo: String(respuesta.ritmo ?? ''),
+    devuelto: String(respuesta.devuelto ?? ''),
   }
 }
 
@@ -117,8 +125,8 @@ export function marcarPreguntable(fila, reciboId, rotulo, categoria) {
  * Escucha una lista entera en vez de cada fila: las filas se repintan en cada
  * cambio y sus escuchadores morirían con ellas.
  * @param {HTMLElement} caja
- * @param {() => { nombres: Map<string, string>, tratos: Record<string, Trato>, apodos: Record<string, string>, ritmos?: Record<string, string> } | null} mirarEstado
- * @param {(cambio: { reciboId: string, trato: Trato, apodo: string, categoria: string, ritmo: string, cambiaTrato: boolean }) => unknown} alCambiar
+ * @param {() => { nombres: Map<string, string>, tratos: Record<string, Trato>, apodos: Record<string, string>, ritmos?: Record<string, string>, devueltos?: Record<string, string> } | null} mirarEstado
+ * @param {(cambio: { reciboId: string, trato: Trato, apodo: string, categoria: string, ritmo: string, devuelto: string, cambiaTrato: boolean }) => unknown} alCambiar
  */
 export function preguntarAlPulsar(caja, mirarEstado, alCambiar) {
   const abrir = async (/** @type {Element} */ objetivo) => {
@@ -136,10 +144,11 @@ export function preguntarAlPulsar(caja, mirarEstado, alCambiar) {
     const apodo = estado.apodos[reciboId] ?? ''
     const categoria = fila.dataset.categoria ?? 'otros'
     const ritmo = estado.ritmos?.[reciboId] ?? ''
+    const devuelto = estado.devueltos?.[reciboId] ?? ''
     const nombre = fila.dataset.rotulo ?? estado.nombres.get(reciboId.split('#')[0]) ?? reciboId
-    const elegido = await preguntarTrato({ nombre, actual, apodo, categoria, ritmo })
+    const elegido = await preguntarTrato({ nombre, actual, apodo, categoria, ritmo, devuelto })
     if (elegido === null) return
-    if (elegido.trato === actual && elegido.apodo === apodo && elegido.categoria === categoria && elegido.ritmo === ritmo) return
+    if (elegido.trato === actual && elegido.apodo === apodo && elegido.categoria === categoria && elegido.ritmo === ritmo && elegido.devuelto === devuelto) return
     await alCambiar({ reciboId, ...elegido, cambiaTrato: elegido.trato !== actual })
   }
 

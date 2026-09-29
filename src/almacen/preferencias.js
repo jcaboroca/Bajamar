@@ -40,6 +40,7 @@ import { VENTANA_POR_DEFECTO } from '../analisis/compromisos.js'
  * @property {Record<string, true>} apagadas   categoría → no toca esta temporada
  * @property {Record<string, true>} saltados   reciboId|mes → este mes no se paga
  * @property {Record<string, boolean>} inversiones reciboId → es inversión, no gasto
+ * @property {Record<string, string>} devueltos  reciboId → quién te lo devuelve
  * @property {import('../dominio/tipos.js').Bulto[]} bultos
  * @property {number} colchon                  céntimos
  * @property {number} ventanaRitmo             meses que mira el goteo atrás
@@ -47,7 +48,7 @@ import { VENTANA_POR_DEFECTO } from '../analisis/compromisos.js'
 
 /** @returns {Promise<Preferencias>} */
 export async function cargar() {
-  const [retoques, presupuestos, objetivos, patrimonio, reglas, bultos, colchon, ventanaRitmo, tratos, apodos, unicos, anuales, apagadas, saltados, inversiones, planes, ritmos, manuales] = await Promise.all([
+  const [retoques, presupuestos, objetivos, patrimonio, reglas, bultos, colchon, ventanaRitmo, tratos, apodos, unicos, anuales, apagadas, saltados, inversiones, planes, ritmos, manuales, devueltos] = await Promise.all([
     leerTodo('retoques'),
     leerTodo('presupuestos'),
     leerTodo('objetivos'),
@@ -66,6 +67,7 @@ export async function cargar() {
     leerTodo('planes'),
     leerTodo('ritmos'),
     leerTodo('manuales'),
+    leerTodo('devueltos'),
   ])
 
   return {
@@ -90,6 +92,7 @@ export async function cargar() {
     apagadas: Object.fromEntries(apagadas.map((/** @type {any} */ a) => [a.id, true])),
     saltados: Object.fromEntries(saltados.map((/** @type {any} */ s) => [s.id, true])),
     inversiones: Object.fromEntries(inversiones.map((/** @type {any} */ i) => [i.id, i.esInversion])),
+    devueltos: Object.fromEntries(devueltos.map((/** @type {any} */ d) => [d.id, d.quien])),
     colchon: Number(/** @type {any} */ (colchon)?.valor ?? 0),
     ventanaRitmo: Number(/** @type {any} */ (ventanaRitmo)?.valor ?? VENTANA_POR_DEFECTO),
   }
@@ -335,6 +338,18 @@ export async function ponerApodo(reciboId, nombre) {
   const limpio = nombre.trim()
   if (limpio === '') return borrar('apodos', reciboId)
   return escribir('apodos', { id: reciboId, nombre: limpio.slice(0, 40) })
+}
+
+/**
+ * Quién te devuelve un recibo. El IBI de tu madre sale de tu cuenta y vuelve
+ * en un bizum unos días después: el dinero se mueve, pero el gasto no es tuyo.
+ * @param {string} reciboId
+ * @param {string} quien  vacío significa que lo pagas tú
+ */
+export async function ponerDevuelto(reciboId, quien) {
+  const limpio = quien.trim()
+  if (limpio === '') return borrar('devueltos', reciboId)
+  return escribir('devueltos', { id: reciboId, quien: limpio.slice(0, 40) })
 }
 
 /** Identificador corto y único para lo que crea el usuario. */

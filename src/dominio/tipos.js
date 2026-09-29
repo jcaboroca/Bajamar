@@ -65,6 +65,7 @@
  * @property {number} observaciones
  * @property {string[]} cobros         los movimientos de los que sale la serie
  * @property {'activo' | 'retrasado' | 'extinto'} estado
+ * @property {string} [devuelto]      quién te lo devuelve: sale de tu cuenta, pero no es tu gasto
  */
 
 /**

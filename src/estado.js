@@ -138,6 +138,7 @@ function deManuales(manuales, hoy) {
  * @param {import('./analisis/patrimonio.js').Apunte[]} [opciones.patrimonio]
  * @param {Record<string, 'fijo' | 'suelto' | 'baja'>} [opciones.tratos] reciboId → cómo preverlo
  * @param {Record<string, string>} [opciones.apodos] reciboId → cómo lo llama el usuario
+ * @param {Record<string, string>} [opciones.devueltos] reciboId → quién te lo devuelve
  * @param {Record<string, true>} [opciones.unicos] entidadId → pasó una vez y no volverá
  * @param {Record<string, true>} [opciones.anuales] entidadId → pasó una vez y vuelve cada año
  * @param {Record<string, string>} [opciones.ritmos] reciboId → cada cuánto llega, dicho por el usuario
@@ -232,22 +233,35 @@ export function construirEstado(crudos, opciones = {}) {
   // El apodo se pone aquí y no en cada vista: así el nombre que puso el usuario
   // viaja solo hasta los eventos, los avisos y los fijos.
   const apodos = opciones.apodos ?? {}
+  const devueltos = opciones.devueltos ?? {}
   /**
    * Los cuatro plazos del IBI son un recibo troceado, no cuatro recibos: quien
-   * bautiza uno bautiza los cuatro. Se reconocen por cobrador y precio, que es
-   * lo mismo que los distinguió de los demás recibos del mismo día.
+   * bautiza uno bautiza los cuatro, y quien te devuelve uno te devuelve los
+   * cuatro. Se reconocen por cobrador y precio, que es lo mismo que los
+   * distinguió de los demás recibos del mismo día.
    * @param {Compromiso[]} lista
    */
   const apodar = (lista) => {
-    const bautizados = lista.filter((c) => apodos[c.reciboId])
+    /** @param {Record<string, string>} dicho */
+    const heredar = (dicho) => {
+      const dichos = lista.filter((c) => dicho[c.reciboId])
+      return (/** @type {Compromiso} */ c) => {
+        const propio = dicho[c.reciboId]
+        if (propio) return propio
+        const hermano = dichos.find((b) => (
+          b.entidadId === c.entidadId
+          && Math.abs(Math.abs(b.importeEsperado) - Math.abs(c.importeEsperado)) <= 5
+        ))
+        return hermano ? dicho[hermano.reciboId] : ''
+      }
+    }
+    const nombreDe = heredar(apodos)
+    const devueltoDe = heredar(devueltos)
     return lista.map((c) => {
-      const propio = apodos[c.reciboId]
-      const hermano = propio ? null : bautizados.find((b) => (
-        b.entidadId === c.entidadId
-        && Math.abs(Math.abs(b.importeEsperado) - Math.abs(c.importeEsperado)) <= 5
-      ))
-      const nombre = propio ?? (hermano ? apodos[hermano.reciboId] : null)
-      return nombre ? { ...c, nombre } : c
+      const nombre = nombreDe(c)
+      const devuelto = devueltoDe(c)
+      if (!nombre && !devuelto) return c
+      return { ...c, ...(nombre ? { nombre } : {}), ...(devuelto ? { devuelto } : {}) }
     })
   }
   const compromisosTodos = apodar([...deteccion.compromisos, ...deManuales(opciones.manuales ?? [], hoy)])
@@ -492,6 +506,7 @@ export function construirEstado(crudos, opciones = {}) {
     ingresos,
     tratos,
     apodos,
+    devueltos,
     unicos,
     anuales: opciones.anuales ?? {},
     ritmos: opciones.ritmos ?? {},

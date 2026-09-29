@@ -454,3 +454,19 @@ test('bautizar un plazo bautiza todos los del mismo recibo', () => {
     'pero no se lleva por delante a la basura, que cuesta otra cosa',
   )
 })
+
+test('lo que te devuelven sale de tu cuenta pero no es tu gasto', () => {
+  const movimientos = extracto()
+  for (const fecha of ['2025-05-02', '2025-07-01', '2025-10-01', '2026-05-04', '2026-07-01']) {
+    movimientos.push(fila(`ibi-${fecha}`, fecha, 'IMPUESTOS AJ. GAVA', -4891, 800000))
+  }
+  const sinMarcar = construirEstado(movimientos, { hoy: HOY, meses: 3 })
+  const plazos = sinMarcar.compromisos.filter((c) => Math.abs(c.importeEsperado) === 4891)
+  assert.ok(plazos.length >= 3)
+  const e = construirEstado(movimientos, { hoy: HOY, meses: 3, devueltos: { [plazos[0].reciboId]: 'Mamá' } })
+  const marcados = e.compromisos.filter((c) => c.devuelto === 'Mamá')
+  assert.equal(marcados.length, plazos.length, 'marcar un plazo marca todos los del recibo')
+  // El dinero sale igual: la previsión es lo único que no puede mentir.
+  const saldos = (/** @type {any} */ p) => JSON.stringify(p.dias?.map((/** @type {any} */ d) => d.saldo) ?? p)
+  assert.equal(saldos(e.proyeccion), saldos(sinMarcar.proyeccion), 'el suelo previsto no se mueve ni un céntimo')
+})

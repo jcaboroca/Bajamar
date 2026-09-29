@@ -103,7 +103,9 @@ function pintarFijos(estado) {
       if (div.open) cerrados.delete(titulo)
       else cerrados.add(titulo)
     })
-    const suma = lista.reduce((t, f) => t + f.mensualEquivalente, 0)
+    // Lo que te devuelven sale de tu cuenta el día que toca —y la previsión lo
+    // cuenta—, pero no es lo que te cuesta vivir un mes.
+    const suma = lista.reduce((t, f) => (f.devuelto ? t : t + f.mensualEquivalente), 0)
     const cabeza = nodo('summary', 'grupo-cabecera')
     cabeza.append(
       nodo('span', 'rotulo rotulo-menor', titulo),
@@ -117,9 +119,11 @@ function pintarFijos(estado) {
       const fila = linea({
         marca: diaYMes(f.proximaPrevista),
         nombre: f.nombre,
-        detalle: `${cada}${equivalente}${f.aplazable ? ' · te lo puedes saltar' : ''}`,
+        detalle: f.devuelto
+          ? `${cada} · te lo devuelve ${f.devuelto}`
+          : `${cada}${equivalente}${f.aplazable ? ' · te lo puedes saltar' : ''}`,
         importe: formatEuros(f.importeEsperado),
-        clase: f.estado === 'retrasado' ? 'apagado' : '',
+        clase: f.estado === 'retrasado' || f.devuelto ? 'apagado' : '',
       })
       marcarPreguntable(fila, f.reciboId, rotuloDe(f.reciboId, f.nombre, f.importeEsperado), f.categoria)
       ol.append(fila)
