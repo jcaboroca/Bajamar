@@ -213,9 +213,12 @@ function pintarApartados(estado) {
   requerir('apartados').replaceChildren(...estado.apartados.map((a) => {
     const detalle = a.motivo === 'extinto'
       ? `dejó de pasar en ${nombreDeMes(a.ultima).toLowerCase()}`
-      : 'ya no lo pagas'
+      : a.motivo === 'anulado'
+        ? 'te lo devuelven el mismo día'
+        : 'ya no lo pagas'
     const fila = linea({ nombre: a.nombre, detalle, importe: '', clase: 'apagado' })
-    marcarPreguntable(fila, a.reciboId, rotuloDe(a.reciboId, a.nombre, a.importe))
+    // Lo anulado no es una decisión suya, así que no hay nada que reabrir.
+    if (a.motivo !== 'anulado') marcarPreguntable(fila, a.reciboId, rotuloDe(a.reciboId, a.nombre, a.importe))
     return fila
   }))
 }

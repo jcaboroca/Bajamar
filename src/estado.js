@@ -242,11 +242,13 @@ export function construirEstado(crudos, opciones = {}) {
     [...compromisosTodos, ...ingresosTodos],
     new Set(deteccion.dudosos.map((d) => d.entidadId)),
   )
+  const anulados = loQueSeAnula(compromisosTodos, ingresosTodos)
+  const recibosPorId = new Map([...compromisosTodos, ...ingresosTodos].map((c) => [c.reciboId, c]))
   const deBaja = new Set([
     ...Object.keys(tratos).filter((id) => tratos[id] === 'baja'),
     // Un cobro y su devolución del mismo día se tratan como una baja: ni se
     // prevén ni sus apuntes cuentan como gasto del día a día.
-    ...loQueSeAnula(compromisosTodos, ingresosTodos),
+    ...anulados,
   ])
   const aplazables = new Set(Object.keys(tratos).filter((id) => tratos[id] === 'suelto'))
 
@@ -481,13 +483,15 @@ export function construirEstado(crudos, opciones = {}) {
     // Lo apartado se busca en la detección sin filtrar: es la única que aún
     // sabe cómo se llamaba y cuánto costaba lo que el usuario dio de baja.
     apartados: [
-      ...[...deBaja].map((id) => {
-        const recibo = [...compromisosTodos, ...ingresosTodos].find((c) => c.reciboId === id)
+      // De un par que se anula sólo se enseña el cargo: la devolución al lado
+      // sería la misma línea dos veces y ninguna de las dos se entendería.
+      ...[...deBaja].filter((id) => !anulados.has(id) || (recibosPorId.get(id)?.importeEsperado ?? 0) < 0).map((id) => {
+        const recibo = recibosPorId.get(id)
         return {
           reciboId: id,
           nombre: recibo?.nombre ?? nombres.get(id.split('#')[0]) ?? id,
           importe: recibo?.importeEsperado ?? 0,
-          motivo: /** @type {'baja' | 'extinto'} */ ('baja'),
+          motivo: /** @type {'baja' | 'extinto' | 'anulado'} */ (anulados.has(id) ? 'anulado' : 'baja'),
           ultima: recibo?.ultimaVista ?? '',
           trato: tratos[id],
         }
@@ -498,7 +502,7 @@ export function construirEstado(crudos, opciones = {}) {
         reciboId: c.reciboId,
         nombre: c.nombre,
         importe: c.importeEsperado,
-        motivo: /** @type {'baja' | 'extinto'} */ ('extinto'),
+        motivo: /** @type {'baja' | 'extinto' | 'anulado'} */ ('extinto'),
         ultima: c.ultimaVista,
         trato: tratos[c.reciboId],
       })),
