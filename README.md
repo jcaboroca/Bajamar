@@ -19,7 +19,7 @@ petición de red. Todo ocurre y se queda en tu navegador.
 
 ```sh
 npm run dev      # sirve la aplicación en http://localhost:4173
-npm test         # 279 pruebas, sin dependencias
+npm test         # 291 pruebas, sin dependencias
 ```
 
 No hay `npm install` porque no hay nada que instalar: **cero dependencias**,
