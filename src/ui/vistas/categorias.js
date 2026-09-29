@@ -12,7 +12,6 @@
  */
 
 import { formatEuros, formatEurosRedondo } from '../../dominio/dinero.js'
-import { MESES_DE } from '../../analisis/fijos.js'
 import { diaYMes, linea, nodo, nombreDeMes, requerir, vacio } from '../piezas.js'
 import { marcarPreguntable, preguntarAlPulsar, rotuloDe } from '../trato.js'
 
@@ -30,6 +29,15 @@ let ultimo = null
  */
 const cerrados = new Set()
 
+/** Cada cuánto llega, dicho como se dice. */
+const CADA_CUANTO = {
+  mensual: 'al mes',
+  bimestral: 'cada dos meses',
+  trimestral: 'cada tres meses',
+  semestral: 'cada seis meses',
+  anual: 'una vez al año',
+}
+
 export function montarCategorias({ alCambiarTrato, alMarcarAnual }) {
   for (const caja of ['fijos', 'apartados']) {
     preguntarAlPulsar(requerir(caja), () => ultimo, alCambiarTrato)
@@ -45,7 +53,6 @@ export function montarCategorias({ alCambiarTrato, alMarcarAnual }) {
 export function pintarCategorias(estado) {
   ultimo = estado
   pintarFijos(estado)
-  pintarSuscripciones(estado)
   pintarPreguntas(estado)
   pintarApartados(estado)
 }
@@ -79,7 +86,7 @@ function pintarFijos(estado) {
     div.append(cabeza, nodo('p', 'aclaracion', explicacion))
     const ol = nodo('ol', 'eventos pulsables')
     for (const f of lista) {
-      const cada = f.periodicidad === 'mensual' ? 'al mes' : `cada ${MESES_DE[f.periodicidad]} meses`
+      const cada = f.periodicidad === 'mensual' ? 'al mes' : CADA_CUANTO[f.periodicidad]
       const equivalente = f.periodicidad === 'mensual' ? '' : ` · ${formatEuros(f.mensualEquivalente)} al mes equivalente`
       const fila = linea({
         marca: diaYMes(f.proximaPrevista),
@@ -95,11 +102,31 @@ function pintarFijos(estado) {
     return div
   }
 
+  // Se agrupa por qué clase de gasto es, no por cada cuánto se paga: un seguro
+  // sigue siendo un seguro lo cobren al mes o al año.
+  const todos = [...c.mensuales, ...c.variables, ...c.periodicos, ...c.anuales]
+  const de = (categoria) => todos.filter((f) => f.categoria === categoria)
+  const clasificados = new Set(['suscripciones', 'impuestos', 'seguros'])
+  const resto = todos.filter((f) => !clasificados.has(f.categoria))
+
   const grupos = [
-    grupo('Cada mes, lo mismo', 'Se puede dar por sabido lo que vale.', c.mensuales),
-    grupo('Cada mes, distinto', 'La cifra es la mediana: lo que suele costar, no lo que costó la última vez.', c.variables),
-    grupo('Cada pocos meses', 'Trimestrales y semestrales.', c.periodicos),
-    grupo('Una vez al año', 'Lo que hay que ver venir con meses de antelación.', c.anuales),
+    grupo(
+      'Gastos fijos al mes',
+      'Lo que se va todos los meses pase lo que pase.',
+      resto.filter((f) => f.periodicidad === 'mensual'),
+    ),
+    grupo(
+      'Suscripciones',
+      `Entre todas, ${formatEuros(c.suscripcionesMes)} al mes. Al año son ${formatEurosRedondo(c.suscripcionesAnio)}.`,
+      de('suscripciones'),
+    ),
+    grupo('Impuestos', 'Lo que hay que ver venir con meses de antelación.', de('impuestos')),
+    grupo('Seguros', 'Pólizas, se paguen al mes o de una vez al año.', de('seguros')),
+    grupo(
+      'Cada pocos meses',
+      'Ni mensual ni de las de arriba: llega de tanto en tanto.',
+      resto.filter((f) => f.periodicidad !== 'mensual'),
+    ),
   ].filter((g) => g !== null)
 
   if (grupos.length === 0) {
@@ -111,23 +138,6 @@ function pintarFijos(estado) {
   }
 
   caja.replaceChildren(...grupos)
-}
-
-/** @param {Estado} estado */
-function pintarSuscripciones(estado) {
-  const lista = estado.costes.suscripciones
-  requerir('bloque-suscripciones').hidden = lista.length === 0
-  if (lista.length === 0) return
-
-  requerir('suscripciones').replaceChildren(...lista.map((f) => linea({
-    nombre: f.nombre,
-    detalle: `próxima el ${diaYMes(f.proximaPrevista)}`,
-    importe: `${formatEuros(f.mensualEquivalente)} / mes`,
-  })))
-
-  requerir('suscripciones-pie').textContent =
-    `Entre todas, ${formatEuros(estado.costes.suscripcionesMes)} al mes. `
-    + `Al año son ${formatEurosRedondo(estado.costes.suscripcionesAnio)}.`
 }
 
 /** @param {Estado} estado */
