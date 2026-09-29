@@ -101,7 +101,7 @@ describe('periodicidad', () => {
     assert.deepEqual(compromisos, [], 'sin una tercera vista, el precio tiene que cuadrar')
   })
 
-  test('los apuntes del mismo día del ayuntamiento son una factura, no tres', () => {
+  test('los apuntes del mismo día del ayuntamiento son recibos distintos, no una factura', () => {
     const plazos = [
       ['2025-10-01', -33071], ['2025-10-01', -4891], ['2025-10-01', -8025],
       ['2026-10-01', -33071], ['2026-10-01', -4891], ['2026-10-01', -8025],
@@ -111,9 +111,14 @@ describe('periodicidad', () => {
       NOMBRES,
       { hoy: '2026-10-15' },
     )
-    assert.equal(compromisos.length, 1, 'el IBI, la basura y el vado son un recibo')
-    assert.equal(compromisos[0].importeEsperado, -45987)
-    assert.equal(compromisos[0].proximaPrevista, '2027-10-01')
+    assert.deepEqual(
+      compromisos.map((c) => c.importeEsperado).sort((a, b) => a - b),
+      [-33071, -8025, -4891],
+      'el IBI de una casa, el de la otra y la basura son tres recibos',
+    )
+    assert.equal(compromisos.reduce((t, c) => t + c.importeEsperado, 0), -45987, 'separarlos no cambia lo que sale')
+    for (const c of compromisos) assert.equal(c.proximaPrevista, '2027-10-01')
+    assert.equal(new Set(compromisos.map((c) => c.reciboId)).size, 3, 'contestar por uno no contesta por los otros')
   })
 
   test('el plazo del que sólo hay uno cuenta si el cobrador ya probó su calendario', () => {
@@ -588,4 +593,31 @@ describe('un cobrador con más de una cosa dentro', () => {
     assert.equal(compromisos[0].periodicidad, 'mensual')
     assert.equal(compromisos[0].importeEsperado, -899, 'vale lo que vale ahora')
   })
+})
+
+test('los impuestos del ayuntamiento se reconocen uno a uno', () => {
+  // Tres inmuebles y dos vehículos, todos con el mismo texto en el extracto.
+  // El IBI va en cuatro fracciones (mayo, julio, octubre, diciembre) y los
+  // plazos se redondean al céntimo; las tasas y los vehículos van aparte.
+  const plazos = []
+  for (const [ano, may, jul, oct, dic] of [['2025', '05-02', '07-01', '10-01', '12-01'], ['2026', '05-04', '07-01', '', '']]) {
+    for (const [dia, ibi] of [[may, 0], [jul, 0], [oct, 0], [dic, 1]]) {
+      if (!dia) continue
+      for (const precio of [33071, 8025, 4891]) plazos.push([`${ano}-${dia}`, -(precio + ibi)])
+    }
+    plazos.push([`${ano}-${jul}`, -11514], [`${ano}-${jul}`, -11050], [`${ano}-${jul}`, -6726])
+    plazos.push([`${ano}-${ano === '2025' ? '03-03' : '03-02'}`, -4228], [`${ano}-${ano === '2025' ? '03-03' : '03-02'}`, -3029])
+    plazos.push([`${ano}-${ano === '2025' ? '06-02' : '06-01'}`, -4228], [`${ano}-${ano === '2025' ? '06-02' : '06-01'}`, -3029])
+  }
+  const { compromisos } = detectarCompromisos(
+    plazos.map(([f, i]) => mov(/** @type {string} */ (f), Number(i))),
+    NOMBRES,
+    { hoy: '2026-09-29' },
+  )
+  const precios = compromisos.map((c) => Math.abs(c.importeEsperado)).sort((a, b) => b - a)
+  // El plazo de diciembre lleva el céntimo del redondeo: sólo se ha visto una vez
+  // y no hay con qué promediarlo.
+  assert.deepEqual(precios, [33072, 33071, 33071, 33071, 11514, 11050, 8026, 8025, 8025, 8025, 6726, 4892, 4891, 4891, 4891, 4228, 4228, 3029, 3029],
+    'cada recibo con su precio, reconocible en la lista')
+  assert.equal(precios.reduce((t, p) => t + p, 0), 227755, 'y al año sale lo mismo que antes de separarlos')
 })

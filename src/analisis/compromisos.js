@@ -293,6 +293,44 @@ function esLaDelAnoPasado(a, b) {
  * @returns {Factura[][]}  cada grupo es un recibo anual distinto
  */
 function anualesDeDosVistas(orden, hoy) {
+  const porPrecio = mismoPrecioDistintoRecibo(orden)
+  if (porPrecio.length > 1) {
+    const partidas = porPrecio.flatMap((grupo) => cadenasDe(grupo))
+    if (partidas.some((c) => c.length >= 2)) return admitibles(partidas, hoy)
+  }
+  return admitibles(cadenasDe(orden), hoy)
+}
+
+/**
+ * El ayuntamiento cobra el mismo día el IBI de una casa, el de la otra y la
+ * basura, y los tres llegan con el mismo texto. Sumarlos da un número que no
+ * se parece a ningún recibo de los suyos y que nadie puede reconocer. Lo que
+ * sí los distingue es el precio: cada uno vale lo mismo año tras año, salvo
+ * algún céntimo de redondeo al trocearlo en plazos.
+ *
+ * Lo que no se repita vuelve al montón, que se sigue agrupando por día: sin
+ * eso, un cargo suelto dejaría de preverse por haberlo separado.
+ * @param {Movimiento[]} orden
+ * @returns {Movimiento[][]}
+ */
+function mismoPrecioDistintoRecibo(orden) {
+  /** @type {Movimiento[][]} */
+  const grupos = []
+  for (const m of orden) {
+    const suyo = grupos.find((g) => Math.abs(Math.abs(g[0].importe) - Math.abs(m.importe)) <= 5)
+    if (suyo) suyo.push(m)
+    else grupos.push([m])
+  }
+  const repetidos = grupos.filter((g) => g.length >= 2)
+  const sueltos = grupos.filter((g) => g.length < 2).flat()
+  return sueltos.length > 0 ? [...repetidos, sueltos] : repetidos
+}
+
+/**
+ * @param {Movimiento[]} orden
+ * @returns {Factura[][]}
+ */
+function cadenasDe(orden) {
   const facturas = facturasPorDia(orden).filter((f) => Math.abs(f.total) >= MINIMO_ANUAL)
   if (facturas.length < 2) return []
 
@@ -312,6 +350,20 @@ function anualesDeDosVistas(orden, hoy) {
     cadenas.push(cadena)
   }
 
+  return cadenas
+}
+
+/**
+ * El calendario lo demuestra el cobrador entero, no cada recibo suyo por
+ * separado: si dos de sus facturas vuelven año tras año, la que sólo se ha
+ * visto una vez es otro plazo del mismo calendario y no una casualidad. Sólo
+ * mientras su turno no haya pasado: si su aniversario vino y no se repitió,
+ * no era un recibo.
+ * @param {Factura[][]} cadenas
+ * @param {string} hoy
+ * @returns {Factura[][]}
+ */
+function admitibles(cadenas, hoy) {
   const confirmadas = cadenas.filter((c) => c.length >= 2)
   if (confirmadas.length < 2) return confirmadas
   return cadenas.filter((c) => c.length >= 2 || sumarMeses(c[0].fecha, 12) > hoy)
