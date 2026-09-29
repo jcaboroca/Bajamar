@@ -714,6 +714,7 @@ async function traer(fichero) {
 async function tragar(ficheros) {
   const avisos = []
   let leidos = 0
+  const antes = (await leerMovimientos()).length
   for (const fichero of ficheros) {
     try {
       const { movimientos, avisos: propios } = importarXls(await fichero.arrayBuffer())
@@ -727,12 +728,21 @@ async function tragar(ficheros) {
 
   const nota = document.getElementById('aviso-bienvenida')
   if (leidos === 0) {
-    if (nota) nota.textContent = avisos[0] ?? 'Ese fichero no parece un extracto en formato Excel.'
+    const problema = avisos[0] ?? 'Ese fichero no parece un extracto en formato Excel.'
+    if (nota) nota.textContent = problema
+    decir(problema)
     return
   }
   if (nota) nota.textContent = ''
 
   await refrescar({ animar: true })
   contarloAlOtro()
+
+  // Añadir un extracto desde Ajustes no cambia nada de lo que se está mirando,
+  // así que sin esto parecía que el botón no hacía nada.
+  const nuevos = (await leerMovimientos()).length - antes
+  const cola = avisos.length > 0 ? ` No pude con ${avisos.length} ${avisos.length === 1 ? 'línea' : 'líneas'}.` : ''
+  if (nuevos === 0) decir(`Ese extracto ya lo tenías entero: ningún movimiento nuevo.${cola}`)
+  else decir(`Apuntados ${nuevos} movimientos nuevos.${cola}`)
 }
 
