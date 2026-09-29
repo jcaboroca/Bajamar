@@ -1,0 +1,165 @@
+// @ts-check
+/**
+ * Categorías: todo lo que se repite.
+ *
+ * Qué se repite, cada cuánto vuelve y cuánto vale. Son cuatro estados de la
+ * misma cosa —un recibo reconocido, una suscripción, uno que no sé si volverá y
+ * uno que ya no pagas— y por eso viven juntos.
+ *
+ * Estaban en Previsión, que así contestaba dos preguntas a la vez: «¿cómo va
+ * este mes?» y «¿qué tengo contratado?». La primera se decide cada semana y la
+ * segunda se toca dos veces al año.
+ */
+
+import { formatEuros, formatEurosRedondo } from '../../dominio/dinero.js'
+import { MESES_DE } from '../../analisis/fijos.js'
+import { diaYMes, linea, nodo, nombreDeMes, requerir, vacio } from '../piezas.js'
+import { marcarPreguntable, preguntarAlPulsar, rotuloDe } from '../trato.js'
+
+/**
+ * @typedef {ReturnType<typeof import('../../estado.js').construirEstado>} Estado
+ */
+
+/** @type {Estado | null} */
+let ultimo = null
+
+export function montarCategorias({ alCambiarTrato, alMarcarAnual }) {
+  for (const caja of ['fijos', 'apartados']) {
+    preguntarAlPulsar(requerir(caja), () => ultimo, alCambiarTrato)
+  }
+  requerir('preguntas').addEventListener('change', (e) => {
+    const casilla = e.target
+    if (!(casilla instanceof HTMLInputElement) || !casilla.dataset.anual) return
+    alMarcarAnual(casilla.dataset.anual, casilla.checked)
+  })
+}
+
+/** @param {Estado} estado */
+export function pintarCategorias(estado) {
+  ultimo = estado
+  pintarFijos(estado)
+  pintarSuscripciones(estado)
+  pintarPreguntas(estado)
+  pintarApartados(estado)
+}
+
+/** @param {Estado} estado */
+function pintarFijos(estado) {
+  const c = estado.costes
+  const caja = requerir('fijos')
+
+  /**
+   * @param {string} titulo
+   * @param {string} explicacion
+   * @param {import('../../analisis/fijos.js').Fijo[]} lista
+   */
+  const grupo = (titulo, explicacion, lista) => {
+    if (lista.length === 0) return null
+    const div = nodo('div', 'grupo')
+    div.append(nodo('p', 'rotulo rotulo-menor', titulo), nodo('p', 'aclaracion', explicacion))
+    const ol = nodo('ol', 'eventos pulsables')
+    for (const f of lista) {
+      const cada = f.periodicidad === 'mensual' ? 'al mes' : `cada ${MESES_DE[f.periodicidad]} meses`
+      const equivalente = f.periodicidad === 'mensual' ? '' : ` · ${formatEuros(f.mensualEquivalente)} al mes equivalente`
+      const fila = linea({
+        marca: diaYMes(f.proximaPrevista),
+        nombre: f.nombre,
+        detalle: `${cada}${equivalente}${f.aplazable ? ' · te lo puedes saltar' : ''}`,
+        importe: formatEuros(f.importeEsperado),
+        clase: f.estado === 'retrasado' ? 'apagado' : '',
+      })
+      marcarPreguntable(fila, f.reciboId, rotuloDe(f.reciboId, f.nombre, f.importeEsperado))
+      ol.append(fila)
+    }
+    div.append(ol)
+    return div
+  }
+
+  const grupos = [
+    grupo('Cada mes, lo mismo', 'Se puede dar por sabido lo que vale.', c.mensuales),
+    grupo('Cada mes, distinto', 'La cifra es la mediana: lo que suele costar, no lo que costó la última vez.', c.variables),
+    grupo('Cada pocos meses', 'Trimestrales y semestrales.', c.periodicos),
+    grupo('Una vez al año', 'Lo que hay que ver venir con meses de antelación.', c.anuales),
+  ].filter((g) => g !== null)
+
+  if (grupos.length === 0) {
+    caja.replaceChildren(vacio(
+      'Todavía no he reconocido ningún recibo periódico. Hacen falta tres o cuatro '
+      + 'apariciones del mismo cobrador para no confundir una costumbre con un compromiso.',
+    ))
+    return
+  }
+
+  caja.replaceChildren(...grupos)
+}
+
+/** @param {Estado} estado */
+function pintarSuscripciones(estado) {
+  const lista = estado.costes.suscripciones
+  requerir('bloque-suscripciones').hidden = lista.length === 0
+  if (lista.length === 0) return
+
+  requerir('suscripciones').replaceChildren(...lista.map((f) => linea({
+    nombre: f.nombre,
+    detalle: `próxima el ${diaYMes(f.proximaPrevista)}`,
+    importe: `${formatEuros(f.mensualEquivalente)} / mes`,
+  })))
+
+  requerir('suscripciones-pie').textContent =
+    `Entre todas, ${formatEuros(estado.costes.suscripcionesMes)} al mes. `
+    + `Al año son ${formatEurosRedondo(estado.costes.suscripcionesAnio)}.`
+}
+
+/** @param {Estado} estado */
+function pintarPreguntas(estado) {
+  const bloque = requerir('bloque-preguntas')
+  bloque.hidden = estado.dudosos.length === 0
+  if (estado.dudosos.length === 0) return
+  requerir('preguntas').replaceChildren(...estado.dudosos.map((d) => {
+    const fila = linea({
+      marca: diaYMes(d.fecha),
+      nombre: d.nombre,
+      detalle: `la última vez hace ${d.meses} meses · ¿vuelve?`,
+      importe: formatEuros(d.importe, { signo: true }),
+      clase: 'previsto',
+    })
+    fila.append(casillaAnual(d.entidadId, d.nombre, estado.anuales[d.entidadId] === true))
+    return fila
+  }))
+}
+
+/**
+ * La app no puede distinguir un seguro anual visto una vez de un pago único, y
+ * ese es justo el dato que el usuario tiene y ella no.
+ * @param {string} entidadId
+ * @param {string} nombre
+ * @param {boolean} marcado
+ */
+function casillaAnual(entidadId, nombre, marcado) {
+  const etiqueta = nodo('label', 'clasificar-unico pregunta-anual')
+  const casilla = document.createElement('input')
+  casilla.type = 'checkbox'
+  casilla.dataset.anual = entidadId
+  casilla.checked = marcado
+  casilla.setAttribute('aria-label', `${nombre} vuelve cada año`)
+  etiqueta.append(casilla, nodo('span', '', 'Sí, vuelve cada año'))
+  return etiqueta
+}
+
+/**
+ * Lo que el usuario ha sacado de la previsión. Sin esta lista, decir «ya no lo
+ * pago» sería una puerta de una sola dirección: lo apartado desaparece de
+ * todas partes y no habría dónde volver a encontrarlo.
+ * @param {Estado} estado
+ */
+function pintarApartados(estado) {
+  requerir('bloque-apartados').hidden = estado.apartados.length === 0
+  requerir('apartados').replaceChildren(...estado.apartados.map((a) => {
+    const detalle = a.motivo === 'extinto'
+      ? `dejó de pasar en ${nombreDeMes(a.ultima).toLowerCase()}`
+      : 'ya no lo pagas'
+    const fila = linea({ nombre: a.nombre, detalle, importe: '', clase: 'apagado' })
+    marcarPreguntable(fila, a.reciboId, rotuloDe(a.reciboId, a.nombre, a.importe))
+    return fila
+  }))
+}

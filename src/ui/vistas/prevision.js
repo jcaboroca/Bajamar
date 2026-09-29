@@ -1,48 +1,48 @@
 // @ts-check
 /**
- * Previsión: qué viene y cuánto cuesta que venga.
+ * Previsión: el mes de arriba abajo.
  *
- * Aquí conviven dos maneras de mirar el mismo dinero. Mes a mes se ve la
- * forma del año —dónde hay un mes que no cuadra— y día a día se ve por qué.
- * Un mes puede cerrar en positivo y aun así haber pasado por un descubierto el
- * día 12, así que cada mes lleva su propio suelo además de su saldo final.
+ * La nómina entera y de ella van saliendo cosas, en el orden en que se deciden.
+ * Cada escalón deja a la derecha lo que queda, que es la cifra que contesta «¿y
+ * entonces cuánto me sobra?».
  *
- * Cuanto más lejos se mira, menos se sabe. Lo que hay a doce meses son
- * recibos que se repiten y un ritmo de gasto medido, no una bola de cristal, y
- * el pie de la lámina lo dice con esas palabras.
+ * Los tres escalones que llevan detalle —fijos, inversiones y día a día— se
+ * abren y se cierran. Cerrados, la cascada se lee entera de un vistazo: seis
+ * líneas y la respuesta. Abiertos, se ve de dónde sale cada cifra. Antes eran
+ * cuarenta líneas siempre, y para llegar a «acabas con» había que bajar.
+ *
+ * Aquí ya no vive ni el horizonte a doce meses —que es del Resumen, porque es
+ * la misma pregunta que la bajamar pero más lejos— ni las listas de lo que se
+ * repite, que se fueron a Categorías.
  */
 
 import { formatEuros, formatEurosRedondo } from '../../dominio/dinero.js'
-import { diasEntre, mesDe, ultimoDiaDelMes, sumarMeses } from '../../dominio/tipos.js'
-import { MESES_DE } from '../../analisis/fijos.js'
-import { dibujarLamina } from '../lamina.js'
+import { diasEntre } from '../../dominio/tipos.js'
 import { montarSimulador, pintarSimulador } from '../simulador.js'
-import { diaYMes, linea, nodo, nombreDeMes, requerir, vacio } from '../piezas.js'
+import { diaYMes, nodo, nombreDeMes, requerir } from '../piezas.js'
 import { marcarPreguntable, preguntarAlPulsar, rotuloDe } from '../trato.js'
 
 /**
  * @typedef {ReturnType<typeof import('../../estado.js').construirEstado>} Estado
- * @typedef {import('../../analisis/bajamar.js').Proyeccion} Proyeccion
  */
-
-let horizonte = 3
 
 /** @type {Estado | null} */
 let ultimo = null
 
-export function montarPrevision({ alCambiarTrato, alApagarCategoria, alMarcarInversion, alSaltarCobro, alAsignar, alRecuadrar, alMarcarAnual }) {
-  // «No lo sé» vive aquí, con los fijos y los apartados: es la misma familia
-  // de preguntas sobre recibos, y en el Resumen era una bandeja de tareas
-  // disfrazada de resumen.
-  requerir('preguntas').addEventListener('change', (e) => {
-    const casilla = e.target
-    if (!(casilla instanceof HTMLInputElement) || !casilla.dataset.anual) return
-    alMarcarAnual(casilla.dataset.anual, casilla.checked)
-  })
+/**
+ * Qué escalones están abiertos.
+ *
+ * La cascada se vuelve a construir entera en cada refresco, y cualquier
+ * decisión —saltarse un recibo, mover una barra— dispara uno. Sin recordarlo,
+ * abrir «Día a día», tocar una barra y verlo cerrarse en la cara sería el
+ * comportamiento normal de la pantalla.
+ */
+const abiertos = new Set()
+
+export function montarPrevision({ alCambiarTrato, alApagarCategoria, alMarcarInversion, alSaltarCobro, alAsignar, alRecuadrar }) {
   montarSimulador({ alApagarCategoria, alAsignar, alRecuadrar })
-  for (const caja of ['fijos', 'apartados', 'cascada']) {
-    preguntarAlPulsar(requerir(caja), () => ultimo, alCambiarTrato)
-  }
+  preguntarAlPulsar(requerir('cascada'), () => ultimo, alCambiarTrato)
+
   requerir('cascada').addEventListener('change', (ev) => {
     const casilla = /** @type {HTMLInputElement} */ (ev.target)
     if (!casilla.dataset.inversion) return
@@ -53,72 +53,16 @@ export function montarPrevision({ alCambiarTrato, alApagarCategoria, alMarcarInv
     if (!(boton instanceof HTMLElement) || !boton.dataset.saltar || !boton.dataset.mes) return
     alSaltarCobro(boton.dataset.saltar, boton.dataset.mes, boton.dataset.puesto !== 'si')
   })
-  for (const caja of ['fijos', 'apartados']) {
-    preguntarAlPulsar(requerir(caja), () => ultimo, alCambiarTrato)
-  }
-
-  requerir('horizonte').addEventListener('click', (e) => {
-    const boton = e.target instanceof Element ? e.target.closest('[data-meses]') : null
-    if (!(boton instanceof HTMLButtonElement)) return
-    horizonte = Number(boton.dataset.meses)
-    for (const otro of requerir('horizonte').querySelectorAll('[data-meses]')) {
-      otro.setAttribute('aria-pressed', String(otro === boton))
-    }
-    repintar()
-  })
 }
 
 /** @param {Estado} estado */
 export function pintarPrevision(estado) {
   ultimo = estado
-  repintar()
-}
-
-function repintar() {
-  if (!ultimo) return
-  const estado = ultimo
-  const hasta = ultimoDiaDelMes(sumarMeses(estado.hoy, horizonte - 1))
-  const proyeccion = recortar(estado.proyeccionLarga, hasta)
-
-  requerir('lamina-larga').replaceChildren(dibujarLamina(proyeccion, { marca: 'largo' }))
-
-  requerir('prevision-pie').textContent =
-    `El suelo de estos ${horizonte} meses es ${formatEurosRedondo(proyeccion.suelo.saldo)}. `
-    + 'De aquí en adelante sólo hay recibos que se repiten y tu ritmo de gasto medido: '
-    + 'cuanto más lejos, menos seguro.'
-
   pintarCascada(estado)
   pintarSimulador(estado)
-  pintarFijos(estado)
-  pintarApartados(estado)
-  pintarSuscripciones(estado)
-  pintarPreguntas(estado)
 }
 
-/**
- * @param {Proyeccion} proyeccion
- * @param {string} hasta
- * @returns {Proyeccion}
- */
-function recortar(proyeccion, hasta) {
-  const curva = proyeccion.curva.filter((p) => p.fecha <= hasta)
-  if (curva.length === 0) return proyeccion
-  const suelo = curva.reduce((bajo, p) => (p.saldo < bajo.saldo ? p : bajo), curva[0])
-  return {
-    ...proyeccion,
-    hasta,
-    curva,
-    suelo: { ...suelo },
-    saldoFinal: curva[curva.length - 1].saldo,
-    eventos: proyeccion.eventos.filter((e) => e.fecha <= hasta),
-  }
-}
-/**
- * El mes de arriba abajo: la nómina entera y de ella van saliendo cosas, en el
- * orden en que se deciden. Cada escalón deja a la derecha lo que queda, que es
- * la cifra que contesta «¿y entonces cuánto me sobra?».
- * @param {Estado} estado
- */
+/** @param {Estado} estado */
 function pintarCascada(estado) {
   const c = estado.cascada
   const nombre = nombreDeMes(c.mes)
@@ -134,16 +78,21 @@ function pintarCascada(estado) {
   filas.push(encabezado('Lo que cobras', c.ingreso, queda))
 
   /**
+   * @param {string} clave
    * @param {string} titulo
    * @param {string} cuandoNoHay
    * @param {number} suma
    * @param {import('../../analisis/cascada.js').Escalon[]} lista
+   * @param {HTMLElement} [extra]
    */
-  const escalon = (titulo, cuandoNoHay, suma, lista) => {
+  const escalon = (clave, titulo, cuandoNoHay, suma, lista, extra) => {
     queda += suma
-    const li = encabezado(titulo, suma, queda)
-    if (lista.length === 0) li.append(nodo('p', 'cascada-vacio', cuandoNoHay))
-    else li.append(desglose(lista))
+    const li = nodo('li', 'cascada-fila')
+    const caja = plegable(clave, titulo, suma)
+    if (lista.length > 0) caja.append(desglose(lista))
+    else if (!extra) caja.append(nodo('p', 'cascada-vacio', cuandoNoHay))
+    if (extra) caja.append(extra)
+    li.append(caja, nodo('p', 'cascada-queda', `quedan ${formatEurosRedondo(queda)}`))
     filas.push(li)
   }
 
@@ -153,29 +102,51 @@ function pintarCascada(estado) {
   const seguros = [...c.fijos, ...c.plazos, ...c.toca]
     .sort((a, b) => (a.fecha ?? '').localeCompare(b.fecha ?? ''))
   escalon(
+    'fijos',
     `Gastos fijos de ${nombre.toLowerCase()}`,
     'Ninguno.',
     c.sumaFijos + c.sumaPlazos + c.sumaToca,
     seguros,
   )
-  escalon('Inversiones', 'Este mes no apartas nada.', c.sumaInversiones, c.inversiones)
+  escalon('inversiones', 'Inversiones', 'Este mes no apartas nada.', c.sumaInversiones, c.inversiones)
 
   filas.push(loQueQuedaParaVivir(queda, c))
 
-  queda += c.diaADia
-  const dia = encabezado('Día a día', c.diaADia, queda)
-  // Las barras van aquí y no en un bloque aparte: se reparte en el mismo sitio
-  // donde se ve cuánto queda por repartir.
+  // Las barras van dentro del escalón y no en un bloque aparte: se reparte en
+  // el mismo sitio donde se ve cuánto queda por repartir.
   const reparto = requerir('reparto')
   reparto.hidden = false
-  dia.append(reparto)
-  filas.push(dia)
+  escalon('diaadia', 'Día a día', '', c.diaADia, [], reparto)
 
   filas.push(encabezado('Acabas con', c.cierre, null, c.cierre < 0))
   requerir('cascada').replaceChildren(...filas)
 
   pintarSaldoDelMes(estado)
   requerir('cascada-pie').textContent = margen(c)
+}
+
+/**
+ * La cabecera que abre y cierra, recordando si estaba abierta.
+ * @param {string} clave
+ * @param {string} titulo
+ * @param {number} importe
+ */
+function plegable(clave, titulo, importe) {
+  const caja = document.createElement('details')
+  caja.className = 'cascada-desglose'
+  caja.open = abiertos.has(clave)
+  caja.addEventListener('toggle', () => {
+    if (caja.open) abiertos.add(clave)
+    else abiertos.delete(clave)
+  })
+  const cabeza = document.createElement('summary')
+  cabeza.className = 'cascada-cabeza'
+  cabeza.append(
+    nodo('span', 'cascada-titulo', titulo),
+    nodo('span', 'cifras', formatEuros(importe, { signo: true })),
+  )
+  caja.append(cabeza)
+  return caja
 }
 
 /**
@@ -318,125 +289,4 @@ function marcaDeInversion(e) {
   label.addEventListener('click', (ev) => ev.stopPropagation())
   label.append(casilla, nodo('span', '', e.inversion ? 'Es ahorro, no gasto' : 'Marcar como ahorro'))
   return label
-}
-
-/** @param {Estado} estado */
-function pintarFijos(estado) {
-  const c = estado.costes
-  const caja = requerir('fijos')
-
-  /**
-   * @param {string} titulo
-   * @param {string} explicacion
-   * @param {import('../../analisis/fijos.js').Fijo[]} lista
-   */
-  const grupo = (titulo, explicacion, lista) => {
-    if (lista.length === 0) return null
-    const div = nodo('div', 'grupo')
-    div.append(nodo('p', 'rotulo rotulo-menor', titulo), nodo('p', 'aclaracion', explicacion))
-    const ol = nodo('ol', 'eventos pulsables')
-    for (const f of lista) {
-      const cada = f.periodicidad === 'mensual' ? 'al mes' : `cada ${MESES_DE[f.periodicidad]} meses`
-      const equivalente = f.periodicidad === 'mensual' ? '' : ` · ${formatEuros(f.mensualEquivalente)} al mes equivalente`
-      const fila = linea({
-        marca: diaYMes(f.proximaPrevista),
-        nombre: f.nombre,
-        detalle: `${cada}${equivalente}${f.aplazable ? ' · te lo puedes saltar' : ''}`,
-        importe: formatEuros(f.importeEsperado),
-        clase: f.estado === 'retrasado' ? 'apagado' : '',
-      })
-      marcarPreguntable(fila, f.reciboId, rotuloDe(f.reciboId, f.nombre, f.importeEsperado))
-      ol.append(fila)
-    }
-    div.append(ol)
-    return div
-  }
-
-  const grupos = [
-    grupo('Cada mes, lo mismo', 'Se puede dar por sabido lo que vale.', c.mensuales),
-    grupo('Cada mes, distinto', 'La cifra es la mediana: lo que suele costar, no lo que costó la última vez.', c.variables),
-    grupo('Cada pocos meses', 'Trimestrales y semestrales.', c.periodicos),
-    grupo('Una vez al año', 'Lo que hay que ver venir con meses de antelación.', c.anuales),
-  ].filter((g) => g !== null)
-
-  if (grupos.length === 0) {
-    caja.replaceChildren(vacio(
-      'Todavía no he reconocido ningún recibo periódico. Hacen falta tres o cuatro '
-      + 'apariciones del mismo cobrador para no confundir una costumbre con un compromiso.',
-    ))
-    return
-  }
-
-  caja.replaceChildren(...grupos)
-}
-
-/**
- * Lo que el usuario ha sacado de la previsión. Sin esta lista, decir «ya no lo
- * pago» sería una puerta de una sola dirección: lo apartado desaparece de
- * todas partes y no habría dónde volver a encontrarlo.
- * @param {Estado} estado
- */
-function pintarApartados(estado) {
-  requerir('bloque-apartados').hidden = estado.apartados.length === 0
-  requerir('apartados').replaceChildren(...estado.apartados.map((a) => {
-    const detalle = a.motivo === 'extinto'
-      ? `dejó de pasar en ${nombreDeMes(a.ultima).toLowerCase()}`
-      : 'ya no lo pagas'
-    const fila = linea({ nombre: a.nombre, detalle, importe: '', clase: 'apagado' })
-    marcarPreguntable(fila, a.reciboId, rotuloDe(a.reciboId, a.nombre, a.importe))
-    return fila
-  }))
-}
-
-/** @param {Estado} estado */
-function pintarSuscripciones(estado) {
-  const lista = estado.costes.suscripciones
-  requerir('bloque-suscripciones').hidden = lista.length === 0
-  if (lista.length === 0) return
-
-  requerir('suscripciones').replaceChildren(...lista.map((f) => linea({
-    nombre: f.nombre,
-    detalle: `próxima el ${diaYMes(f.proximaPrevista)}`,
-    importe: `${formatEuros(f.mensualEquivalente)} / mes`,
-  })))
-
-  requerir('suscripciones-pie').textContent =
-    `Entre todas, ${formatEuros(estado.costes.suscripcionesMes)} al mes. `
-    + `Al año son ${formatEurosRedondo(estado.costes.suscripcionesAnio)}.`
-}
-
-/** @param {Estado} estado */
-function pintarPreguntas(estado) {
-  const bloque = requerir('bloque-preguntas')
-  bloque.hidden = estado.dudosos.length === 0
-  if (estado.dudosos.length === 0) return
-  requerir('preguntas').replaceChildren(...estado.dudosos.map((d) => {
-    const fila = linea({
-      marca: diaYMes(d.fecha),
-      nombre: d.nombre,
-      detalle: `la última vez hace ${d.meses} meses · ¿vuelve?`,
-      importe: formatEuros(d.importe, { signo: true }),
-      clase: 'previsto',
-    })
-    fila.append(casillaAnual(d.entidadId, d.nombre, estado.anuales[d.entidadId] === true))
-    return fila
-  }))
-}
-
-/**
- * La app no puede distinguir un seguro anual visto una vez de un pago único, y
- * ese es justo el dato que el usuario tiene y ella no.
- * @param {string} entidadId
- * @param {string} nombre
- * @param {boolean} marcado
- */
-function casillaAnual(entidadId, nombre, marcado) {
-  const etiqueta = nodo('label', 'clasificar-unico pregunta-anual')
-  const casilla = document.createElement('input')
-  casilla.type = 'checkbox'
-  casilla.dataset.anual = entidadId
-  casilla.checked = marcado
-  casilla.setAttribute('aria-label', `${nombre} vuelve cada año`)
-  etiqueta.append(casilla, nodo('span', '', 'Sí, vuelve cada año'))
-  return etiqueta
 }

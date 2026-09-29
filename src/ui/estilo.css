@@ -885,6 +885,11 @@ main {
 .cascada-cabeza { display: flex; gap: 1rem; align-items: baseline; justify-content: space-between; }
 .cascada-titulo { font-weight: 600; }
 .cascada-queda { margin: 0.125rem 0 0; font-size: 0.8125rem; color: var(--secundario); text-align: right; }
+
+/* Los escalones con detalle se abren. El importe y el «quedan» se leen
+   siempre; el desglose sólo cuando se pide. Mismo marcador nativo que los
+   desplegables del Resumen: son el mismo gesto. */
+.cascada-desglose > summary { cursor: pointer; list-style-position: inside; }
 .cascada-vacio { margin: 0.25rem 0 0; font-size: 0.8125rem; color: var(--secundario); }
 
 .cascada-detalle { margin: 0.5rem 0 0; padding: 0 0 0 0.75rem; border-left: 2px solid var(--linea); list-style: none; }

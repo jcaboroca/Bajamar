@@ -50,6 +50,7 @@ import { arrancarNavegacion } from './nav.js'
 import { montarResumen, pintarResumen } from './vistas/resumen.js'
 import { montarMovimientos, pintarMovimientos } from './vistas/movimientos.js'
 import { montarPrevision, pintarPrevision } from './vistas/prevision.js'
+import { montarCategorias, pintarCategorias } from './vistas/categorias.js'
 import { montarPatrimonio, pintarPatrimonio } from './vistas/patrimonio.js'
 import { montarAjustes, pintarAjustes } from './vistas/ajustes.js'
 
@@ -179,12 +180,16 @@ function montarVistas() {
     },
   })
 
-  montarPrevision({
+  montarCategorias({
     alCambiarTrato,
     alMarcarAnual: async (entidadId, esAnual) => {
       await ponerAnual(entidadId, esAnual)
       await refrescar()
     },
+  })
+
+  montarPrevision({
+    alCambiarTrato,
     alApagarCategoria: async (categoria, apagada) => {
       await ponerApagada(categoria, apagada)
       await refrescar()
@@ -315,6 +320,7 @@ async function refrescar({ animar = false, local = true } = {}) {
   pintarResumen(estado, { animar })
   pintarMovimientos(estado)
   pintarPrevision(estado)
+  pintarCategorias(estado)
   pintarPatrimonio(estado, preferencias.objetivos)
   pintarAjustes(estado, preferencias.colchon, preferencias.ventanaRitmo)
   pintarSincro()

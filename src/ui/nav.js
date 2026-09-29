@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * Navegación entre las cinco áreas.
+ * Navegación entre las seis áreas.
  *
  * Sin router ni historia falsa: el hash es el estado. Así se puede volver con
  * el botón atrás del móvil sin salir de la aplicación, que es lo que todo el
@@ -9,7 +9,7 @@
 
 import { requerir } from './piezas.js'
 
-const AREAS = ['resumen', 'movimientos', 'prevision', 'patrimonio', 'ajustes']
+const AREAS = ['resumen', 'movimientos', 'prevision', 'categorias', 'patrimonio', 'ajustes']
 
 /**
  * @param {(vista: string) => void} alCambiar

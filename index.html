@@ -24,6 +24,7 @@
     <button type="button" class="pestana" data-vista="resumen" aria-current="page">Resumen</button>
     <button type="button" class="pestana" data-vista="movimientos">Movimientos</button>
     <button type="button" class="pestana" data-vista="prevision">Previsión</button>
+    <button type="button" class="pestana" data-vista="categorias">Categorías</button>
     <button type="button" class="pestana" data-vista="patrimonio">Patrimonio</button>
     <button type="button" class="pestana" data-vista="ajustes">Ajustes</button>
   </nav>
@@ -66,6 +67,17 @@
       <ol id="categorias" class="categorias"></ol>
     </section>
 
+    <section class="bloque">
+      <p class="rotulo">Hasta dónde miras</p>
+      <div class="filtros" id="horizonte" role="group" aria-label="Horizonte">
+        <button type="button" class="filtro" data-meses="3" aria-pressed="true">3 meses</button>
+        <button type="button" class="filtro" data-meses="6" aria-pressed="false">6 meses</button>
+        <button type="button" class="filtro" data-meses="12" aria-pressed="false">12 meses</button>
+      </div>
+      <div id="lamina-larga"></div>
+      <p class="nota" id="prevision-pie"></p>
+    </section>
+
   </div>
 
   <!-- ── Movimientos ────────────────────────────────────────────────────── -->
@@ -103,17 +115,6 @@
       <p class="nota" id="cascada-pie"></p>
     </section>
 
-    <section class="bloque">
-      <p class="rotulo">Hasta dónde miras</p>
-      <div class="filtros" id="horizonte" role="group" aria-label="Horizonte">
-        <button type="button" class="filtro" data-meses="3" aria-pressed="true">3 meses</button>
-        <button type="button" class="filtro" data-meses="6" aria-pressed="false">6 meses</button>
-        <button type="button" class="filtro" data-meses="12" aria-pressed="false">12 meses</button>
-      </div>
-      <div id="lamina-larga"></div>
-      <p class="nota" id="prevision-pie"></p>
-    </section>
-
     <!-- La cascada lo adopta dentro de su escalón «Día a día»: se reparte donde
          se ve lo que hay que repartir. Vive aquí para que sus oyentes se pongan
          una sola vez y sobrevivan a los repintados. -->
@@ -128,12 +129,12 @@
       <p class="nota" id="simulador-pie"></p>
     </div>
 
-    <section class="bloque" id="bloque-preguntas" hidden>
-      <p class="rotulo">No lo sé</p>
-      <p class="aclaracion">Esto ha pasado una o dos veces. No son suficientes para
-        saber cada cuánto vuelve, así que no lo doy por hecho.</p>
-      <ol id="preguntas" class="eventos"></ol>
-    </section>
+  </div>
+
+  <!-- ── Categorías ─────────────────────────────────────────────────────── -->
+  <!-- Todo lo que se repite: qué es, cada cuánto vuelve y cuánto vale. Vivía
+       en Previsión, que así hablaba a la vez de este mes y del año entero. -->
+  <div class="vista" id="vista-categorias" hidden>
 
     <section class="bloque">
       <p class="rotulo">Gastos fijos</p>
@@ -143,17 +144,24 @@
         de que lo sepa.</p>
     </section>
 
+    <section class="bloque" id="bloque-suscripciones" hidden>
+      <p class="rotulo">Suscripciones</p>
+      <ol id="suscripciones" class="eventos"></ol>
+      <p class="nota" id="suscripciones-pie"></p>
+    </section>
+
+    <section class="bloque" id="bloque-preguntas" hidden>
+      <p class="rotulo">No lo sé</p>
+      <p class="aclaracion">Esto ha pasado una o dos veces. No son suficientes para
+        saber cada cuánto vuelve, así que no lo doy por hecho.</p>
+      <ol id="preguntas" class="eventos"></ol>
+    </section>
+
     <section class="bloque" id="bloque-apartados" hidden>
       <p class="rotulo">Fuera de la previsión</p>
       <ol id="apartados" class="eventos pulsables"></ol>
       <p class="nota">Esto no se prevé: o me lo dijiste tú, o lleva tres veces
         seguidas sin pasar. Tócalo si te equivocaste o si vuelve a estar en pie.</p>
-    </section>
-
-    <section class="bloque" id="bloque-suscripciones" hidden>
-      <p class="rotulo">Suscripciones</p>
-      <ol id="suscripciones" class="eventos"></ol>
-      <p class="nota" id="suscripciones-pie"></p>
     </section>
 
   </div>

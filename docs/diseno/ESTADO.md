@@ -112,6 +112,30 @@ selector de mes al mes en curso.
 `docs/` está excluido del repositorio por privacidad —lleva diagnósticos con
 importes reales— salvo `docs/diseno/`, que es donde está esto.
 
+## Qué contesta cada pestaña
+
+Son seis y cada una tiene una pregunta. Si te encuentras añadiendo algo que no
+contesta la de su pestaña, va en otra.
+
+| | |
+|---|---|
+| **Resumen** | ¿Llego? ¿Cuánto tengo para vivir? ¿Voy bien? ¿Y más allá? |
+| **Movimientos** | ¿En qué se fue esto? |
+| **Previsión** | La cascada de un mes: de la nómina a lo que queda |
+| **Categorías** | Qué se repite, cada cuánto y cuánto vale |
+| **Patrimonio** | Lo que no está en la cuenta |
+| **Ajustes** | Colchón, ventana del ritmo, sincronización |
+
+El horizonte a 3/6/12 meses está en el Resumen y no en Previsión: es la misma
+pregunta que la bajamar, sólo que más lejos. Previsión hablaba a la vez de este
+mes y del año entero, y las listas de recibos —que se tocan dos veces al año—
+competían por la pantalla con la cascada, que se mira cada semana.
+
+Los tres escalones con detalle de la cascada se pliegan. **Su estado abierto se
+recuerda en un `Set` del módulo**, porque la cascada se reconstruye entera en
+cada refresco y cualquier decisión dispara uno: sin eso, abrir «Día a día»,
+mover una barra y verlo cerrarse sería el comportamiento normal.
+
 ## Los nombres del estado, que engañan
 
 `construirEstado` devuelve un objeto grande y tres de sus campos tienen nombre
@@ -166,6 +190,8 @@ movimientos enseñaban cifras distintas.
 | `96f1331` | Un botón para rendirse: que mande uno y el otro se calle |
 | `d18d3e3` | **El que tenía menos decisiones era justo el que tenía la que faltaba** |
 | `97d2093` | **Las categorías salen de en qué gastas, no de cuánto te sobra** |
+| `feef1d2` | Dejar por escrito dónde se queda esto |
+| *(este)* | Previsión se queda con la cascada; lo demás, a Categorías |
 
 Los dos últimos son los arreglos de fondo. El segundo: la lista de barras de
 Previsión se construía a partir del reparto **propuesto**, y esa propuesta va
@@ -215,14 +241,17 @@ Por orden de lo que más molesta:
 2. **Ciento dos reglas de categoría a ciegas.** El buzón traía ese montón de
    asignaciones manuales de comercio a categoría y no hay ninguna pantalla
    donde verlas ni limpiarlas. Si algún gasto aparece bajo un nombre que no
-   toca, es ahí. Merece una lista con su botón de quitar.
+   toca, es ahí. Merece una lista con su botón de quitar. **Ya tiene sitio**:
+   la pestaña Categorías, que hoy sólo enseña la mitad de lo que su nombre
+   promete —los recibos— y le falta lo que se llama como ella: las reglas,
+   `estado.reparto` y las categorías apagadas.
 3. **Verificar con datos reales.** El dueño tiene que comprobar que en un
    periodo cerrado `saldo al empezar + nómina − recibos` le lleva exactamente a
    lo que cerró. Si sobra o falta, el desglose desplegable dice dónde.
-4. **Previsión se ha quedado coja.** Lo único suyo es la cascada, el reparto y
-   las listas de fijos y suscripciones; su tabla mes a mes es la misma
-   navegación que el Resumen ya tiene. Es candidata a repartirse y desaparecer,
-   pero es decisión del dueño: sobran pestañas y él lo sabe.
+4. **Previsión es ahora una sola cosa: la cascada del mes.** Se le quitó el
+   horizonte (al Resumen) y las listas de recibos (a Categorías). Queda por ver
+   si con eso se sostiene como pestaña propia o acaba dentro del Resumen; de
+   momento se queda, porque es donde se decide y se mira cada semana.
 5. **Las barras pequeñas cuestan de agarrar** desde que todas comparten techo.
    Lo hablado: botones de más y menos, o una casilla donde escribir la cifra.
    **No** volver a un techo por barra, que es de donde se venía y era peor.
@@ -250,3 +279,8 @@ encuentra lo que la suite no.
 Y cuando toques algo del estado, **comprueba en el navegador qué contiene de
 verdad** antes de filtrar por ello. Lo de arriba sobre `ritmo.porMes` no es una
 curiosidad: dar por supuesto que era un desglose dejó la pantalla en blanco.
+
+En la cascada hay una comprobación que vale por diez: **el último «quedan» tiene
+que ser igual que «Acabas con»**. Al hacer plegables los escalones se coló un
+`queda += c.diaADia` de más y la resta se hacía dos veces; las 291 pruebas
+pasaron y la pantalla lo cantaba a la primera.

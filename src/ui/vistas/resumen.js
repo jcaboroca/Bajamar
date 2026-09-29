@@ -11,6 +11,11 @@
  *   1. ¿Llego? — el punto más bajo del periodo y cuándo.
  *   2. ¿Cuánto tengo para vivir, y a qué ritmo?
  *   3. ¿Voy bien, o me estoy pasando?
+ *   4. ¿Y más allá? — la misma pregunta a tres, seis o doce meses.
+ *
+ * La cuarta vivía en Previsión, donde compartía pantalla con la cascada de un
+ * solo mes. Es la primera pregunta otra vez, sólo que más lejos, así que va
+ * aquí y al final: cuanto más lejos se mira, menos se sabe.
  *
  * Y habla siempre de un periodo concreto, elegido arriba. Un periodo va de una
  * nómina a la siguiente, así que septiembre es del 25 de agosto al 24 de
@@ -19,7 +24,7 @@
  */
 
 import { formatEuros, formatEurosRedondo } from '../../dominio/dinero.js'
-import { diasEntre, fechaLarga } from '../../dominio/tipos.js'
+import { diasEntre, fechaLarga, sumarMeses, ultimoDiaDelMes } from '../../dominio/tipos.js'
 import { residuoDe } from '../../analisis/mensual.js'
 import { diasQueDura } from '../../analisis/periodos.js'
 import { dibujarLamina } from '../lamina.js'
@@ -37,10 +42,23 @@ let ultimo = null
 /** Cuál se está mirando. Vacío = el que esté en curso. */
 let elegido = ''
 
+/** Cuántos meses alcanza el bloque de abajo. */
+let horizonte = 3
+
 export function montarResumen({ alCambiarTrato }) {
   preguntarAlPulsar(requerir('avisos'), () => ultimo, alCambiarTrato)
   requerir('mes-antes').addEventListener('click', () => mover(-1))
   requerir('mes-despues').addEventListener('click', () => mover(1))
+
+  requerir('horizonte').addEventListener('click', (e) => {
+    const boton = e.target instanceof Element ? e.target.closest('[data-meses]') : null
+    if (!(boton instanceof HTMLButtonElement)) return
+    horizonte = Number(boton.dataset.meses)
+    for (const otro of requerir('horizonte').querySelectorAll('[data-meses]')) {
+      otro.setAttribute('aria-pressed', String(otro === boton))
+    }
+    if (ultimo) pintarHastaDonde(ultimo)
+  })
 }
 
 /** @param {number} paso */
@@ -82,6 +100,46 @@ export function pintarResumen(estado, { animar }) {
   pintarLlego(estado, periodo, animar)
   pintarVivir(estado, periodo)
   pintarComoVas(periodo)
+  pintarHastaDonde(estado)
+}
+
+/**
+ * 4 · ¿Y más allá? La misma curva, pero a tres, seis o doce meses.
+ *
+ * No depende del periodo elegido arriba: siempre cuenta desde hoy hacia
+ * delante. Lo que hay ahí fuera son recibos que se repiten y un ritmo de gasto
+ * medido, no una bola de cristal, y el pie lo dice con esas palabras.
+ *
+ * @param {Estado} estado
+ */
+function pintarHastaDonde(estado) {
+  const hasta = ultimoDiaDelMes(sumarMeses(estado.hoy, horizonte - 1))
+  const proyeccion = recortar(estado.proyeccionLarga, hasta)
+
+  requerir('lamina-larga').replaceChildren(dibujarLamina(proyeccion, { marca: 'largo' }))
+  requerir('prevision-pie').textContent =
+    `El suelo de estos ${horizonte} meses es ${formatEurosRedondo(proyeccion.suelo.saldo)}. `
+    + 'De aquí en adelante sólo hay recibos que se repiten y tu ritmo de gasto medido: '
+    + 'cuanto más lejos, menos seguro.'
+}
+
+/**
+ * @param {import('../../analisis/bajamar.js').Proyeccion} proyeccion
+ * @param {string} hasta
+ * @returns {import('../../analisis/bajamar.js').Proyeccion}
+ */
+function recortar(proyeccion, hasta) {
+  const curva = proyeccion.curva.filter((p) => p.fecha <= hasta)
+  if (curva.length === 0) return proyeccion
+  const suelo = curva.reduce((bajo, p) => (p.saldo < bajo.saldo ? p : bajo), curva[0])
+  return {
+    ...proyeccion,
+    hasta,
+    curva,
+    suelo: { ...suelo },
+    saldoFinal: curva[curva.length - 1].saldo,
+    eventos: proyeccion.eventos.filter((e) => e.fecha <= hasta),
+  }
 }
 
 /** Cómo se lee: «octubre», o «octubre de 2027» si cambia el año. */
