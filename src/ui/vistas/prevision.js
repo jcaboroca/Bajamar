@@ -127,7 +127,13 @@ function pintarCascada(estado) {
   reparto.hidden = false
   if (enCurso) {
     queda += gastado
-    filas.push(encabezado('Día a día, hasta hoy', gastado, queda))
+    const li = nodo('li', 'cascada-fila')
+    const caja = plegable('gastado', 'Día a día, hasta hoy', gastado)
+    const apuntes = periodo ? periodo.desglose.diaADia.filter((a) => !a.previsto) : []
+    if (apuntes.length === 0) caja.append(nodo('p', 'cascada-vacio', 'Todavía nada.'))
+    else caja.append(loGastado(apuntes, estado))
+    li.append(caja, nodo('p', 'cascada-queda', `quedan ${formatEurosRedondo(queda)}`))
+    filas.push(li)
     escalon('diaadia', 'Lo que te queda a tu ritmo', '', porVenir, [], reparto, 'previsto')
   } else {
     escalon('diaadia', 'Día a día', '', c.diaADia, [], reparto)
@@ -162,6 +168,27 @@ function plegable(clave, titulo, importe) {
   )
   caja.append(cabeza)
   return caja
+}
+
+/**
+ * Los apuntes de verdad que han ido saliendo este mes. Sin esto, la cifra de lo
+ * ya gastado no se podía comprobar: un cargo gordo del taller subía el total y
+ * no había dónde ir a ver que era él.
+ * @param {import('../../analisis/mensual.js').Apunte[]} apuntes
+ * @param {Estado} estado
+ */
+function loGastado(apuntes, estado) {
+  const ul = nodo('ul', 'cascada-detalle')
+  for (const a of [...apuntes].sort((x, y) => y.fecha.localeCompare(x.fecha))) {
+    const li = nodo('li')
+    li.append(
+      nodo('span', 'cascada-nombre', (a.entidadId && estado.nombres.get(a.entidadId)) || a.concepto),
+      nodo('span', 'cascada-cuando', diaYMes(a.fecha)),
+      nodo('span', 'cifras', formatEuros(a.importe)),
+    )
+    ul.append(li)
+  }
+  return ul
 }
 
 /**
