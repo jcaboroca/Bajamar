@@ -511,7 +511,7 @@ let recadoPendiente
 /**
  * Un aviso que se lee esté donde esté el usuario.
  *
- * El rótulo fijo vive en Ajustes, y ahora que hay cinco áreas casi nunca es la
+ * El rótulo fijo vive en Ajustes, y ahora que hay seis áreas casi nunca es la
  * que está abierta. Escribir sólo ahí sería no decir nada.
  * @param {string} texto
  */

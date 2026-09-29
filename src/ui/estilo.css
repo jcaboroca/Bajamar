@@ -94,7 +94,7 @@ main {
 
 .navegacion {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   max-width: 44rem;
   margin: 0 auto;
 }
@@ -755,7 +755,7 @@ main {
 /* ── Recado ─────────────────────────────────────────────────────────────── */
 
 /* Lo que la aplicación tiene que contar no puede vivir sólo en Ajustes: con
-   cinco áreas, casi nunca es la que está abierta. */
+   seis áreas, casi nunca es la que está abierta. */
 /* Tirar hacia abajo para buscar lo del otro aparato. */
 .tirador {
   position: fixed;
