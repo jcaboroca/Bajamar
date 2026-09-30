@@ -479,14 +479,7 @@ function publicar() {
     const clave = claveRecordada()
     if (!clave) return
     try {
-      try {
-        const suya = await bajar(BUZON, clave)
-        await guardarMovimientos(suya.movimientos)
-        if (await mezclarDecisiones(suya.decisiones ?? {})) await refrescar({ local: false })
-      } catch (fallo) {
-        if (!(fallo instanceof SinBuzon)) throw fallo
-      }
-      await subir(BUZON, hacerMaleta(await leerMovimientos(), await leerDecisiones()), clave)
+      await mezclarYSubir(clave)
       marcarSincro()
       pintarSincro()
     } catch {
@@ -494,6 +487,23 @@ function publicar() {
       // a abrir la app: no hay nada que el usuario pueda hacer con este aviso.
     }
   }, 1200)
+}
+
+/**
+ * Subir sin bajar antes pisaría el buzón con lo que haya en este aparato, que
+ * puede ser menos de lo que hay allí.
+ * @param {string} clave
+ */
+async function mezclarYSubir(clave) {
+  if (!BUZON) return
+  try {
+    const suya = await bajar(BUZON, clave)
+    await guardarMovimientos(suya.movimientos)
+    if (await mezclarDecisiones(suya.decisiones ?? {})) await refrescar({ local: false })
+  } catch (fallo) {
+    if (!(fallo instanceof SinBuzon)) throw fallo
+  }
+  await subir(BUZON, hacerMaleta(await leerMovimientos(), await leerDecisiones()), clave)
 }
 
 /**
@@ -517,11 +527,14 @@ async function contarloAlOtro() {
   }
 
   try {
-    await subir(BUZON, hacerMaleta(await leerMovimientos(), await leerDecisiones()), clave)
+    await mezclarYSubir(clave)
     marcarSincro()
     pintarSincro()
     decir('Enviado. Al abrir la app en el otro dispositivo aparecerá allí.')
-  } catch {
+  } catch (error) {
+    if (error instanceof ContrasenaInvalida) {
+      return decir('Guardado aquí. Esa contraseña no abre lo que ya hay en el buzón, así que no he subido nada.')
+    }
     decir('Guardado aquí, pero no he podido avisar al otro dispositivo.')
   }
 }
@@ -663,7 +676,7 @@ async function enviar() {
   if (quiereRecordar()) recordarClave(clave)
   try {
     if (BUZON) {
-      await subir(BUZON, maleta, clave)
+      await mezclarYSubir(clave)
       marcarSincro()
       pintarSincro()
       decir('Enviado. Ábrelo en el otro dispositivo con esa contraseña.')
@@ -674,6 +687,9 @@ async function enviar() {
         : 'Fichero cifrado descargado. Pásalo al otro dispositivo y ábrelo allí.')
     }
   } catch (error) {
+    if (error instanceof ContrasenaInvalida) {
+      return decir('Esa contraseña no abre lo que ya hay en el buzón. No he subido nada, para no pisarlo.')
+    }
     decir(`No he podido enviarlo: ${error instanceof Error ? error.message : error}`)
   }
 }
