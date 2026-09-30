@@ -63,6 +63,8 @@ export const SEMILLAS = [
   // pedidos de Glovo son cuarenta comercios que sólo aparecieron una vez.
   { nombre: 'Glovo', patron: /^GLOVO/, tipo: 'comercio', categoria: 'restaurantes' },
   { nombre: 'Uber Eats', patron: /UBER ?EATS/, tipo: 'comercio', categoria: 'restaurantes' },
+  // Una pizzería: sin esto, «taller» la mandaba a la furgoneta.
+  { nombre: 'El Taller de la Pizza', patron: /TALLER DE LA P/, tipo: 'comercio', categoria: 'restaurantes' },
   { nombre: 'Booking', patron: /BOOKING\.COM/, tipo: 'comercio', categoria: 'viajes' },
   { nombre: 'Grab', patron: /^GRAB A-/, tipo: 'comercio', categoria: 'viajes' },
   { nombre: 'Playtomic', patron: /PLAYTOMIC/, tipo: 'comercio', categoria: 'ocio' },

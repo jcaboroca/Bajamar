@@ -192,8 +192,3 @@ export function fechaLarga(iso) {
   const [, m, d] = iso.split('-').map(Number)
   return `${d} de ${MESES[m - 1]}`
 }
-
-/** @param {Movimiento} m */
-export function esGasto(m) {
-  return m.importe < 0
-}

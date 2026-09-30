@@ -60,7 +60,7 @@ const MINIMO_ANUAL = 3000 // 30,00 €
  * son obligaciones que suelen volver. Una compra en una tienda de bicicletas
  * no vuelve, y preguntar por ella sería ruido.
  */
-export const SUELEN_VOLVER = new Set([
+const SUELEN_VOLVER = new Set([
   'seguros', 'impuestos', 'luz', 'agua', 'gas', 'telecom', 'vehiculos', 'calefaccion', 'riggs',
 ])
 

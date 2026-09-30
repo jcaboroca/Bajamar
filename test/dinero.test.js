@@ -88,3 +88,8 @@ describe('mediana', () => {
     assert.equal(mediana([]), 0)
   })
 })
+
+test('el cero no lleva signo, venga de donde venga', () => {
+  assert.equal(formatEuros(-0), '0,00 €')
+  assert.equal(formatEurosRedondo(-40), '0 €', 'cuarenta céntimos negativos redondean a cero, no a «-0»')
+})

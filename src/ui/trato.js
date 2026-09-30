@@ -40,7 +40,7 @@ const RITMOS = /** @type {Array<[string, string]>} */ ([
  * @param {string} [p.devuelto]
  * @returns {Promise<{ trato: Trato, apodo: string, categoria: string, ritmo: string, devuelto: string } | null>}  null si se arrepiente
  */
-export async function preguntarTrato({ nombre, actual = 'fijo', apodo = '', categoria = 'otros', ritmo = '', devuelto = '' }) {
+async function preguntarTrato({ nombre, actual = 'fijo', apodo = '', categoria = 'otros', ritmo = '', devuelto = '' }) {
   const respuesta = await pedirDatos({
     titulo: nombre,
     aceptar: 'Guardar',

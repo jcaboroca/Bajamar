@@ -1,15 +1,21 @@
 # Por dónde va esto
 
-Escrito el 28 de septiembre de 2026 y puesto al día el 30. Si vas a seguir
-desde aquí, léete esto antes de tocar nada: casi todo lo que se rompió estos
-días se rompió por dar por supuesto algo que este documento cuenta.
+Escrito el 28 de septiembre de 2026 y puesto al día el 1 de octubre. Si vas a
+seguir desde aquí, léete esto antes de tocar nada: casi todo lo que se rompió
+estos días se rompió por dar por supuesto algo que este documento cuenta.
+
+**La regla que más ha costado aprender:** los extractos reales del dueño están
+en `~/Downloads/` (`DDMMYYYY_0468_….xls` la cuenta, `DDMMYYYY 4106________3018.xls`
+la tarjeta). Antes de suponer cómo funciona su banco, **pásalos por
+`importarXls` en node y mira**. Tres arreglos de la tarjeta hechos a ciegas
+fallaron; con los ficheros abiertos salió al céntimo a la primera.
 
 ## Lo básico
 
 Cero dependencias, sin paso de compilación, JS vanilla. Node 22 o más.
 
 ```sh
-npm test      # 306 pruebas
+npm test      # 322 pruebas
 npm run dev   # http://localhost:4173
 npm run buzon # sólo si hay que volver a desplegar el worker
 ```
@@ -113,6 +119,39 @@ De paso: «FRACCIONAMIENTO» no es cosa del cobrador sino del banco, que hace lo
 mismo con una compra de 70 € en una tienda de perros y con una transferencia de
 468 € a MyInvestor. No lo leas como un calendario del acreedor.
 
+## La tarjeta es una foto, no un historial
+
+Esto salió de comparar el extracto de tarjeta del 26 de septiembre con el del
+30, y cuadra al céntimo con lo que cobró el banco:
+
+- **El extracto de tarjeta es una foto de lo que falta por cobrar** el día que
+  se descarga. Lo ya liquidado desaparece de la siguiente. **Sólo vale la
+  última foto**: `soloLaUltimaFoto` en `estado.js` tira las demás antes de
+  calcular nada. Juntarlas cobraba dos veces lo ya pagado.
+- Cada fila lleva `foto` (día sacado del nombre del fichero + hora de
+  importar) y un id `tarjeta:<día>-<huella del contenido>:<i>`. Antes el id era
+  sólo la posición, y la foto del 30 pisó cuatro filas de la del 26 y dejó
+  ocho mezcladas. Las filas viejas, sin `foto`, sólo cuentan si no hay otra.
+- **Lo fraccionado se cobra a fin de mes empezando por el mes siguiente** a la
+  compra, en tres cuotas. Lo del 22 de septiembre no entró el 30.
+- **Cada fila fraccionada de la foto es una cuota que se repite tres meses**,
+  haya o no abono en la cuenta: el dueño fracciona muchas compras dentro de la
+  propia tarjeta y no dejan rastro en la cuenta. Un abono de la cuenta que una
+  foto posterior ya no trae está pagado entero. Está en
+  `cuotasPendientes` (`fraccionados.js`).
+- Lo **no** fraccionado entra entero en la próxima liquidación
+  (`pendienteTarjeta`). Todavía no se ha visto en sus datos una compra normal:
+  la primera que haya, comprobar con el extracto en qué recibo cae.
+
+Comprobación con sus ficheros: con la foto del 26, el cobro del 30 de
+septiembre da **565,30 €**; con la del 30, el del 31 de octubre da **346,77 €**
+y luego 161,32 en noviembre y diciembre. `estado.proximoCobroTarjeta`
+(`{ fecha, importe, luego, hasta }`) es lo que pinta Movimientos › Tarjeta.
+
+La liquidación se busca por **categoría `tarjeta`**, no por el texto del banco:
+en cuanto la entidad se reconoce el compromiso se llama «Liquidación de la
+VISA» y la expresión `TARJETA CREDITO` ya no casaba nunca.
+
 ## Un recibo troceado sigue siendo un recibo
 
 El ayuntamiento cobra el mismo día el IBI de una casa, el de la otra y la basura,
@@ -141,17 +180,24 @@ cobrador y precio ±5 céntimos: exactamente el mismo criterio que los separó.
 
 ## Trampas del entorno
 
-**`sw.js` ya no es un caché: es un desinstalador.** Borra todas las cachés, se
-desregistra y recarga las ventanas que controle. Está ahí porque el fichero no
-se puede borrar sin más: quien tuviera instalada la versión vieja seguiría
-sirviéndose una copia congelada para siempre, y eso es exactamente lo que pasó.
-Déjalo registrado hasta que esté claro que ya no queda ningún aparato enganchado.
+**`sw.js` guarda la aplicación entera en el aparato** para que arranque sin
+red. Un almacén por sello (`bajamar-<sello>`), `skipWaiting` + `clients.claim`,
+y al activarse borra los demás. `version.json` va siempre a la red. Dos cosas
+que no se ven y lo sostienen:
 
-El caché anterior era **cache-first**, y por eso congelaba la aplicación. Cuando
-se rehaga el modo sin conexión tiene que ser **network-first**: ir siempre a la
-red y caer en la copia guardada sólo si no hay. No al revés.
+- **El sello se escribe dentro de `sw.js`** (`scripts/sellar.mjs`, en el
+  `pretest`): el script de un service worker es lo único que el navegador no
+  sirve de su caché, así que es el único canal fiable para anunciar versión.
+  Para que el hash no se muerda la cola, `sw.js` se pesa con el sello quitado.
+- **`version.json` lleva la lista de ficheros** que se guardan y que el botón
+  «hay versión nueva» pide a la fuerza antes de recargar. Sin eso, el botón
+  entraba en bucle diez minutos: recargar servía los módulos viejos de la
+  caché de Pages. **Esa lista tiene que incluir `config.js`**, que vive fuera de
+  `src/`: faltó y sin red no arrancaba nada, porque basta un import roto para
+  que no se ejecute la aplicación. `test/sellar.test.js` recorre ahora todos
+  los imports desde `app.js` y falla si alguno no está en la lista.
 
-**El navegador de Playwright no ejecuta service workers.**
+**Playwright no ejecuta service workers.**
 `getRegistrations()` devuelve un registro con `installing`, `waiting` y `active`
 a nulo, `controller` se queda en `null` y `ready` no resuelve nunca. Es decir:
 desde aquí **no se puede comprobar** si el service worker hace su trabajo. Dilo
@@ -179,24 +225,37 @@ selector de mes al mes en curso.
 `docs/` está excluido del repositorio por privacidad —lleva diagnósticos con
 importes reales— salvo `docs/diseno/`, que es donde está esto.
 
+**La página de Playwright puede tener la contraseña del buzón puesta** —el 30
+apareció una de quince caracteres que nadie había tecleado ahí—. Antes de meter
+datos en ella: `(await import('/Bajamar/src/almacen/llavero.js')).olvidarClave()`.
+Y al acabar, `db.vaciar()`.
+
 ## Qué contesta cada pestaña
 
-Son seis y cada una tiene una pregunta. Si te encuentras añadiendo algo que no
+Son cinco y cada una tiene una pregunta. Si te encuentras añadiendo algo que no
 contesta la de su pestaña, va en otra.
 
 | | |
 |---|---|
-| **Resumen** | ¿Llego? ¿Cuánto tengo para vivir? ¿Voy bien? ¿Y más allá? |
-| **Movimientos** | ¿En qué se fue esto? |
-| **Previsión** | La cascada de un mes: de la nómina a lo que queda |
-| **Categorías** | Qué se repite, cada cuánto y cuánto vale |
+| **Resumen** | ¿Llego? ¿De dónde sale y cuánto tengo para vivir? ¿Voy bien? ¿Y más allá? |
+| **Movimientos** | ¿En qué se fue esto? Y, con el filtro Tarjeta, cuánto me van a cobrar |
+| **Categorías** | En qué se me va el día a día, y qué se repite |
 | **Patrimonio** | Lo que no está en la cuenta |
 | **Ajustes** | Colchón, ventana del ritmo, sincronización |
 
-El horizonte a 3/6/12 meses está en el Resumen y no en Previsión: es la misma
-pregunta que la bajamar, sólo que más lejos. Previsión hablaba a la vez de este
-mes y del año entero, y las listas de recibos —que se tocan dos veces al año—
-competían por la pantalla con la cascada, que se mira cada semana.
+**Previsión ya no existe como pestaña**: el dueño vio que repetía el Resumen.
+La cascada vive en Resumen (`#de-donde-sale`), abierta, **sólo en el mes en
+curso**; en los demás meses sale «Cómo fue agosto» (`#bloque-vivir`). Nunca
+los dos: decían lo mismo dos veces seguidas. El simulador sigue dentro del
+escalón «Día a día» de la cascada, y «Cómo vas» tiene un botón que lo abre
+(`abrirReparto`). Un `#prevision` guardado cae en Resumen.
+
+En la cascada, **lo pagado va en el color del texto y lo pendiente en ámbar**,
+como en toda la aplicación. Ámbar significa «todavía no ha pasado».
+
+Categorías empieza por «En qué se te va el día a día»: `estado.reparto`, cada
+categoría plegada con sus comercios; tocar uno le cambia la categoría
+(`ponerRegla`, vale para todo lo suyo).
 
 Los tres escalones con detalle de la cascada se pliegan. **Su estado abierto se
 recuerda en un `Set` del módulo**, porque la cascada se reconstruye entera en
@@ -210,8 +269,9 @@ de una cosa y son otra. Esto costó romper la Previsión entera el 29:
 
 - **`estado.ritmo.porMes` es un solo número**, lo que gastas al mes en total.
   No es un desglose por categoría. El desglose es **`estado.reparto`**, un array
-  de `{ categoria, nombre, alMes, cuantos }` ordenado de más caro a menos, con
-  `alMes` en céntimos negativos.
+  de `{ categoria, nombre, alMes, cuantos, comercios }` ordenado de más caro a
+  menos, con `alMes` en céntimos negativos. `comercios` usa la misma escala, así
+  que suman su trozo.
 - **`estado.residuo` es siempre el del periodo en curso**, mires el mes que
   mires en la interfaz. No depende del selector.
 - El desglose mes a mes es `estado.detalleMensual`, no `estado.detalle`. Y el
@@ -280,12 +340,54 @@ faltaba, así que no sub��a nunca y los dos se alejaban en silencio. Lo corr
 es `hayQueSubir(mias, suyas)` en `db.js`: ¿hay aquí algo que allí no conste, o
 algo tocado más tarde aquí? Con una que haya, sube.
 
+**Subir siempre después de bajar y mezclar.** Había tres sitios que suben al
+buzón y sólo uno mezclaba antes; los otros dos —después de importar y el
+botón «Enviar cifrado»— subían lo que hubiera en ese aparato y podían dejar el
+buzón a medias. Ahora los tres pasan por `mezclarYSubir` en `app.js`, y si la
+contraseña no abre lo que ya hay, no se sube nada.
+
 Se valoró meter Firebase y **se descartó con argumentos**. Con cifrado en
 cliente —que es innegociable aquí— Firestore queda reducido a un almacén de
 bultos opacos, exactamente lo que ya hace el worker: ni consultas, ni fusión en
 servidor, ni tiempo real útil. Sin cifrado serían mil y pico movimientos
 bancarios en claro en servidores de Google. Y el fallo no era de dónde se
 guardaba, era de cuándo se hablaba.
+
+## Qué se hizo el 30 de septiembre por la noche y el 1 de octubre
+
+| | |
+|---|---|
+| `c48ee2e` | La liquidación de la VISA ya no te la cobro dos veces |
+| `13af5fa` | El botón de la versión nueva ya no se muerde la cola |
+| `8fc8b3b` | **Bajamar ya existe sin cobertura** |
+| `de7d123` | Categorías ya enseña en qué se te va el día a día |
+| `cec0676` | **Previsión se muda a Resumen, y quedan cinco pestañas** |
+| `b604158` | Un mes se cuenta una vez, no dos |
+| `1f766d7` | En la cascada, lo pagado y lo que falta vuelven a distinguirse |
+| `573ac38` | El euro ya no se queda solo en el renglón de abajo |
+| `65677cc` | Sin conexión ya arranca (faltaba `config.js`) |
+| `7201703` | **La tarjeta, por fin, con tus números: 565,30 el 30 y 346,77 el 31** |
+| `70d659d` | **El buzón ya no se pisa con lo que haya en un aparato a medias** |
+| `363def7` | Disney+ y HBO Max se llaman por su nombre, aunque los cobre PayPal |
+
+La de la tarjeta es la importante, y la lección es de método: el dueño dijo
+«te he importado el Excel, ¿qué no ves ahí? debería estar claro», y lo estaba.
+Se habían hecho tres arreglos suponiendo cómo funcionaba su tarjeta y los tres
+estaban mal. Abrir los dos extractos y compararlos dio la regla entera.
+
+La del buzón salió de probar lo anterior: al meter sus extractos en la página
+de pruebas, la aplicación intentó subir al buzón real sin mezclar antes. No
+llegó a salir nada, pero el fallo era de la aplicación.
+
+Disney+ y HBO Max: el banco escribe `PAYPAL *DISNEYPLUS` y la semilla de
+PayPal los tragaba a los dos, distinguidos sólo por el precio. Ahora tienen
+semilla propia antes que PayPal. Su `reciboId` pasó de `paypal#7`/`paypal#5`
+a `disney`/`hbo-max`: lo que el dueño hubiera decidido sobre los viejos queda
+huérfano.
+
+El aviso «tu saldo se pone en negativo el 24 de noviembre» que sale con sus
+datos **es real**, no un fallo: manda 968 € al mes a MyInvestor (500 el día 1
+y 468 el 10) y en septiembre fraccionó los 468.
 
 ## Qué se hizo el 29 de septiembre por la tarde y el 30
 
@@ -375,61 +477,36 @@ y a qué ritmo?** y **¿voy bien?**. Todo lo demás salió de ahí.
 
 ## Qué queda
 
-Repasado entero el 30 de septiembre: 9.581 líneas de fuente en 46 ficheros,
-3.254 de pruebas, 306 en verde, cero dependencias. No hay ningún fichero que
-nadie importe. Por orden de lo que más molesta:
+Repasado el 1 de octubre, 322 pruebas en verde, cero dependencias. El dueño
+decidió qué se hace y qué no; respétalo:
 
-1. **La aplicación ya no funciona sin conexión.** Se instala en la pantalla de
-   inicio, pero necesita red para arrancar. `sw.js` son dieciocho líneas cuyo
-   único trabajo es desinstalar la versión vieja. Falta rehacer el modo sin
-   conexión **network-first** y sustituir entonces ese desinstalador. Acuérdate
-   de que eso no se puede verificar desde el navegador de pruebas: lo tiene que
-   comprobar el dueño en su móvil. **Es lo único de esta lista que cambia lo que
-   la aplicación es, y no sólo lo que enseña.**
-2. **Categorías no enseña categorías, enseña recibos.** Las 102 reglas de
-   comercio a categoría que trajo el buzón no tienen ninguna pantalla donde
-   verse ni corregirse, y `estado.reparto` —cuánto se va en comida, en coche, en
-   casa— se calcula y no se pinta en ningún sitio. Ya tiene sitio: esa pestaña.
-3. **Unos 545 € al mes sin nombre.** «Compras» se lleva 450 € en 243 apuntes y
-   «Sin clasificar» otros 95 € en 114. Es casi un quinto del gasto. Mientras eso
-   sea un borrón, el suelo previsto es bueno pero no exacto.
-4. **«Personas» sigue mezclando lo que te devuelven.** Los recibos ya se
-   resuelven con `devueltos`; los bizums sueltos, no. `src/analisis/reembolsos.js`
-   sigue sin escribirse, y quizá lo que toque no sea escribirlo sino estirar
-   `devueltos`.
-5. **No hay forma de borrar un recibo apuntado a mano.** `quitarManual` está
-   escrita en `preferencias.js` y no la llama nadie: la función existe, el botón
-   no.
-6. **Verificar con datos reales.** El dueño tiene que comprobar que en un
-   periodo cerrado `saldo al empezar + nómina − recibos` le lleva exactamente a
-   lo que cerró. Si sobra o falta, el desglose desplegable dice dónde.
-7. **Previsión se ha quedado flaca.** Se le quitó el horizonte —al Resumen— y
-   las listas de recibos —a Categorías. Le queda la cascada del mes y el
-   simulador. Seis pestañas son muchas en un móvil y ésta es la candidata a
-   caber dentro del Resumen. De momento se queda, porque es donde se decide.
-8. **Las barras pequeñas cuestan de agarrar** desde que todas comparten techo.
-   Lo hablado: botones de más y menos, o una casilla donde escribir la cifra.
-   **No** volver a un techo por barra, que es de donde se venía y era peor.
-9. **Informes** mensual, trimestral y anual, y **salud financiera**: están en la
+**Le toca a él**, no al código:
+
+- Probar el **modo avión** en el móvil: Playwright no ejecuta service workers.
+- Marcar **Holaluz** como «ya no lo pago»: su compañía de luz ahora es Octopus.
+- Abrir «Compras» y «Sin clasificar» en Categorías y mover lo mal puesto.
+- Volver a marcar lo que tuviera decidido sobre Disney+ y HBO Max.
+
+**Pendiente, sin prisa:**
+
+1. **La primera compra normal con la tarjeta**, sin fraccionar: comprobar con
+   el extracto en qué liquidación cae. Todo lo visto hasta hoy era fraccionado.
+2. **Informes** mensual, trimestral y anual, y **salud financiera**: están en la
    especificación y no se han empezado.
-10. **Código muerto de verdad**, poco pero hay: `totalesPorCategoria` en
-    `estado.js` y `esGasto` en `tipos.js`, que no llama nadie ni las pruebas. Y
-    ocho `export` que sobran porque sólo se usan dentro de su fichero:
-    `preguntarTrato`, `importarCuenta`, `importarTarjeta`, `esOle2`, `ALMACENES`,
-    `DECISIONES`, `SUELEN_VOLVER`, `OFICIOS`.
-11. **Dos bultos huérfanos de 303 KB** en el almacén del buzón, bajo
-    contraseñas de prueba que se perdieron. Limpiarlos la próxima vez que se
-    toque el worker.
-12. `worker/.wrangler/cache/wrangler-account.json` sigue en el historial público
-    con el id de cuenta de Cloudflare y el correo. Sacarlo de verdad exige
-    reescribir el historial, que es decisión del dueño.
+3. **Que el aviso de saldo negativo diga qué lo arregla** («si te saltas la
+   aportación de octubre a MyInvestor no llegas a cero»). Es la idea que más
+   se parece a lo que la aplicación quiere ser.
+4. **«Personas» sigue mezclando lo que te devuelven.** Quizá baste con estirar
+   `devueltos` a los bizums sueltos.
+5. **Verificar con datos reales** que un periodo cerrado cuadra al céntimo.
+6. **Las barras pequeñas del simulador cuestan de agarrar.** No volver a un
+   techo por barra.
+7. `worker/.wrangler/cache/wrangler-account.json` sigue en el historial
+   público (id de cuenta y correo, no una clave). Sacarlo exige reescribir el
+   historial con `--force`, y eso es decisión del dueño.
 
-Roces menores, ya contados al dueño y sin arreglar: en Previsión la cifra grande
-es la del mes entero mientras la frase de debajo divide el resto entre los días
-que quedan; el día 1 de un mes la línea dice `Día a día, hasta hoy −0,00 €`;
-`formatEurosRedondo` usa un guion normal donde `formatEuros` usa el menos
-tipográfico; y «SUMUP TALLER DE LA P» está clasificado como vehículos cuando es
-una pizzería.
+**Decidido que no:** borrar recibos apuntados a mano (`quitarManual` existe y
+no tiene botón; el dueño no lo quiere).
 
 ## Lo que está bien y conviene no tocar
 

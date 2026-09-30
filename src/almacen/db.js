@@ -14,7 +14,7 @@ const VERSION = 13
  * Todo lo que el usuario decide a mano vive separado de los movimientos: si
  * reimporta el extracto, sus correcciones siguen ahí.
  */
-export const ALMACENES = [
+const ALMACENES = [
   'movimientos',
   'ajustes',
   'reglas',      // entidadId → categoría elegida por el usuario
@@ -38,7 +38,7 @@ export const ALMACENES = [
 ]
 
 /** Lo que viaja entre dispositivos: todo menos los movimientos. */
-export const DECISIONES = ALMACENES.filter((n) => n !== 'movimientos')
+const DECISIONES = ALMACENES.filter((n) => n !== 'movimientos')
 
 /** @type {IDBDatabase | null} */
 let abierta = null

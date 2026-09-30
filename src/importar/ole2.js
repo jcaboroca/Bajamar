@@ -16,7 +16,7 @@ const SECTOR_LIBRE = -1
  * @param {ArrayBuffer} datos
  * @returns {boolean}
  */
-export function esOle2(datos) {
+function esOle2(datos) {
   if (datos.byteLength < 512) return false
   const b = new Uint8Array(datos, 0, 8)
   return FIRMA.every((v, i) => b[i] === v)

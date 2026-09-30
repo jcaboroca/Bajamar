@@ -531,3 +531,13 @@ test('Disney+ y HBO Max se reconocen aunque los cobre PayPal', () => {
   assert.equal(nombreDe('p'), 'PayPal', 'lo demás de PayPal sigue siendo PayPal')
   assert.ok(e.compromisos.some((c) => c.nombre === 'Disney+') && e.compromisos.some((c) => c.nombre === 'HBO Max'))
 })
+
+test('el taller de la pizza es un restaurante, no un taller', () => {
+  const movimientos = extracto()
+  movimientos.push(fila('pz', '2026-09-12', 'COMPRA TARJ. 5402XXXXXXXX7032 SUMUP *TALLER DE LA P-GAVA', -2350, 0))
+  movimientos.push(fila('tl', '2026-09-13', 'COMPRA TARJ. 5402XXXXXXXX7032 TALLER MECANICO PEPE-GAVA', -9000, 0))
+  const e = construirEstado(movimientos, { hoy: HOY, meses: 2 })
+  const de = (/** @type {string} */ id) => e.movimientos.find((m) => m.id === id)?.categoria
+  assert.equal(de('pz'), 'restaurantes')
+  assert.equal(de('tl'), 'vehiculos', 'un taller de verdad sigue siendo un taller')
+})

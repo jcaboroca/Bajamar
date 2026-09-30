@@ -65,7 +65,8 @@ export function parseImporte(texto) {
  */
 export function formatEuros(centimos, opciones) {
   const formateador = opciones?.simbolo === false ? FORMATO_SECO : FORMATO
-  const texto = formateador.format(centimos / 100).replace(/\u00a0/g, ' ')
+  // `|| 0` porque Intl escribe el cero negativo con signo: «-0,00 €».
+  const texto = formateador.format(centimos / 100 || 0).replace(/\u00a0/g, ' ')
   return opciones?.signo && centimos > 0 ? `+${texto}` : texto
 }
 
@@ -74,7 +75,7 @@ export function formatEuros(centimos, opciones) {
  * @param {number} centimos
  */
 export function formatEurosRedondo(centimos) {
-  return `${FORMATO_ENTERO.format(Math.round(centimos / 100)).replace(/\u00a0/g, ' ')} €`
+  return `${FORMATO_ENTERO.format(Math.round(centimos / 100) || 0).replace(/\u00a0/g, ' ')} €`
 }
 
 /**

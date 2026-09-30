@@ -56,7 +56,7 @@ function buscarFila(rejilla, predicado) {
  * @param {Celda[][]} rejilla
  * @returns {Resultado}
  */
-export function importarCuenta(rejilla) {
+function importarCuenta(rejilla) {
   const cabecera = buscarFila(rejilla, (_, i) => texto(rejilla, i, 0) === 'F. Operativa')
   if (cabecera === -1) {
     return { movimientos: [], avisos: ['No encontré la cabecera "F. Operativa".'], meta: {} }
@@ -149,7 +149,7 @@ function huella(/** @type {string} */ texto) {
  * @param {string} [foto]  día de la foto y hora de importarla
  * @returns {Resultado}
  */
-export function importarTarjeta(rejilla, foto = fotoDe({})) {
+function importarTarjeta(rejilla, foto = fotoDe({})) {
   const filaPendientes = buscarFila(rejilla, (_, i) =>
     /^Total operaciones pendientes/i.test(texto(rejilla, i, 0)),
   )

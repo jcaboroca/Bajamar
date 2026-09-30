@@ -13,7 +13,7 @@
  */
 
 /** @type {Array<{ patron: RegExp, categoria: string }>} */
-export const OFICIOS = [
+const OFICIOS = [
   // Comer fuera. Va primero porque medio mundo tiene un bar dentro.
   {
     patron: /\bBARS?\b|\bTAVERNA|CERVE[CS]ERIA|RESTAURANT|RISTORANTE|ROSTISSERIA|PIZZ|\bCAFE\b|CAFETERIA|\bTAPEO\b|BRASERIA|HAMBURGUES|\bSUSHI\b|KEBAB|CHIRINGUITO|\bMESON\b|\bBRASSERIE|UBER ?EATS|\bREST\b|\bBISTRO|\bTABERNA/,
