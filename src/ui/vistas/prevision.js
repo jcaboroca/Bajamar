@@ -301,7 +301,7 @@ function encabezado(titulo, importe, queda, mal = false) {
 function desglose(lista) {
   const ul = nodo('ul', 'cascada-detalle')
   for (const e of lista) {
-    const li = nodo('li', e.saltado ? 'saltado' : '')
+    const li = nodo('li', e.saltado ? 'saltado' : e.previsto ? 'previsto' : '')
     li.append(
       nodo('span', 'cascada-nombre', e.nombre),
       nodo('span', 'cascada-cuando', e.saltado

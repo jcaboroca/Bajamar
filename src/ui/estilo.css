@@ -917,6 +917,9 @@ details.grupo > summary::marker { color: var(--secundario); }
    una cuenta y va en ámbar, el mismo que usa el Resumen para lo previsto. */
 .cascada-fila.previsto .cascada-titulo,
 .cascada-fila.previsto .cascada-cabeza .cifras { color: var(--acento); }
+.cascada-detalle li.previsto .cascada-nombre,
+.cascada-detalle li.previsto .cascada-cuando,
+.cascada-detalle li.previsto .cifras { color: var(--acento); }
 
 /* Los escalones con detalle se abren. El importe y el «quedan» se leen
    siempre; el desglose sólo cuando se pide. Mismo marcador nativo que los
