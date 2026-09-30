@@ -1,7 +1,7 @@
 # Por dónde va esto
 
-Escrito el 28 de septiembre de 2026 y puesto al día el 29. Si vas a seguir
-desde aquí, léete esto antes de tocar nada: casi todo lo que se rompió esos dos
+Escrito el 28 de septiembre de 2026 y puesto al día el 30. Si vas a seguir
+desde aquí, léete esto antes de tocar nada: casi todo lo que se rompió estos
 días se rompió por dar por supuesto algo que este documento cuenta.
 
 ## Lo básico
@@ -9,16 +9,24 @@ días se rompió por dar por supuesto algo que este documento cuenta.
 Cero dependencias, sin paso de compilación, JS vanilla. Node 22 o más.
 
 ```sh
-npm test      # 291 pruebas
+npm test      # 306 pruebas
 npm run dev   # http://localhost:4173
 npm run buzon # sólo si hay que volver a desplegar el worker
 ```
 
-`npm run sellar` **ya no existe**: se fue con la aplicación instalable el 29 de
-septiembre. Si lees una instrucción que lo menciona, está caducada.
+No hay `npm run sellar`: **el sello se pone solo** en el `pretest`, o sea que
+cada `npm test` reescribe `version.json` con los doce primeros caracteres de un
+hash del código. `src/ui/actualizacion.js` lo compara con el publicado cada
+pocos minutos y te avisa si lo que miras ya no es lo último. Consecuencia
+práctica: **`version.json` sale modificado en `git status` casi siempre**, y
+es correcto que entre en el commit.
 
 El dinero son **céntimos enteros** en todas partes. Ningún importe pasa por un
 `float` más allá del instante en que se lee del `.xls`.
+
+**La aplicación publicada está en https://jcaboroca.github.io/Bajamar/** y es la
+única que cuenta: verificar en `localhost` y dar algo por bueno ha salido mal
+todas las veces que se ha intentado.
 
 ## El modelo, que es lo que no se adivina
 
@@ -86,6 +94,51 @@ Dos excepciones que ya están puestas:
   tiene fecha y se compensa con la liquidación que deshace. Se reconoce por
   `m.fraccionado`, que el importador marca por el concepto.
 
+## Cuenta y tarjeta viven en la misma tabla
+
+En `movimientos` conviven los apuntes de la cuenta corriente y los del extracto
+de la tarjeta de crédito. **Los de tarjeta llevan el id con prefijo `tarjeta:`**;
+los de cuenta, no. Parecen lo mismo y no lo son: un apunte de tarjeta no ha
+salido de la cuenta, saldrá dentro del recibo mensual que la liquida.
+
+Esto hizo perder una tarde el 29. Tres cargos del ayuntamiento del 1 de julio
+—10,24 + 36,83 + 38,38— se leyeron como cargos de la cuenta y se concluyó que
+faltaban 370,90 € por salir en octubre y diciembre. Eran apuntes de la tarjeta:
+el banco había abonado en cuenta tres recibos enteros (556,35 €) para
+fraccionárselos en la tarjeta, y las otras dos cuotas ya habían ido dentro del
+recibo de tarjeta, que saltó de 34,63 € en junio a 379,83 € en julio y 664,27 €
+en agosto. **Antes de decir que falta dinero, mira de qué origen es el apunte.**
+
+De paso: «FRACCIONAMIENTO» no es cosa del cobrador sino del banco, que hace lo
+mismo con una compra de 70 € en una tienda de perros y con una transferencia de
+468 € a MyInvestor. No lo leas como un calendario del acreedor.
+
+## Un recibo troceado sigue siendo un recibo
+
+El ayuntamiento cobra el mismo día el IBI de una casa, el de la otra y la basura,
+y los tres llegan con el mismo texto: `IMPUESTOS AJ. GAVA`. Sumarlos por día daba
+un número que no se parecía a ningún recibo suyo y que nadie podía reconocer
+—era la queja «los impuestos no me cuadran»—. Lo que sí los distingue es el
+**precio**: cada uno vale lo mismo año tras año, salvo algún céntimo de redondeo
+al trocearlo en plazos.
+
+`mismoPrecioDistintoRecibo` en `compromisos.js` agrupa por importe con una
+tolerancia de **cinco céntimos**, ni uno más: 80,25 y 80,23 son el mismo recibo,
+110,50 y 110,24 no. Los 19 recibos del ayuntamiento se reconocen ahora uno a uno.
+
+Dos cosas que cuestan de ver y tienen prueba:
+
+- Al separar por precio, cada grupo pierde la prueba de que ese cobrador tiene
+  calendario fijo, y el plazo del que sólo hay un caso desaparecía. Por eso
+  `admitibles` decide mirando **al cobrador entero**, no a cada cadena.
+- Lo que no se repite vuelve a un montón común que se sigue agrupando por día:
+  sin eso, un cargo suelto dejaría de preverse por haberlo separado.
+
+**Los cuatro plazos son un recibo, no cuatro**, así que quien bautiza uno bautiza
+los cuatro, y quien marca uno como devuelto marca los cuatro. La herencia entre
+hermanos está en `apodar`, dentro de `estado.js`, y reconoce hermanos por
+cobrador y precio ±5 céntimos: exactamente el mismo criterio que los separó.
+
 ## Trampas del entorno
 
 **`sw.js` ya no es un caché: es un desinstalador.** Borra todas las cachés, se
@@ -103,6 +156,20 @@ red y caer en la copia guardada sólo si no hay. No al revés.
 a nulo, `controller` se queda en `null` y `ready` no resuelve nunca. Es decir:
 desde aquí **no se puede comprobar** si el service worker hace su trabajo. Dilo
 en vez de afirmar que funciona.
+
+**Para verificar un despliegue hay que pedir que no se cachee.** GitHub Pages
+sirve con `cache-control: max-age=600`, y mientras una pestaña siga viva el
+navegador ni siquiera vuelve a pedir los módulos. El 29 se dio por verificado un
+arreglo mirando una página que estaba ejecutando el código anterior, y el fallo
+seguía en pantalla. La única receta que sirve:
+
+```js
+await page.setExtraHTTPHeaders({ 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' })
+```
+
+antes de navegar. Y comprueba el sello de lo que estás mirando: `SELLO` en
+`src/ui/version.js` tiene que coincidir con el `version.json` que acabas de
+publicar. Pages tarda entre cuarenta segundos y dos minutos.
 
 En desarrollo, para saltarte cualquier copia guardada, la única receta que sirve
 es una dirección nueva: `http://localhost:4173/?f=<marca de tiempo>`. Ni
@@ -149,6 +216,50 @@ de una cosa y son otra. Esto costó romper la Previsión entera el 29:
   mires en la interfaz. No depende del selector.
 - El desglose mes a mes es `estado.detalleMensual`, no `estado.detalle`. Y el
   saldo de partida es `estado.saldoInicial`, no `saldoHoy`.
+- **`estado.proyeccion` no es un array**: no le pidas un `.filter`.
+- Las entradas de `detalleMensual` se identifican por **`id`** (`'2026-10'`), no
+  por `mes`.
+- Las filas crudas de `movimientos` **no tienen `entidadId`**, y el texto del
+  banco está en `conceptoRaw`, no en `concepto`.
+
+Cuando dudes, reconstruye el estado en el navegador y mira qué contiene de
+verdad antes de filtrar por ello:
+
+```js
+const db = await import('/Bajamar/src/almacen/db.js')
+const est = await import('/Bajamar/src/estado.js')
+const pref = await import('/Bajamar/src/almacen/preferencias.js')
+const p = await pref.cargar()
+const e = est.construirEstado(await db.leerTodo('movimientos'), {
+  categoriasManuales: p.reglas, retoques: p.retoques, planes: p.planes,
+  patrimonio: p.patrimonio, tratos: p.tratos, apodos: p.apodos, unicos: p.unicos,
+  anuales: p.anuales, ritmos: p.ritmos, manuales: p.manuales, apagadas: p.apagadas,
+  inversiones: p.inversiones, saltados: p.saltados, ventanaRitmo: p.ventanaRitmo,
+  colchon: p.colchon, devueltos: p.devueltos,
+})
+```
+
+## Lo que sale de tu cuenta y no es tu gasto
+
+El IBI de su madre sale de su cuenta el día que toca y vuelve en un bizum unos
+días después. En el panel de cada recibo hay un campo, «¿Te lo devuelve
+alguien?», que se guarda en el almacén `devueltos` (**base de datos v13**).
+
+El reparto es deliberado y no conviene deshacerlo sin entender por qué:
+
+- **Categorías descuenta** el recibo del coste mensual y su línea dice quién te
+  lo devuelve. Esa pestaña contesta «cuánto me cuesta vivir un mes», y ese
+  dinero no te cuesta.
+- **La previsión no se entera de nada.** El dinero sale el día que sale. Y el
+  bizum de vuelta **no se prevé**: contar con dinero que depende de que alguien
+  se acuerde es justo el optimismo que esta aplicación existe para no tener.
+
+Así queda intacta la invariante 2. El dueño pidió que Categorías lo descontara
+sabiendo que se le propuso lo contrario —prever el bizum entrante— y esto es el
+acuerdo: la cuenta de la vida descuenta, el saldo no.
+
+Números reales para reconocer que funciona: impuestos de 189,80 €/mes a
+**164,27 €/mes** marcando dos recibos, el IBI de 48,91 € y el vado de 110,50 €.
 
 ## Cómo se juntan dos dispositivos
 
@@ -175,6 +286,39 @@ bultos opacos, exactamente lo que ya hace el worker: ni consultas, ni fusión en
 servidor, ni tiempo real útil. Sin cifrado serían mil y pico movimientos
 bancarios en claro en servidores de Google. Y el fallo no era de dónde se
 guardaba, era de cuándo se hablaba.
+
+## Qué se hizo el 29 de septiembre por la tarde y el 30
+
+| | |
+|---|---|
+| `99269b4` | En el Resumen, lo pagado y lo que falta se distinguen por el color |
+| `fdf5f4d` | La app avisa cuando lo que miras ya no es la última versión |
+| `3f4deb7` | La comisión del banco no es un gasto: te la devuelven el mismo día |
+| `ee5b1b3` | **«Ya no lo pagas» era mentira: la comisión la pagas y te la devuelven** |
+| `5fff5c7` | **Los impuestos del ayuntamiento ya se reconocen uno a uno** |
+| `3384302` | Bautizar un plazo bautiza los cuatro |
+| `358550c` | Ya puedes decir quién te devuelve un recibo |
+
+El de los impuestos es el importante y nació de una queja de tres palabras: «los
+impuestos no me cuadran». Un comentario del código y una prueba con nombre
+defendían activamente la creencia falsa —«el IBI, la basura y el vado son un
+recibo»— y los dos cayeron cuando el dueño mandó la tabla del ayuntamiento. Que
+una prueba pase no significa que afirme algo cierto.
+
+El de la comisión es una regresión propia: al enrutar el par que se anula por
+`deBaja` heredó el cartel de las bajas y la aplicación decía «ya no lo pagas» de
+algo que sí se paga. Ahora tiene motivo propio, `anulado`, con su texto —«te lo
+devuelven el mismo día»— y no se puede reabrir, porque no fue una decisión suya.
+
+**Método, otra vez.** El ritual de comprobar que una prueba nueva falla sin el
+arreglo (`cp fichero /tmp/ok.js && git checkout HEAD -- fichero && npm test`) se
+aplicó tres veces y las tres mereció la pena. Una prueba que no falla cuando
+debería no vale nada.
+
+Y el día acabó con un diagnóstico equivocado más, el de los 370,90 € que no
+faltaban, tumbado por el dueño con un «no puede ser que me cobren sólo un tercio
+de un cuarto, míralo bien». Tenía razón: está contado arriba, en lo de cuenta y
+tarjeta.
 
 ## Qué se hizo el 29 de septiembre
 
@@ -231,50 +375,87 @@ y a qué ritmo?** y **¿voy bien?**. Todo lo demás salió de ahí.
 
 ## Qué queda
 
-Por orden de lo que más molesta:
+Repasado entero el 30 de septiembre: 9.581 líneas de fuente en 46 ficheros,
+3.254 de pruebas, 306 en verde, cero dependencias. No hay ningún fichero que
+nadie importe. Por orden de lo que más molesta:
 
 1. **La aplicación ya no funciona sin conexión.** Se instala en la pantalla de
-   inicio, pero necesita red para arrancar. Falta rehacer el modo sin conexión
-   **network-first**, y sustituir entonces el desinstalador que hoy ocupa
-   `sw.js`. Acuérdate de que eso no se puede verificar desde el navegador de
-   pruebas: lo tiene que comprobar el dueño en su móvil.
-2. **Ciento dos reglas de categoría a ciegas.** El buzón traía ese montón de
-   asignaciones manuales de comercio a categoría y no hay ninguna pantalla
-   donde verlas ni limpiarlas. Si algún gasto aparece bajo un nombre que no
-   toca, es ahí. Merece una lista con su botón de quitar. **Ya tiene sitio**:
-   la pestaña Categorías, que hoy sólo enseña la mitad de lo que su nombre
-   promete —los recibos— y le falta lo que se llama como ella: las reglas,
-   `estado.reparto` y las categorías apagadas.
-3. **Verificar con datos reales.** El dueño tiene que comprobar que en un
+   inicio, pero necesita red para arrancar. `sw.js` son dieciocho líneas cuyo
+   único trabajo es desinstalar la versión vieja. Falta rehacer el modo sin
+   conexión **network-first** y sustituir entonces ese desinstalador. Acuérdate
+   de que eso no se puede verificar desde el navegador de pruebas: lo tiene que
+   comprobar el dueño en su móvil. **Es lo único de esta lista que cambia lo que
+   la aplicación es, y no sólo lo que enseña.**
+2. **Categorías no enseña categorías, enseña recibos.** Las 102 reglas de
+   comercio a categoría que trajo el buzón no tienen ninguna pantalla donde
+   verse ni corregirse, y `estado.reparto` —cuánto se va en comida, en coche, en
+   casa— se calcula y no se pinta en ningún sitio. Ya tiene sitio: esa pestaña.
+3. **Unos 545 € al mes sin nombre.** «Compras» se lleva 450 € en 243 apuntes y
+   «Sin clasificar» otros 95 € en 114. Es casi un quinto del gasto. Mientras eso
+   sea un borrón, el suelo previsto es bueno pero no exacto.
+4. **«Personas» sigue mezclando lo que te devuelven.** Los recibos ya se
+   resuelven con `devueltos`; los bizums sueltos, no. `src/analisis/reembolsos.js`
+   sigue sin escribirse, y quizá lo que toque no sea escribirlo sino estirar
+   `devueltos`.
+5. **No hay forma de borrar un recibo apuntado a mano.** `quitarManual` está
+   escrita en `preferencias.js` y no la llama nadie: la función existe, el botón
+   no.
+6. **Verificar con datos reales.** El dueño tiene que comprobar que en un
    periodo cerrado `saldo al empezar + nómina − recibos` le lleva exactamente a
    lo que cerró. Si sobra o falta, el desglose desplegable dice dónde.
-4. **Previsión es ahora una sola cosa: la cascada del mes.** Se le quitó el
-   horizonte (al Resumen) y las listas de recibos (a Categorías). Queda por ver
-   si con eso se sostiene como pestaña propia o acaba dentro del Resumen; de
-   momento se queda, porque es donde se decide y se mira cada semana.
-5. **Las barras pequeñas cuestan de agarrar** desde que todas comparten techo.
+7. **Previsión se ha quedado flaca.** Se le quitó el horizonte —al Resumen— y
+   las listas de recibos —a Categorías. Le queda la cascada del mes y el
+   simulador. Seis pestañas son muchas en un móvil y ésta es la candidata a
+   caber dentro del Resumen. De momento se queda, porque es donde se decide.
+8. **Las barras pequeñas cuestan de agarrar** desde que todas comparten techo.
    Lo hablado: botones de más y menos, o una casilla donde escribir la cifra.
    **No** volver a un techo por barra, que es de donde se venía y era peor.
-6. **Dos bultos huérfanos de 303 KB** en el almacén del buzón, bajo
-   contraseñas de prueba que se perdieron. Limpiarlos la próxima vez que se
-   toque el worker.
-7. **Gastos sin clasificar de bulto:** «Compras» se come 450 € al mes en 243
-   apuntes y «Sin clasificar» otros 95 € en 114. Y «Personas» (los Bizums, 149 €
-   al mes) mezcla dinero que luego te devuelven; `src/analisis/reembolsos.js`
-   está por escribir.
-8. `worker/.wrangler/cache/wrangler-account.json` sigue en el historial público
-   con el id de cuenta de Cloudflare y el correo. Sacarlo de verdad exige
-   reescribir el historial, que es decisión del dueño.
+9. **Informes** mensual, trimestral y anual, y **salud financiera**: están en la
+   especificación y no se han empezado.
+10. **Código muerto de verdad**, poco pero hay: `totalesPorCategoria` en
+    `estado.js` y `esGasto` en `tipos.js`, que no llama nadie ni las pruebas. Y
+    ocho `export` que sobran porque sólo se usan dentro de su fichero:
+    `preguntarTrato`, `importarCuenta`, `importarTarjeta`, `esOle2`, `ALMACENES`,
+    `DECISIONES`, `SUELEN_VOLVER`, `OFICIOS`.
+11. **Dos bultos huérfanos de 303 KB** en el almacén del buzón, bajo
+    contraseñas de prueba que se perdieron. Limpiarlos la próxima vez que se
+    toque el worker.
+12. `worker/.wrangler/cache/wrangler-account.json` sigue en el historial público
+    con el id de cuenta de Cloudflare y el correo. Sacarlo de verdad exige
+    reescribir el historial, que es decisión del dueño.
+
+Roces menores, ya contados al dueño y sin arreglar: en Previsión la cifra grande
+es la del mes entero mientras la frase de debajo divide el resto entre los días
+que quedan; el día 1 de un mes la línea dice `Día a día, hasta hoy −0,00 €`;
+`formatEurosRedondo` usa un guion normal donde `formatEuros` usa el menos
+tipográfico; y «SUMUP TALLER DE LA P» está clasificado como vehículos cuando es
+una pizzería.
+
+## Lo que está bien y conviene no tocar
+
+El modelo del periodo entre nóminas y las cinco invariantes. Son lo que ha hecho
+que cada vez que algo no cuadraba se supiera *dónde* mirar. Y la disciplina de
+que un euro que sale de la cuenta cuenta siempre, pase lo que pase con quién te
+lo devuelva después: el 29 estuvo a punto de romperse y aguantó.
 
 ## Cómo comprobar que no has roto nada
 
-`npm test` y, sobre todo, **abre la aplicación y míralo**. El 28, tres fallos de
-los gordos pasaban todas las pruebas y sólo se vieron en pantalla: el botón que
-no guardaba nada, la nómina contada dos veces y el bloque que no cuadraba con
-el saldo. El 29 se repitió: ninguna de las 291 pruebas se enteró de que la
-Previsión se quedaba sin categorías, ni de que dos aparatos llevaban días sin
-hablarse. Sembrar movimientos en el IndexedDB de `localhost` y leer la pantalla
-encuentra lo que la suite no.
+`npm test` y, sobre todo, **abre la aplicación publicada y míralo**. El 28, tres
+fallos de los gordos pasaban todas las pruebas y sólo se vieron en pantalla: el
+botón que no guardaba nada, la nómina contada dos veces y el bloque que no
+cuadraba con el saldo. El 29 se repitió: ninguna de las 291 pruebas se enteró de
+que la Previsión se quedaba sin categorías, ni de que dos aparatos llevaban días
+sin hablarse. Sembrar movimientos en el IndexedDB de `localhost` y leer la
+pantalla encuentra lo que la suite no —pero lo último que se mira antes de decir
+«está arreglado» tiene que ser la web publicada, sin caché.
+
+Cuando escribas una prueba nueva, **comprueba que falla sin el arreglo**:
+
+```sh
+cp src/fichero.js /tmp/ok.js && git checkout HEAD -- src/fichero.js
+npm test          # tiene que salir en rojo
+cp /tmp/ok.js src/fichero.js
+```
 
 Y cuando toques algo del estado, **comprueba en el navegador qué contiene de
 verdad** antes de filtrar por ello. Lo de arriba sobre `ritmo.porMes` no es una
