@@ -349,7 +349,7 @@ function pintarVivir(estado, periodo) {
       : ` Sueles gastar ${formatEurosRedondo(habitual)}, así que vas holgado.`
   requerir('vivir-nota').textContent = restante <= 0
     ? 'No queda nada: todo lo que gastes sale de lo que tenías.'
-    : `${formatEurosRedondo(alDia)} al día durante los ${quedanDias} días que quedan.${comparacion}`
+    : `${formatEurosRedondo(alDia)} al día durante ${quedanDias === 1 ? 'el día que queda' : `los ${quedanDias} días que quedan`}.${comparacion}`
 }
 
 /**

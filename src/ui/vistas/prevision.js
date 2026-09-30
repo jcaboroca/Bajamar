@@ -266,7 +266,9 @@ function loQueQuedaParaVivir(queda, c, estado, gastado) {
     li.append(nodo('p', 'cascada-vivir-lectura', 'No queda nada. Todo lo que gastes sale del colchón.'))
     return li
   }
-  const plazo = enCurso ? `los ${dias} días que faltan` : `${dias} días`
+  const plazo = enCurso
+    ? (dias === 1 ? 'el día que falta' : `los ${dias} días que faltan`)
+    : (dias === 1 ? 'un día' : `${dias} días`)
   // La cifra de arriba es la del mes entero; sin decir lo ya gastado, la
   // división no cuadra a ojo y parece un error.
   const llevas = enCurso ? `Te has gastado ${formatEurosRedondo(Math.abs(gastado))}. Con lo que queda, ` : ''
