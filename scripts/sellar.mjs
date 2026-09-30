@@ -7,6 +7,12 @@ import { join, relative, sep } from 'node:path'
 
 const raiz = fileURLToPath(new URL('..', import.meta.url))
 const generado = join(raiz, 'src', 'version.js')
+const servidor = join(raiz, 'sw.js')
+const SIN_SELLAR = "const SELLO = 'sin-sellar'"
+
+// El sello acaba dentro del propio sw.js, así que para pesarlo se mira sin él:
+// si no, cambiarlo cambiaría el hash y no pararía nunca.
+const servidorDesnudo = () => readFileSync(servidor, 'utf8').replace(/const SELLO = '[^']*'/, SIN_SELLAR)
 
 /** @param {string} dir */
 function ficheros(dir) {
@@ -21,9 +27,14 @@ function ficheros(dir) {
   return salida
 }
 
-const lista = [...ficheros(join(raiz, 'src')), join(raiz, 'index.html')].sort()
+const lista = [
+  ...ficheros(join(raiz, 'src')),
+  join(raiz, 'index.html'),
+  join(raiz, 'manifest.webmanifest'),
+].sort()
 const suma = createHash('sha1')
 for (const f of lista) suma.update(readFileSync(f))
+suma.update(servidorDesnudo())
 const sello = suma.digest('hex').slice(0, 12)
 
 // La lista viaja con el sello porque al aplicar la versión hay que pedir cada
@@ -36,4 +47,5 @@ const rutas = [...lista.map((f) => relative(raiz, f)), join('src', 'version.js')
   .sort()
 
 writeFileSync(generado, `// @ts-check\n// Lo escribe scripts/sellar.mjs. No se edita a mano.\nexport const SELLO = '${sello}'\n`)
+writeFileSync(servidor, servidorDesnudo().replace(SIN_SELLAR, `const SELLO = '${sello}'`))
 writeFileSync(join(raiz, 'version.json'), `${JSON.stringify({ sello, ficheros: rutas })}\n`)

@@ -131,8 +131,7 @@ async function arrancar() {
   })
 
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-    // Ya no hay PWA, pero quien la instaló sigue con ella puesta: registrar el
-    // desinstalador es la única forma de que le llegue.
+    // Guarda la app en el aparato para que exista sin cobertura.
     navigator.serviceWorker.register('sw.js').catch(() => {})
   }
 
