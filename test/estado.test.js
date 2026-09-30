@@ -470,3 +470,19 @@ test('lo que te devuelven sale de tu cuenta pero no es tu gasto', () => {
   const saldos = (/** @type {any} */ p) => JSON.stringify(p.dias?.map((/** @type {any} */ d) => d.saldo) ?? p)
   assert.equal(saldos(e.proyeccion), saldos(sinMarcar.proyeccion), 'el suelo previsto no se mueve ni un céntimo')
 })
+
+test('lo que la visa ya te ha liquidado no se vuelve a prever', () => {
+  const movimientos = extracto()
+  // Cuatro meses de liquidación a fin de mes, la última ya cobrada.
+  for (const [i, f] of ['2026-06-30', '2026-07-31', '2026-08-31', '2026-09-25'].entries()) {
+    movimientos.push(fila(`visa${i}`, f, 'TARJETA CREDITO JAVIER CABO ROCA', -20000, 100000))
+  }
+  const compra = (id, fecha, importe) => ({ ...fila(id, fecha, 'COMPRA TARJ. CONDIS', importe, 0), origen: 'tarjeta' })
+  movimientos.push(compra('tarjeta:1', '2026-08-14', -8000))
+  movimientos.push(compra('tarjeta:2', '2026-09-15', -20000))
+  // Ésta es la única que aún no ha pasado por ninguna liquidación.
+  movimientos.push(compra('tarjeta:3', '2026-09-26', -3300))
+
+  const e = construirEstado(movimientos, { hoy: HOY, meses: 2 })
+  assert.equal(e.pendienteTarjeta, -3300, 'sólo debe quedar lo comprado después del último recibo')
+})

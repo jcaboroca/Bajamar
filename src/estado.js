@@ -319,8 +319,21 @@ export function construirEstado(crudos, opciones = {}) {
   // La tarjeta se conoce por dos vías y cada una sabe una cosa: el histórico de
   // la cuenta sabe CUÁNDO la cobran, y el extracto de la tarjeta sabe CUÁNTO
   // van a cobrar. Sumar las dos sería contar el mismo dinero dos veces.
-  const pendienteTarjeta = tarjeta.reduce((t, m) => t + m.importe, 0)
-  const liquidacion = compromisos.find((c) => LIQUIDACION_TARJETA.test(c.nombre)) ?? null
+  //
+  // Se busca por categoría y no sólo por el texto del banco: en cuanto la
+  // entidad se reconoce, el compromiso pasa a llamarse «Liquidación de la
+  // VISA» y dejaba de casar con el concepto crudo, así que no se encontraba
+  // nunca y el cargo se previa por libre.
+  const liquidacion = compromisos.find((c) => (
+    (categorias.get(c.reciboId) ?? categorias.get(c.entidadId)) === 'tarjeta'
+    || LIQUIDACION_TARJETA.test(c.nombre)
+  )) ?? null
+  // Y una compra deja de estar pendiente en cuanto pasa el recibo que la paga.
+  // Sin esto, cada extracto nuevo apilaba las compras de todos los meses ya
+  // liquidados y la previsión volvía a cobrar lo que ya habías pagado.
+  const pendienteTarjeta = tarjeta
+    .filter((m) => m.fecha > (liquidacion?.ultimaVista ?? ''))
+    .reduce((t, m) => t + m.importe, 0)
   const cargoTarjeta = pendienteTarjeta === 0 ? null : {
     fecha: liquidacion?.proximaPrevista ?? proximoDia(hoy, 30),
     importe: pendienteTarjeta,
