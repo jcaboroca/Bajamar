@@ -513,3 +513,21 @@ test('el próximo cobro de la tarjeta junta los plazos de ese día', () => {
   assert.equal(e.proximoCobroTarjeta?.luego, -32264, 'las otras dos de MyInvestor')
   assert.equal(e.pendienteTarjeta, 0, 'lo fraccionado va en sus plazos, no en la liquidación')
 })
+
+test('Disney+ y HBO Max se reconocen aunque los cobre PayPal', () => {
+  const movimientos = extracto()
+  for (const [i, mes] of ['06', '07', '08', '09'].entries()) {
+    movimientos.push(fila(`d${i}`, `2026-${mes}-24`, 'COMPRA TARJ. 5402XXXXXXXX7032 PAYPAL *DISNEYPLUS-Hoofddorp', -699, 0))
+    movimientos.push(fila(`h${i}`, `2026-${mes}-03`, 'COMPRA TARJ. 5402XXXXXXXX7032 PAYPAL *HBOMAX HELP.HB-Stockholm', -549, 0))
+  }
+  movimientos.push(fila('p', '2026-09-20', 'COMPRA TARJ. 5402XXXXXXXX7032 PAYPAL *PAGO 3 PLAZOS-MADRID', -2240, 0))
+  const e = construirEstado(movimientos, { hoy: HOY, meses: 2 })
+  const nombreDe = (/** @type {string} */ id) => {
+    const m = e.movimientos.find((x) => x.id === id)
+    return m?.entidadId ? e.nombres.get(m.entidadId) : null
+  }
+  assert.equal(nombreDe('d3'), 'Disney+')
+  assert.equal(nombreDe('h3'), 'HBO Max')
+  assert.equal(nombreDe('p'), 'PayPal', 'lo demás de PayPal sigue siendo PayPal')
+  assert.ok(e.compromisos.some((c) => c.nombre === 'Disney+') && e.compromisos.some((c) => c.nombre === 'HBO Max'))
+})

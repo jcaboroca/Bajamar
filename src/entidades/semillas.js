@@ -48,6 +48,9 @@ export const SEMILLAS = [
   { nombre: 'Apple', patron: /APPLE\.COM|\bITUNES\b/, tipo: 'comercio', categoria: 'suscripciones' },
   { nombre: 'Spotify', patron: /SPOTIFY/, tipo: 'comercio', categoria: 'suscripciones' },
   { nombre: 'Google', patron: /^GOOGLE\b/, tipo: 'comercio', categoria: 'suscripciones' },
+  // Se cobran por PayPal («PAYPAL *DISNEYPLUS»): van antes para no quedarse todas en «PayPal».
+  { nombre: 'Disney+', patron: /DISNEY/, tipo: 'comercio', categoria: 'suscripciones' },
+  { nombre: 'HBO Max', patron: /\bHBO/, tipo: 'comercio', categoria: 'suscripciones' },
 
   // Compras y plataformas
   { nombre: 'Amazon', patron: /AMAZON|\bAMZN\b/, tipo: 'comercio', categoria: 'compras' },
