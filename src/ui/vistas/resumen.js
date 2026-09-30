@@ -413,9 +413,9 @@ function pintarComoVas(periodo, sePuedeRepartir) {
 
   if (!periodo.plan) {
     requerir('reparto-nota').textContent = ''
-    lista.replaceChildren(vacio(
-      'Todavía no has repartido este mes. Decide en qué se va '
-      + 'y aquí te digo si te estás pasando.',
+    lista.replaceChildren(vacio(sePuedeRepartir
+      ? 'Todavía no has repartido este mes. Decide en qué se va y aquí te digo si te estás pasando.'
+      : 'Este mes no lo repartiste, así que no hay con qué compararlo.',
     ))
     return
   }
