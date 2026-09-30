@@ -31,6 +31,16 @@ let ultimo = null
  */
 const cerrados = new Set()
 
+/**
+ * Qué categorías del día a día has abierto. Al revés que los recibos, éstas
+ * empiezan plegadas: la cabecera ya dice lo que cuestan.
+ * @type {Set<string>}
+ */
+const abiertas = new Set()
+
+/** Por encima de esto, una categoría se lee mejor con el resto en una línea. */
+const COMERCIOS_A_LA_VISTA = 12
+
 /** Cada cuánto llega, dicho como se dice. */
 const CADA_CUANTO = {
   mensual: 'al mes',
@@ -40,7 +50,20 @@ const CADA_CUANTO = {
   anual: 'una vez al año',
 }
 
-export function montarCategorias({ alCambiarTrato, alMarcarAnual, alApuntarRecibo }) {
+export function montarCategorias({ alCambiarTrato, alMarcarAnual, alApuntarRecibo, alClasificar }) {
+  requerir('dia-a-dia').addEventListener('click', async (e) => {
+    const fila = e.target instanceof Element ? e.target.closest('[data-comercio]') : null
+    if (!(fila instanceof HTMLElement) || !fila.dataset.comercio) return
+    const datos = await pedirDatos({
+      titulo: fila.dataset.nombre ?? 'Este comercio',
+      aceptar: 'Cambiarlo',
+      campos: [
+        { nombre: 'categoria', etiqueta: '¿En qué lo cuentas?', tipo: 'lista', valor: fila.dataset.categoria ?? 'otros', opciones: Object.entries(CATEGORIAS) },
+      ],
+    })
+    if (datos === null || datos === 'borrar' || datos.categoria === fila.dataset.categoria) return
+    await alClasificar(fila.dataset.comercio, String(datos.categoria))
+  })
   for (const caja of ['fijos', 'apartados']) {
     preguntarAlPulsar(requerir(caja), () => ultimo, alCambiarTrato)
   }
@@ -78,9 +101,67 @@ export function montarCategorias({ alCambiarTrato, alMarcarAnual, alApuntarRecib
 /** @param {Estado} estado */
 export function pintarCategorias(estado) {
   ultimo = estado
+  pintarDiaADia(estado)
   pintarFijos(estado)
   pintarPreguntas(estado)
   pintarApartados(estado)
+}
+
+/**
+ * El goteo partido en categorías, y cada categoría en los comercios que la
+ * llenan. Es el único sitio donde se ve de qué está hecho «Compras», y por
+ * tanto el único donde se puede deshacer.
+ * @param {Estado} estado
+ */
+function pintarDiaADia(estado) {
+  const trozos = estado.reparto
+  requerir('bloque-dia-a-dia').hidden = trozos.length === 0
+  if (trozos.length === 0) return
+  requerir('dia-a-dia-aclaracion').textContent = `Lo que no es recibo: ${formatEuros(estado.ritmo.porMes)} al mes, `
+    + 'contado con la mediana de tus meses completos.'
+
+  requerir('dia-a-dia').replaceChildren(...trozos.map((t) => {
+    const div = nodo('details', 'grupo')
+    div.open = abiertas.has(t.categoria)
+    div.addEventListener('toggle', () => {
+      if (div.open) abiertas.add(t.categoria)
+      else abiertas.delete(t.categoria)
+    })
+    const cabeza = nodo('summary', 'grupo-cabecera')
+    cabeza.append(
+      nodo('span', 'rotulo rotulo-menor', t.nombre),
+      nodo('span', 'cifras grupo-suma', `${formatEuros(t.alMes)} al mes`),
+    )
+    const ol = nodo('ol', 'eventos pulsables')
+    const vistos = t.comercios.slice(0, COMERCIOS_A_LA_VISTA)
+    for (const c of vistos) {
+      const nombre = c.entidadId ? estado.nombres.get(c.entidadId) ?? c.entidadId : 'Sin reconocer'
+      const fila = linea({
+        nombre,
+        detalle: c.cuantos === 1 ? 'una vez' : `${c.cuantos} veces`,
+        importe: formatEuros(c.alMes),
+        clase: c.entidadId ? '' : 'apagado',
+      })
+      // Sin comercio reconocido no hay a quién ponerle regla.
+      if (c.entidadId) {
+        fila.dataset.comercio = c.entidadId
+        fila.dataset.nombre = nombre
+        fila.dataset.categoria = t.categoria
+      }
+      ol.append(fila)
+    }
+    const resto = t.comercios.slice(COMERCIOS_A_LA_VISTA)
+    if (resto.length > 0) {
+      ol.append(linea({
+        nombre: `Otros ${resto.length} comercios`,
+        detalle: 'los tienes todos en Movimientos',
+        importe: formatEuros(resto.reduce((s, c) => s + c.alMes, 0)),
+        clase: 'apagado',
+      }))
+    }
+    div.append(cabeza, ol)
+    return div
+  }))
 }
 
 /** @param {Estado} estado */

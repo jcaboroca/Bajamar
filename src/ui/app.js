@@ -13,6 +13,7 @@
  */
 
 import { hoyIso } from '../dominio/tipos.js'
+import { CATEGORIAS } from '../entidades/semillas.js'
 import { importarXls } from '../importar/sabadell.js'
 import { guardarMovimientos, hayQueSubir, leerDecisiones, leerMovimientos, mezclarDecisiones, vaciar } from '../almacen/db.js'
 import { bajar, subir, aFichero, desdeFichero, hacerMaleta, buzonDesde, SinBuzon } from '../almacen/sincro.js'
@@ -189,6 +190,11 @@ function montarVistas() {
 
   montarCategorias({
     alCambiarTrato,
+    alClasificar: async (entidadId, categoria) => {
+      await ponerRegla(entidadId, categoria)
+      await refrescar()
+      decir(`Hecho: ${ultimoEstado?.nombres.get(entidadId) ?? 'ese comercio'} va ahora a ${CATEGORIAS[categoria] ?? categoria}.`)
+    },
     alApuntarRecibo: async (manual) => {
       await ponerManual(manual)
       await refrescar()

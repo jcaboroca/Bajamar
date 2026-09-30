@@ -55,3 +55,25 @@ describe('en qué se va el goteo', () => {
     assert.deepEqual(repartirGasto([], { porMes: -10000 }), [])
   })
 })
+
+describe('quién forma cada trozo', () => {
+  const de = (/** @type {string} */ fecha, /** @type {number} */ importe, /** @type {string | null} */ entidadId) => (
+    /** @type {any} */ ({ id: `${fecha}-${entidadId}-${importe}`, fecha, importe, categoria: 'compras', entidadId })
+  )
+
+  test('cada categoría dice qué comercios la llenan, de más caro a menos', () => {
+    const trozos = repartirGasto([
+      de('2026-07-03', -3000, 'amazon'),
+      de('2026-07-20', -1000, 'decathlon'),
+      de('2026-08-05', -3000, 'amazon'),
+      de('2026-08-09', -1000, null),
+      de('2026-09-01', -500, 'amazon'), // mes a medias: fuera
+    ], { porMes: -4000 })
+    const [compras] = trozos
+    assert.deepEqual(compras.comercios.map((c) => c.entidadId), ['amazon', 'decathlon', ''])
+    assert.deepEqual(compras.comercios.map((c) => c.cuantos), [2, 1, 1])
+    // Misma escala que su trozo: Amazon es tres cuartos del gasto, así que tres
+    // cuartos de lo que cuesta la categoría al mes.
+    assert.equal(compras.comercios[0].alMes, -3000)
+  })
+})
