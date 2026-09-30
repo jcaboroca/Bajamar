@@ -51,8 +51,8 @@ const CADA_CUANTO = {
 }
 
 export function montarCategorias({ alCambiarTrato, alMarcarAnual, alApuntarRecibo, alClasificar }) {
-  requerir('dia-a-dia').addEventListener('click', async (e) => {
-    const fila = e.target instanceof Element ? e.target.closest('[data-comercio]') : null
+  const cambiarDeCategoria = async (/** @type {EventTarget | null} */ objetivo) => {
+    const fila = objetivo instanceof Element ? objetivo.closest('[data-comercio]') : null
     if (!(fila instanceof HTMLElement) || !fila.dataset.comercio) return
     const datos = await pedirDatos({
       titulo: fila.dataset.nombre ?? 'Este comercio',
@@ -63,6 +63,14 @@ export function montarCategorias({ alCambiarTrato, alMarcarAnual, alApuntarRecib
     })
     if (datos === null || datos === 'borrar' || datos.categoria === fila.dataset.categoria) return
     await alClasificar(fila.dataset.comercio, String(datos.categoria))
+  }
+  const diaADia = requerir('dia-a-dia')
+  diaADia.addEventListener('click', (e) => cambiarDeCategoria(e.target))
+  diaADia.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return
+    if (!(e.target instanceof Element) || !e.target.matches('[data-comercio]')) return
+    e.preventDefault()
+    cambiarDeCategoria(e.target)
   })
   for (const caja of ['fijos', 'apartados']) {
     preguntarAlPulsar(requerir(caja), () => ultimo, alCambiarTrato)
@@ -147,6 +155,8 @@ function pintarDiaADia(estado) {
         fila.dataset.comercio = c.entidadId
         fila.dataset.nombre = nombre
         fila.dataset.categoria = t.categoria
+        fila.tabIndex = 0
+        fila.setAttribute('role', 'button')
       }
       ol.append(fila)
     }
