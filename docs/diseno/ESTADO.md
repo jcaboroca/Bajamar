@@ -512,7 +512,10 @@ decidió qué se hace y qué no; respétalo:
    (`aaaa…`) ya se borró.
 
 **Decidido que no:** borrar recibos apuntados a mano (`quitarManual` existe y
-no tiene botón; el dueño no lo quiere).
+no tiene botón; el dueño no lo quiere). Y **sincronizar sola con el banco**: ni
+PSD2 con el Sabadell (vía agregador tipo Enable Banking, el worker vería los
+movimientos en claro) ni con el usuario de Fintonic (sin API, habría que guardar
+su contraseña y va contra sus condiciones). Se queda el Excel del Sabadell.
 
 ## Lo que está bien y conviene no tocar
 
