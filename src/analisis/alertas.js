@@ -112,7 +112,7 @@ export function revisar({ proyeccion, fijos, ingresos, movimientos, nombres, pre
         : `${retrasados.length} recibos no han vuelto a pasar`,
       detalle: retrasados.length === 1
         ? 'Tocaba hace tiempo y no aparece. Puede que lo hayas dado de baja, o puede que llegue con retraso y se junte con el siguiente. Toca aquí para decírmelo.'
-        : `${lista}. Puede que los hayas dado de baja, o puede que lleguen con retraso y se junten con los siguientes. En Previsión puedes decirme cuáles ya no pagas.`,
+        : `${lista}. Puede que los hayas dado de baja, o puede que lleguen con retraso y se junten con los siguientes. En Categorías puedes decirme cuáles ya no pagas.`,
       // Sólo cuando hay uno: con varios, un toque no puede contestar por todos.
       reciboId: retrasados.length === 1 ? retrasados[0].reciboId : undefined,
     })

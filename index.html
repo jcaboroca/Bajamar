@@ -23,7 +23,6 @@
   <nav class="navegacion" aria-label="Secciones">
     <button type="button" class="pestana" data-vista="resumen" aria-current="page">Resumen</button>
     <button type="button" class="pestana" data-vista="movimientos">Movimientos</button>
-    <button type="button" class="pestana" data-vista="prevision">Previsión</button>
     <button type="button" class="pestana" data-vista="categorias">Categorías</button>
     <button type="button" class="pestana" data-vista="patrimonio">Patrimonio</button>
     <button type="button" class="pestana" data-vista="ajustes">Ajustes</button>
@@ -55,6 +54,31 @@
       <div id="lamina"></div>
     </section>
 
+    <!-- La cascada: el porqué de la cifra de arriba. Plegada, porque sólo se
+         mira cuando uno duda; y sólo en el mes en curso, que es del que habla. -->
+    <details class="bloque bloque-plegable" id="de-donde-sale">
+      <summary><span class="rotulo">¿De dónde sale?</span></summary>
+      <p class="rotulo rotulo-menor" id="cascada-rotulo">Tu mes</p>
+      <p class="aclaracion" id="cascada-entradilla"></p>
+      <ol id="cascada" class="cascada"></ol>
+      <div id="cascada-saldo"></div>
+      <p class="nota" id="cascada-pie"></p>
+
+      <!-- La cascada lo adopta dentro de su escalón «Día a día»: se reparte donde
+           se ve lo que hay que repartir. Vive aquí para que sus oyentes se pongan
+           una sola vez y sobrevivan a los repintados. -->
+      <div id="reparto" hidden>
+        <p class="cascada-queda">Tu punto más bajo con este reparto:
+          <span id="simulador-suelo" class="cifras">—</span></p>
+        <p class="cascada-vivir-lectura" id="simulador-efecto">—</p>
+        <ol id="simulador" class="palancas"></ol>
+        <div class="acciones">
+          <button type="button" id="simulador-reset" class="boton boton-sobrio" hidden>Volver a como estás</button>
+        </div>
+        <p class="nota" id="simulador-pie"></p>
+      </div>
+    </details>
+
     <section class="bloque">
       <p class="rotulo" id="vivir-rotulo">Para el día a día</p>
       <div id="vivir"></div>
@@ -65,6 +89,7 @@
       <p class="rotulo" id="reparto-rotulo">Cómo vas</p>
       <p class="aclaracion" id="reparto-nota"></p>
       <ol id="categorias" class="categorias"></ol>
+      <button type="button" id="repartir-mes" class="boton boton-sobrio" hidden>Repartir el mes</button>
     </section>
 
     <section class="bloque">
@@ -101,33 +126,6 @@
         <button type="button" id="movimientos-mas" class="boton boton-sobrio" hidden>Ver más</button>
       </div>
     </section>
-
-  </div>
-
-  <!-- ── Previsión ──────────────────────────────────────────────────────── -->
-  <div class="vista" id="vista-prevision" hidden>
-
-    <section class="bloque">
-      <p class="rotulo" id="cascada-rotulo">Tu mes</p>
-      <p class="aclaracion" id="cascada-entradilla"></p>
-      <ol id="cascada" class="cascada"></ol>
-      <div id="cascada-saldo"></div>
-      <p class="nota" id="cascada-pie"></p>
-    </section>
-
-    <!-- La cascada lo adopta dentro de su escalón «Día a día»: se reparte donde
-         se ve lo que hay que repartir. Vive aquí para que sus oyentes se pongan
-         una sola vez y sobrevivan a los repintados. -->
-    <div id="reparto" hidden>
-      <p class="cascada-queda">Tu punto más bajo con este reparto:
-        <span id="simulador-suelo" class="cifras">—</span></p>
-      <p class="cascada-vivir-lectura" id="simulador-efecto">—</p>
-      <ol id="simulador" class="palancas"></ol>
-      <div class="acciones">
-        <button type="button" id="simulador-reset" class="boton boton-sobrio" hidden>Volver a como estás</button>
-      </div>
-      <p class="nota" id="simulador-pie"></p>
-    </div>
 
   </div>
 

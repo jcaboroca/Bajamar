@@ -62,6 +62,15 @@ export function pintarPrevision(estado) {
   pintarSimulador(estado)
 }
 
+/** Abre la cascada por el escalón donde se reparte, y lo pone a la vista. */
+export function abrirReparto() {
+  abiertos.add('diaadia')
+  requerir('de-donde-sale').open = true
+  if (ultimo) pintarCascada(ultimo)
+  const quieto = matchMedia('(prefers-reduced-motion: reduce)').matches
+  requerir('reparto').scrollIntoView({ behavior: quieto ? 'auto' : 'smooth', block: 'start' })
+}
+
 /** @param {Estado} estado */
 function pintarCascada(estado) {
   const c = estado.cascada

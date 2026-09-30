@@ -73,6 +73,11 @@ main {
 .bloque { padding: clamp(2.25rem, 7vw, 4rem) 0; }
 .bloque + .bloque { border-top: 1px solid var(--linea); }
 
+/* Un bloque entero que se abre: el rótulo hace de tirador. */
+.bloque-plegable > summary { cursor: pointer; list-style-position: inside; color: var(--secundario); }
+.bloque-plegable > summary .rotulo { display: inline; margin: 0; }
+.bloque-plegable[open] > summary { margin-bottom: 1.5rem; }
+
 /* ── Navegación ───────────────────────────────────────────────── */
 
 .cabecera {

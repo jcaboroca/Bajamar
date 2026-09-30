@@ -13,9 +13,12 @@
  *   3. ¿Voy bien, o me estoy pasando?
  *   4. ¿Y más allá? — la misma pregunta a tres, seis o doce meses.
  *
- * La cuarta vivía en Previsión, donde compartía pantalla con la cascada de un
+ * La cuarta vivió en Previsión, donde compartía pantalla con la cascada de un
  * solo mes. Es la primera pregunta otra vez, sólo que más lejos, así que va
  * aquí y al final: cuanto más lejos se mira, menos se sabe.
+ *
+ * Luego se vino también la cascada, plegada bajo la bajamar: es el porqué de
+ * esa cifra, y tenía poco sentido cambiar de pestaña para preguntárselo.
  *
  * Y habla siempre de un periodo concreto, elegido arriba. Un periodo va de una
  * nómina a la siguiente, así que septiembre es del 25 de agosto al 24 de
@@ -30,6 +33,7 @@ import { diasQueDura } from '../../analisis/periodos.js'
 import { dibujarLamina } from '../lamina.js'
 import { barra, cuentas, diaYMes, nodo, nombreDeMes, requerir, titular, vacio } from '../piezas.js'
 import { marcarPreguntable, preguntarAlPulsar } from '../trato.js'
+import { abrirReparto } from './prevision.js'
 
 /**
  * @typedef {ReturnType<typeof import('../../estado.js').construirEstado>} Estado
@@ -49,6 +53,8 @@ export function montarResumen({ alCambiarTrato }) {
   preguntarAlPulsar(requerir('avisos'), () => ultimo, alCambiarTrato)
   requerir('mes-antes').addEventListener('click', () => mover(-1))
   requerir('mes-despues').addEventListener('click', () => mover(1))
+  requerir('repartir-mes').addEventListener('click', abrirReparto)
+  if (location.hash === '#prevision') requerir('de-donde-sale').open = true
 
   requerir('horizonte').addEventListener('click', (e) => {
     const boton = e.target instanceof Element ? e.target.closest('[data-meses]') : null
@@ -98,8 +104,11 @@ export function pintarResumen(estado, { animar }) {
   pintarAvisos(estado)
   pintarNavegador(estado, periodo)
   pintarLlego(estado, periodo, animar)
+  // La cascada sólo sabe del mes en curso: bajo otro mes contaría otra cosa.
+  const esElDeLaCascada = periodo.id === estado.cascada.mes
+  requerir('de-donde-sale').hidden = !esElDeLaCascada
   pintarVivir(estado, periodo)
-  pintarComoVas(periodo)
+  pintarComoVas(periodo, esElDeLaCascada)
   pintarHastaDonde(estado)
 }
 
@@ -394,16 +403,19 @@ function desplegable(rotulo, total, apuntes, estado, conSigno) {
  * previsto, y si no se sale nada, decirlo en una línea.
  *
  * @param {Periodo} periodo
+ * @param {boolean} sePuedeRepartir
  */
-function pintarComoVas(periodo) {
+function pintarComoVas(periodo, sePuedeRepartir) {
   requerir('reparto-rotulo').textContent = 'Cómo vas'
   const lista = requerir('categorias')
+  requerir('repartir-mes').hidden = !sePuedeRepartir
+  requerir('repartir-mes').textContent = periodo.plan ? 'Cambiar el reparto' : 'Repartir el mes'
 
   if (!periodo.plan) {
     requerir('reparto-nota').textContent = ''
     lista.replaceChildren(vacio(
-      'Todavía no has repartido este mes. En Previsión puedes decidir en qué se va, '
-      + 'y entonces aquí te digo si te estás pasando.',
+      'Todavía no has repartido este mes. Decide en qué se va '
+      + 'y aquí te digo si te estás pasando.',
     ))
     return
   }
