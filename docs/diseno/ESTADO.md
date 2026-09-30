@@ -504,6 +504,12 @@ decidió qué se hace y qué no; respétalo:
 7. `worker/.wrangler/cache/wrangler-account.json` sigue en el historial
    público (id de cuenta y correo, no una clave). Sacarlo exige reescribir el
    historial con `--force`, y eso es decisión del dueño.
+8. **Tres buzones probablemente huérfanos** en el KV: `bf1fc9f5…`, `b77b60f3…` y
+   `5326cffb…`, escritos la noche del 28 al probar contraseñas. El bueno es
+   `607741a6…`. No se borraron por si alguno es el de un aparato que no se ha
+   vuelto a abrir: Ajustes enseña los ocho primeros caracteres del buzón de
+   cada aparato. Caducan solos en septiembre de 2027. El de pruebas
+   (`aaaa…`) ya se borró.
 
 **Decidido que no:** borrar recibos apuntados a mano (`quitarManual` existe y
 no tiene botón; el dueño no lo quiere).
