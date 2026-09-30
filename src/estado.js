@@ -570,6 +570,9 @@ export function construirEstado(crudos, opciones = {}) {
     apagadas: Object.keys(apagadas).sort(),
     saldoInicial,
     pendienteTarjeta,
+    cargoTarjeta,
+    // Lo de la tarjeta hasta este día ya lo pagaste: lo cobró la última liquidación.
+    tarjetaPagadaHasta: liquidacion?.ultimaVista ?? null,
     proyeccion,
     proyeccionLarga,
     fijos,

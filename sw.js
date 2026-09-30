@@ -5,7 +5,7 @@
 // un service worker no se sirve nunca de la caché, así que es el único sitio
 // del que uno se puede fiar. Cada sello tiene su propio almacén: mientras se
 // llena el nuevo, el viejo sigue sirviendo la versión que ya funcionaba.
-const SELLO = '5eb8623045de'
+const SELLO = '75d231a244e7'
 const ALMACEN = `bajamar-${SELLO}`
 const PORTADA = './'
 

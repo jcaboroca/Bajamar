@@ -356,6 +356,8 @@ main {
 .previsto .evento-nombre > span:first-child { color: #B3BEC7; }
 .confirmado .evento-nombre > span:first-child { font-weight: 500; }
 .urgente .evento-importe { color: var(--acento); }
+.por-cobrar .evento-importe,
+.por-cobrar .evento-nombre > span:first-child { color: var(--acento); }
 
 /* Una lista donde cada línea lleva a algún sitio. El realce aparece al tocar,
    no está puesto de antemano: cinco filas resaltadas no resaltan nada. */

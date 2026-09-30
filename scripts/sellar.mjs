@@ -31,6 +31,8 @@ const lista = [
   ...ficheros(join(raiz, 'src')),
   join(raiz, 'index.html'),
   join(raiz, 'manifest.webmanifest'),
+  // Vive fuera de src pero app.js lo importa: sin él, sin red no arranca nada.
+  join(raiz, 'config.js'),
 ].sort()
 const suma = createHash('sha1')
 for (const f of lista) suma.update(readFileSync(f))

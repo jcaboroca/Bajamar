@@ -486,3 +486,25 @@ test('lo que la visa ya te ha liquidado no se vuelve a prever', () => {
   const e = construirEstado(movimientos, { hoy: HOY, meses: 2 })
   assert.equal(e.pendienteTarjeta, -3300, 'sólo debe quedar lo comprado después del último recibo')
 })
+
+test('la comisión por divisa es gasto; la de mantenimiento, no', () => {
+  const movimientos = extracto()
+  movimientos.push(fila('div', '2026-09-02', 'COMISION DIVISA NO EURO', -95, 0))
+  movimientos.push(fila('man', '2026-09-24', 'COMISION MANTENIMIENTO', -6000, 0))
+  const e = construirEstado(movimientos, { hoy: HOY, meses: 2 })
+  const de = (/** @type {string} */ id) => e.movimientos.find((m) => m.id === id)?.categoria
+  assert.equal(de('div'), 'compras')
+  assert.equal(de('man'), 'banco')
+})
+
+test('el estado dice hasta cuándo está pagada la tarjeta y cuándo es el próximo cobro', () => {
+  const movimientos = extracto()
+  for (const [i, f] of ['2026-06-30', '2026-07-31', '2026-08-31', '2026-09-25'].entries()) {
+    movimientos.push(fila(`visa${i}`, f, 'TARJETA CREDITO JAVIER CABO ROCA', -20000, 100000))
+  }
+  movimientos.push({ ...fila('tarjeta:9', '2026-09-26', 'COMPRA TARJ. CONDIS', -3300, 0), origen: 'tarjeta' })
+  const e = construirEstado(movimientos, { hoy: HOY, meses: 2 })
+  assert.equal(e.tarjetaPagadaHasta, '2026-09-25')
+  assert.equal(e.cargoTarjeta?.importe, -3300)
+  assert.ok((e.cargoTarjeta?.fecha ?? '') > '2026-09-25', 'el próximo cobro es posterior al último')
+})

@@ -24,3 +24,24 @@ describe('el sello llega a los tres sitios que lo necesitan', () => {
     assert.ok(ficheros.every((/** @type {string} */ f) => !f.includes('\\')), 'rutas de web, no de Windows')
   })
 })
+
+describe('sin conexión arranca', () => {
+  test('todo lo que la app importa está en la lista de lo que se guarda', () => {
+    // Basta un fichero fuera de la lista para que, sin red, no arranque nada.
+    const { ficheros } = JSON.parse(leer('version.json'))
+    const guardados = new Set(ficheros)
+    const vistos = new Set()
+    const pendientes = ['src/ui/app.js']
+    while (pendientes.length > 0) {
+      const ruta = /** @type {string} */ (pendientes.pop())
+      if (vistos.has(ruta)) continue
+      vistos.add(ruta)
+      for (const [, destino] of leer(ruta).matchAll(/^\s*(?:import|export)[^'"]*from\s+'([^']+)'/gm)) {
+        const url = new URL(destino, `http://x/${ruta}`)
+        pendientes.push(url.pathname.slice(1))
+      }
+    }
+    const faltan = [...vistos].filter((r) => !guardados.has(r))
+    assert.deepEqual(faltan, [])
+  })
+})

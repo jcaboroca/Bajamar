@@ -108,6 +108,8 @@ export const SEMILLAS = [
   { nombre: 'ERNI Consulting', patron: /ERNI CONSULTING/, tipo: 'comercio', categoria: 'nomina' },
 
   // Ruido del propio banco
+  // Va antes que la genérica: ésta no te la devuelven, la pagas por comprar fuera.
+  { nombre: 'Comisión por divisa', patron: /COMISION DIVISA/, tipo: 'comercio', categoria: 'compras' },
   { nombre: 'Comisiones del banco', patron: /COMISION|INTERESES Y\/O/, tipo: 'comercio', categoria: 'banco' },
 ]
 

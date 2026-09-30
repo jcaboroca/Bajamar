@@ -11,7 +11,7 @@
 
 import { formatEuros } from '../../dominio/dinero.js'
 import { CATEGORIAS } from '../../entidades/semillas.js'
-import { linea, nodo, nombreDeMes, requerir, vacio, fechaLarga } from '../piezas.js'
+import { diaYMes, linea, nodo, nombreDeMes, requerir, vacio, fechaLarga } from '../piezas.js'
 
 /**
  * @typedef {import('../../dominio/tipos.js').Movimiento} Movimiento
@@ -98,6 +98,7 @@ function repintar() {
   cuenta.textContent = elegidos.length === 0
     ? ''
     : `${elegidos.length} ${elegidos.length === 1 ? 'movimiento' : 'movimientos'} · ${formatEuros(suma, { signo: true })}`
+  if (filtro === 'tarjeta') cuenta.textContent = loQueDebesALaTarjeta(estado)
 
   const lista = requerir('movimientos-lista')
   if (elegidos.length === 0) {
@@ -128,6 +129,19 @@ function repintar() {
 }
 
 /**
+ * La pregunta al mirar la tarjeta no es cuánto has gastado con ella en total,
+ * sino cuánto te va a cobrar el banco y cuándo.
+ * @param {Estado} estado
+ */
+function loQueDebesALaTarjeta(estado) {
+  const pagado = estado.tarjetaPagadaHasta
+    ? ` Lo de hasta el ${diaYMes(estado.tarjetaPagadaHasta)} ya te lo cobraron.`
+    : ''
+  if (!estado.cargoTarjeta) return `No debes nada a la tarjeta.${pagado}`
+  return `Te cobrarán ${formatEuros(Math.abs(estado.cargoTarjeta.importe))} el ${diaYMes(estado.cargoTarjeta.fecha)}.${pagado}`
+}
+
+/**
  * @param {Movimiento} m
  * @param {Set<string>} recurrentes
  */
@@ -149,7 +163,8 @@ function encaja(m, recurrentes) {
  */
 function fila(m, estado) {
   const detalles = [CATEGORIAS[m.categoria ?? 'otros'] ?? 'Sin clasificar']
-  if (m.origen === 'tarjeta') detalles.push('tarjeta')
+  const porCobrar = m.origen === 'tarjeta' && m.fecha > (estado.tarjetaPagadaHasta ?? '')
+  if (m.origen === 'tarjeta') detalles.push(porCobrar ? 'tarjeta, aún por cobrar' : 'tarjeta')
   if (m.excluido) detalles.push('excluido')
   if (m.nota) detalles.push(m.nota)
 
@@ -158,7 +173,7 @@ function fila(m, estado) {
     nombre: (m.entidadId && estado.nombres.get(m.entidadId)) || m.conceptoRaw,
     detalle: detalles.join(' · '),
     importe: formatEuros(m.importe, { signo: true }),
-    clase: `${m.importe > 0 ? 'entrada' : ''} ${m.excluido ? 'apagado' : ''}`.trim(),
+    clase: `${m.importe > 0 ? 'entrada' : ''} ${m.excluido ? 'apagado' : ''} ${porCobrar ? 'por-cobrar' : ''}`.trim(),
   })
   li.dataset.id = m.id
   li.tabIndex = 0
