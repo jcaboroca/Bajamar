@@ -12,21 +12,30 @@
 import { SELLO } from '../version.js'
 
 /**
- * El sello publicado ahora mismo, o null si no se puede saber. Sin red, sin
- * fichero o con una respuesta rara, se calla: avisar de una versión nueva que
- * no existe es peor que no avisar.
+ * Lo publicado ahora mismo, o null si no se puede saber. Sin red, sin fichero
+ * o con una respuesta rara, se calla: avisar de una versión nueva que no existe
+ * es peor que no avisar.
  * @param {typeof fetch} traer
- * @returns {Promise<string | null>}
+ * @returns {Promise<{ sello: string, ficheros: string[] } | null>}
  */
-export async function selloPublicado(traer) {
+export async function publicado(traer) {
   try {
     const respuesta = await traer('version.json', { cache: 'no-store' })
     if (!respuesta.ok) return null
     const datos = await respuesta.json()
-    return typeof datos?.sello === 'string' ? datos.sello : null
+    if (typeof datos?.sello !== 'string') return null
+    return { sello: datos.sello, ficheros: Array.isArray(datos.ficheros) ? datos.ficheros : [] }
   } catch {
     return null
   }
+}
+
+/**
+ * @param {typeof fetch} traer
+ * @returns {Promise<string | null>}
+ */
+export async function selloPublicado(traer) {
+  return (await publicado(traer))?.sello ?? null
 }
 
 /**
@@ -39,16 +48,34 @@ export async function hayVersionNueva(traer, mio = SELLO) {
 }
 
 /**
+ * Vuelve a pedir a la red cada fichero publicado, saltándose la copia que el
+ * navegador guarda diez minutos. Sin esto, recargar servía el código viejo y
+ * el aviso reaparecía al instante, una y otra vez.
+ * @param {typeof fetch} traer
+ * @param {string[]} ficheros
+ */
+export async function refrescar(traer, ficheros) {
+  await Promise.all(ficheros.map((f) => traer(f, { cache: 'reload' }).catch(() => null)))
+}
+
+/**
  * Enseña el aviso cuando toca. No recarga por su cuenta: recargar a alguien que
  * está a media faena es quitarle la pantalla de las manos.
  * @param {HTMLElement} aviso
  * @param {typeof fetch} traer
  */
 export function vigilarVersion(aviso, traer = fetch) {
+  /** @type {string[]} */
+  let ficheros = []
   const mirar = async () => {
-    if (await hayVersionNueva(traer)) aviso.hidden = false
+    const hay = await publicado(traer)
+    if (!hay || hay.sello === SELLO) return
+    ficheros = hay.ficheros
+    aviso.hidden = false
   }
-  aviso.addEventListener('click', () => {
+  aviso.addEventListener('click', async () => {
+    aviso.textContent = 'Poniéndola…'
+    await refrescar(traer, ficheros)
     // Una dirección nueva obliga al navegador a pedir el documento otra vez;
     // una recarga normal puede devolverle la copia que ya tenía.
     location.replace(`${location.pathname}?v=${Date.now()}${location.hash}`)
