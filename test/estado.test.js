@@ -471,20 +471,18 @@ test('lo que te devuelven sale de tu cuenta pero no es tu gasto', () => {
   assert.equal(saldos(e.proyeccion), saldos(sinMarcar.proyeccion), 'el suelo previsto no se mueve ni un céntimo')
 })
 
-test('lo que la visa ya te ha liquidado no se vuelve a prever', () => {
+test('del extracto de la tarjeta sólo vale la última foto', () => {
+  // Es lo que pasó el 30 de septiembre: la foto del 26 y la del 30 juntas
+  // cobraban otra vez los 565,30 € que el banco ya había liquidado.
   const movimientos = extracto()
-  // Cuatro meses de liquidación a fin de mes, la última ya cobrada.
-  for (const [i, f] of ['2026-06-30', '2026-07-31', '2026-08-31', '2026-09-25'].entries()) {
-    movimientos.push(fila(`visa${i}`, f, 'TARJETA CREDITO JAVIER CABO ROCA', -20000, 100000))
-  }
-  const compra = (id, fecha, importe) => ({ ...fila(id, fecha, 'COMPRA TARJ. CONDIS', importe, 0), origen: 'tarjeta' })
-  movimientos.push(compra('tarjeta:1', '2026-08-14', -8000))
-  movimientos.push(compra('tarjeta:2', '2026-09-15', -20000))
-  // Ésta es la única que aún no ha pasado por ninguna liquidación.
-  movimientos.push(compra('tarjeta:3', '2026-09-26', -3300))
-
+  const enFoto = (/** @type {string} */ foto, /** @type {number} */ i, /** @type {number} */ importe) => ({
+    ...fila(`tarjeta:${foto}-abcd:${i}`, '2026-09-20', 'COMPRA TARJ. CONDIS', importe, 0), origen: 'tarjeta', foto: `${foto} x`,
+  })
+  movimientos.push(enFoto('2026-09-24', 0, -8000), enFoto('2026-09-24', 1, -20000))
+  movimientos.push(enFoto('2026-09-26', 0, -3300))
   const e = construirEstado(movimientos, { hoy: HOY, meses: 2 })
-  assert.equal(e.pendienteTarjeta, -3300, 'sólo debe quedar lo comprado después del último recibo')
+  assert.equal(e.pendienteTarjeta, -3300)
+  assert.equal(e.movimientos.filter((m) => m.origen === 'tarjeta').length, 1, 'la foto vieja no se enseña')
 })
 
 test('la comisión por divisa es gasto; la de mantenimiento, no', () => {
@@ -497,14 +495,21 @@ test('la comisión por divisa es gasto; la de mantenimiento, no', () => {
   assert.equal(de('man'), 'banco')
 })
 
-test('el estado dice hasta cuándo está pagada la tarjeta y cuándo es el próximo cobro', () => {
+test('el próximo cobro de la tarjeta junta los plazos de ese día', () => {
+  // Las cifras de la foto del 30 de septiembre: la tercera cuota del IBI y la
+  // primera de MyInvestor caen juntas el 31 de octubre.
   const movimientos = extracto()
-  for (const [i, f] of ['2026-06-30', '2026-07-31', '2026-08-31', '2026-09-25'].entries()) {
+  for (const [i, f] of ['2026-06-30', '2026-07-31', '2026-08-31', '2026-09-30'].entries()) {
     movimientos.push(fila(`visa${i}`, f, 'TARJETA CREDITO JAVIER CABO ROCA', -20000, 100000))
   }
-  movimientos.push({ ...fila('tarjeta:9', '2026-09-26', 'COMPRA TARJ. CONDIS', -3300, 0), origen: 'tarjeta' })
-  const e = construirEstado(movimientos, { hoy: HOY, meses: 2 })
-  assert.equal(e.tarjetaPagadaHasta, '2026-09-25')
-  assert.equal(e.cargoTarjeta?.importe, -3300)
-  assert.ok((e.cargoTarjeta?.fecha ?? '') > '2026-09-25', 'el próximo cobro es posterior al último')
+  const cuota = (/** @type {number} */ i, /** @type {string} */ fecha, /** @type {string} */ concepto, /** @type {number} */ importe) => ({
+    ...fila(`tarjeta:2026-09-26-abcd:${i}`, fecha, concepto, importe, 0), origen: 'tarjeta', fraccionado: true, foto: '2026-09-26 x',
+  })
+  movimientos.push(cuota(0, '2026-09-22', 'TRANSFERENCIA A MyInvesto', -16132))
+  movimientos.push(cuota(1, '2026-07-01', 'IMPUESTOS AJ. GAVA', -18545))
+  const e = construirEstado(movimientos, { hoy: '2026-09-30', meses: 2 })
+  assert.equal(e.proximoCobroTarjeta?.fecha, '2026-10-31')
+  assert.equal(e.proximoCobroTarjeta?.importe, -34677)
+  assert.equal(e.proximoCobroTarjeta?.luego, -32264, 'las otras dos de MyInvestor')
+  assert.equal(e.pendienteTarjeta, 0, 'lo fraccionado va en sus plazos, no en la liquidación')
 })

@@ -134,11 +134,12 @@ function repintar() {
  * @param {Estado} estado
  */
 function loQueDebesALaTarjeta(estado) {
-  const pagado = estado.tarjetaPagadaHasta
-    ? ` Lo de hasta el ${diaYMes(estado.tarjetaPagadaHasta)} ya te lo cobraron.`
-    : ''
-  if (!estado.cargoTarjeta) return `No debes nada a la tarjeta.${pagado}`
-  return `Te cobrarán ${formatEuros(Math.abs(estado.cargoTarjeta.importe))} el ${diaYMes(estado.cargoTarjeta.fecha)}.${pagado}`
+  const c = estado.proximoCobroTarjeta
+  if (!c) return 'No debes nada a la tarjeta.'
+  const despues = c.luego === 0
+    ? ''
+    : ` Después quedan ${formatEuros(Math.abs(c.luego))} en plazos, hasta el ${diaYMes(c.hasta)}.`
+  return `El ${diaYMes(c.fecha)} te cobrarán ${formatEuros(Math.abs(c.importe))}.${despues}`
 }
 
 /**
@@ -163,7 +164,8 @@ function encaja(m, recurrentes) {
  */
 function fila(m, estado) {
   const detalles = [CATEGORIAS[m.categoria ?? 'otros'] ?? 'Sin clasificar']
-  const porCobrar = m.origen === 'tarjeta' && m.fecha > (estado.tarjetaPagadaHasta ?? '')
+  // Del extracto de la tarjeta sólo queda la última foto, y en ella todo está por cobrar.
+  const porCobrar = m.origen === 'tarjeta'
   if (m.origen === 'tarjeta') detalles.push(porCobrar ? 'tarjeta, aún por cobrar' : 'tarjeta')
   if (m.excluido) detalles.push('excluido')
   if (m.nota) detalles.push(m.nota)

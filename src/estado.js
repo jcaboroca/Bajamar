@@ -127,6 +127,43 @@ function deManuales(manuales, hoy) {
 }
 
 /**
+ * El extracto de la tarjeta es una foto de lo que falta por cobrar: lo ya
+ * liquidado desaparece de la siguiente. Juntar dos fotos cobraría dos veces.
+ * Las filas viejas, de antes de que hubiera fotos, sólo valen si no hay otra cosa.
+ * @param {Movimiento[]} crudos
+ */
+function soloLaUltimaFoto(crudos) {
+  let ultima = null
+  let cuando = ''
+  for (const m of crudos) {
+    if (m.origen === 'tarjeta' && m.foto && m.foto > cuando) {
+      ultima = m
+      cuando = m.foto
+    }
+  }
+  if (ultima === null) return crudos
+  const prefijo = ultima.id.slice(0, ultima.id.lastIndexOf(':') + 1)
+  return crudos.filter((m) => m.origen !== 'tarjeta' || m.id.startsWith(prefijo))
+}
+
+/**
+ * El próximo cargo de la tarjeta, con todo lo que cae ese día, y lo que quedará después.
+ * @param {{ fecha: string, importe: number }[]} cobros
+ */
+function juntarCobros(cobros) {
+  if (cobros.length === 0) return null
+  const fechas = cobros.map((c) => c.fecha).sort()
+  const fecha = fechas[0]
+  const suma = (/** @type {typeof cobros} */ lista) => lista.reduce((t, c) => t + c.importe, 0)
+  return {
+    fecha,
+    importe: suma(cobros.filter((c) => c.fecha === fecha)),
+    luego: suma(cobros.filter((c) => c.fecha > fecha)),
+    hasta: fechas[fechas.length - 1],
+  }
+}
+
+/**
  * @param {Movimiento[]} crudos
  * @param {object} [opciones]
  * @param {string} [opciones.hoy]
@@ -151,6 +188,7 @@ function deManuales(manuales, hoy) {
  * @param {number} [opciones.meses] meses que abarca la proyección de portada
  */
 export function construirEstado(crudos, opciones = {}) {
+  crudos = soloLaUltimaFoto(crudos)
   const hoy = opciones.hoy ?? hoyIso()
   const excepcionales = new Set(opciones.excepcionales ?? [])
   const unicos = opciones.unicos ?? {}
@@ -328,11 +366,11 @@ export function construirEstado(crudos, opciones = {}) {
     (categorias.get(c.reciboId) ?? categorias.get(c.entidadId)) === 'tarjeta'
     || LIQUIDACION_TARJETA.test(c.nombre)
   )) ?? null
-  // Y una compra deja de estar pendiente en cuanto pasa el recibo que la paga.
-  // Sin esto, cada extracto nuevo apilaba las compras de todos los meses ya
-  // liquidados y la previsión volvía a cobrar lo que ya habías pagado.
+  // Lo fraccionado se cobra en sus plazos, que van aparte; lo demás, entero
+  // en la próxima liquidación. Todo lo de la foto está por cobrar: lo ya
+  // cobrado no sale en ella.
   const pendienteTarjeta = tarjeta
-    .filter((m) => m.fecha > (liquidacion?.ultimaVista ?? ''))
+    .filter((m) => !m.fraccionado)
     .reduce((t, m) => t + m.importe, 0)
   const cargoTarjeta = pendienteTarjeta === 0 ? null : {
     fecha: liquidacion?.proximaPrevista ?? proximoDia(hoy, 30),
@@ -340,11 +378,10 @@ export function construirEstado(crudos, opciones = {}) {
   }
 
   const vivos = compromisos.filter((c) => c.estado !== 'extinto' && c !== liquidacion)
-  // La liquidación pendiente ya trae la cuota de este mes; las que faltan son
-  // las de los meses siguientes, que no están escritas en ninguna parte.
   // Con todos los movimientos, no sólo los de cuenta: la cuota de verdad, con
   // sus intereses, sólo está escrita en el extracto de la tarjeta.
-  const plazos = cuotasPendientes(movimientos, cargoTarjeta?.fecha ?? hoy)
+  const plazos = cuotasPendientes(movimientos, liquidacion?.ultimaVista ?? hoy)
+  const proximoCobroTarjeta = juntarCobros([...plazos, ...(cargoTarjeta ? [cargoTarjeta] : [])])
   const saltados = opciones.saltados ?? {}
   const armar = (/** @type {string} */ fin) => eventosDesde({
     compromisos: vivos,
@@ -570,9 +607,7 @@ export function construirEstado(crudos, opciones = {}) {
     apagadas: Object.keys(apagadas).sort(),
     saldoInicial,
     pendienteTarjeta,
-    cargoTarjeta,
-    // Lo de la tarjeta hasta este día ya lo pagaste: lo cobró la última liquidación.
-    tarjetaPagadaHasta: liquidacion?.ultimaVista ?? null,
+    proximoCobroTarjeta,
     proyeccion,
     proyeccionLarga,
     fijos,

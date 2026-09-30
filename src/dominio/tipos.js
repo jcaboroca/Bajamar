@@ -24,6 +24,7 @@
  * @property {Origen} origen
  * @property {string | null} localidad
  * @property {boolean} fraccionado     cuota de un pago aplazado, no gasto nuevo
+ * @property {string} [foto]           tarjeta: de qué extracto sale; sólo vale el último
  * @property {boolean} excepcional     marcado a mano: no cuenta para medianas
  * @property {string} [categoria]      resuelta al construir el estado
  * @property {boolean} [excluido]      fuera de todos los cálculos, por decisión del usuario

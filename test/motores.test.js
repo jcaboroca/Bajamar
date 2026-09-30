@@ -623,18 +623,25 @@ describe('lo que aplazas vuelve en tres cuotas', () => {
     localidad: null, fraccionado: true, excepcional: false,
   })
 
-  test('tres cuotas a fin de mes, y la última recoge el redondeo', () => {
+  test('tres cuotas a fin de mes, desde el mes siguiente, y la última recoge el redondeo', () => {
+    // Lo del 1 de julio seguía en la foto del 30 de septiembre: su última cuota es la de octubre.
     const cuotas = cuotasPendientes([abono('2026-07-01', 33100, 'FRACCIONAMIENTO IMPUESTOS AJ. GAVA')], '2026-06-30')
-    assert.deepEqual(cuotas.map((c) => c.fecha), ['2026-07-31', '2026-08-31', '2026-09-30'])
+    assert.deepEqual(cuotas.map((c) => c.fecha), ['2026-08-31', '2026-09-30', '2026-10-31'])
     assert.deepEqual(cuotas.map((c) => c.importe), [-11033, -11033, -11034])
     assert.equal(cuotas.reduce((t, c) => t + c.importe, 0), -33100)
     assert.equal(cuotas[0].nombre, 'IMPUESTOS AJ. GAVA')
   })
 
   test('lo ya cobrado no se proyecta otra vez', () => {
+    const cuotas = cuotasPendientes([abono('2026-07-01', 33100, 'FRACCIONAMIENTO IMPUESTOS AJ. GAVA')], '2026-09-30')
+    assert.deepEqual(cuotas.map((c) => c.fecha), ['2026-10-31'])
+    assert.equal(cuotas[0].plazo, 3)
+  })
+
+  test('lo fraccionado el 23 no entra en la liquidación del 30', () => {
     const cuotas = cuotasPendientes([abono('2026-09-23', 46800, 'FRACCIONAMIENTO TRANSFERENCIA A MyInvestor')], '2026-09-30')
-    assert.deepEqual(cuotas.map((c) => c.fecha), ['2026-10-31', '2026-11-30'])
-    assert.equal(cuotas[0].plazo, 2)
+    assert.deepEqual(cuotas.map((c) => c.fecha), ['2026-10-31', '2026-11-30', '2026-12-31'])
+    assert.equal(cuotas[0].plazo, 1)
     assert.equal(cuotas[0].nombre, 'MyInvestor')
   })
 
@@ -644,7 +651,8 @@ describe('lo que aplazas vuelve en tres cuotas', () => {
       cargo('2026-09-22', 16132, 'TRANSFERENCIA A MyInvesto'),
     ], '2026-09-30')
     // Dividir 468 entre tres daria 156,00: el banco cobra 161,32.
-    assert.deepEqual(c.map((x) => x.importe), [-16132, -16132])
+    assert.deepEqual(c.map((x) => x.importe), [-16132, -16132, -16132])
+    assert.equal(c[0].nombre, 'MyInvestor', 'el nombre sale del abono, que no recorta')
     assert.equal(c[0].estimada, false)
   })
 
@@ -652,7 +660,7 @@ describe('lo que aplazas vuelve en tres cuotas', () => {
     const c = cuotasPendientes([
       abono('2026-09-23', 46800, 'FRACCIONAMIENTO TRANSFERENCIA A MyInvestor'),
     ], '2026-09-30')
-    assert.deepEqual(c.map((x) => x.importe), [-15600, -15600])
+    assert.deepEqual(c.map((x) => x.importe), [-15600, -15600, -15600])
     assert.equal(c[0].estimada, true)
   })
 
@@ -665,7 +673,23 @@ describe('lo que aplazas vuelve en tres cuotas', () => {
       cargo('2026-07-02', 3683, 'IMPUESTOS AJ. GAVA'),
       cargo('2026-07-03', 11024, 'IMPUESTOS AJ. GAVA'),
     ], '2026-08-31')
-    assert.deepEqual(cuotas.map((x) => x.importe).sort((a, b) => a - b), [-11024, -3838, -3683])
+    const deSeptiembre = cuotas.filter((x) => x.fecha === '2026-09-30')
+    assert.deepEqual(deSeptiembre.map((x) => x.importe).sort((a, b) => a - b), [-11024, -3838, -3683])
+  })
+
+  test('lo fraccionado dentro de la tarjeta, sin abono en la cuenta, también vuelve', () => {
+    // Siete compras de junio de la foto del 26: sin ellas el cobro del 30 salía 356,51 € corto.
+    const enFoto = { ...cargo('2026-06-10', 13202, 'LULUKABARAKA, SL'), foto: '2026-09-26 x' }
+    const c = cuotasPendientes([enFoto], '2026-08-31')
+    assert.deepEqual(c.map((x) => [x.fecha, x.importe]), [['2026-09-30', -13202]])
+  })
+
+  test('un abono que la foto posterior ya no trae está pagado', () => {
+    const c = cuotasPendientes([
+      abono('2026-06-22', 7000, 'FRACCIONAMIENTO COMPRA TARJ. DOGGY DOG-GAV'),
+      { ...cargo('2026-09-22', 16132, 'TRANSFERENCIA A MyInvesto'), foto: '2026-09-30 x' },
+    ], '2026-06-30')
+    assert.ok(!c.some((x) => /DOGGY/.test(x.nombre)), 'Doggy Dog ya no sale en la foto del 30')
   })
 
   test('un cargo normal no es un aplazamiento', () => {

@@ -26,13 +26,14 @@ import { leerLibro, numero, texto } from './xls.js'
 /**
  * Decide qué plantilla es y la parsea.
  * @param {ArrayBuffer} datos
+ * @param {{ nombre?: string, ahora?: Date }} [origen]  el nombre del fichero dice de qué día es la foto
  * @returns {Resultado}
  */
-export function importarXls(datos) {
+export function importarXls(datos, origen = {}) {
   const rejilla = leerLibro(datos)
   const primera = texto(rejilla, 0, 0).toLowerCase()
   if (primera.startsWith('consulta de movimientos')) return importarCuenta(rejilla)
-  if (primera.startsWith('saldos y movimientos')) return importarTarjeta(rejilla)
+  if (primera.startsWith('saldos y movimientos')) return importarTarjeta(rejilla, fotoDe(origen))
   throw new Error(
     `No reconozco esta plantilla. La primera celda dice ${JSON.stringify(texto(rejilla, 0, 0))}. ` +
       'Se esperaba "Consulta de movimientos" (cuenta) o "Saldos y movimientos" (tarjeta).',
@@ -114,15 +115,41 @@ export function importarCuenta(rejilla) {
 }
 
 /**
+ * El banco nombra los ficheros por el día de descarga: 30092026_…, 30092026 4106…
+ * La hora de importar desempata dos fotos del mismo día.
+ * @param {{ nombre?: string, ahora?: Date }} origen
+ */
+function fotoDe({ nombre = '', ahora = new Date() }) {
+  const d = /^(\d{2})(\d{2})(20\d{2})/.exec(nombre)
+  const dia = d ? `${d[3]}-${d[2]}-${d[1]}` : ahora.toISOString().slice(0, 10)
+  return `${dia} ${ahora.toISOString()}`
+}
+
+/** Huella corta y estable del contenido: la misma foto, importada dos veces, es la misma. */
+function huella(/** @type {string} */ texto) {
+  let h = 0x811c9dc5
+  for (let i = 0; i < texto.length; i += 1) {
+    h ^= texto.charCodeAt(i)
+    h = Math.imul(h, 0x01000193) >>> 0
+  }
+  return h.toString(16).padStart(8, '0')
+}
+
+/**
  * Extracto de tarjeta.
+ *
+ * No es un historial: es una foto de lo que falta por cobrar el día que se
+ * descargó. Lo ya liquidado desaparece de la siguiente, así que sólo vale la
+ * última. Por eso cada fila lleva la foto de la que sale.
  *
  * Sus filas NO son gasto nuevo: son las cuotas que se cargarán en la cuenta.
  * Un mismo pago fraccionado aparece aquí una vez por cuota y allí una vez por
  * recibo, así que sumarlas a las de la cuenta contaría lo mismo dos veces.
  * @param {Celda[][]} rejilla
+ * @param {string} [foto]  día de la foto y hora de importarla
  * @returns {Resultado}
  */
-export function importarTarjeta(rejilla) {
+export function importarTarjeta(rejilla, foto = fotoDe({})) {
   const filaPendientes = buscarFila(rejilla, (_, i) =>
     /^Total operaciones pendientes/i.test(texto(rejilla, i, 0)),
   )
@@ -153,7 +180,7 @@ export function importarTarjeta(rejilla) {
     if (!fechaCruda || !concepto) break // el pie de totales empieza con la fecha vacía
     try {
       movimientos.push({
-        id: `tarjeta:${anioExtracto}-${periodo[1]}:${movimientos.length}`,
+        id: '',
         fecha: fechaDesdeEsSinAnio(fechaCruda, anioExtracto, mesExtracto),
         fechaValor: fechaDesdeEsSinAnio(fechaCruda, anioExtracto, mesExtracto),
         conceptoRaw: concepto,
@@ -172,6 +199,10 @@ export function importarTarjeta(rejilla) {
   }
 
   const sumaFilas = movimientos.reduce((t, m) => t + m.importe, 0)
+  // Dos fotos distintas no pueden pisarse fila a fila: la posición sola no identifica nada.
+  const dia = foto.slice(0, 10)
+  const marca = huella(JSON.stringify(movimientos.map((m) => [m.fecha, m.conceptoRaw, m.importe])))
+  movimientos.forEach((m, i) => Object.assign(m, { id: `tarjeta:${dia}-${marca}:${i}`, foto }))
   const declarado = leerTotal(rejilla, /^Total operaciones pendientes/i, 2)
   const dispuesto = leerTotal(rejilla, /^Saldo dispuesto/i, 2)
 

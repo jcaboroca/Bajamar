@@ -728,7 +728,7 @@ async function tragar(ficheros) {
   const antes = (await leerMovimientos()).length
   for (const fichero of ficheros) {
     try {
-      const { movimientos, avisos: propios } = importarXls(await fichero.arrayBuffer())
+      const { movimientos, avisos: propios } = importarXls(await fichero.arrayBuffer(), { nombre: fichero.name })
       await guardarMovimientos(movimientos)
       leidos += movimientos.length
       avisos.push(...propios)
