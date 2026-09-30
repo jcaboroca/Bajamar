@@ -17,8 +17,8 @@
  * solo mes. Es la primera pregunta otra vez, sólo que más lejos, así que va
  * aquí y al final: cuanto más lejos se mira, menos se sabe.
  *
- * Luego se vino también la cascada, plegada bajo la bajamar: es el porqué de
- * esa cifra, y tenía poco sentido cambiar de pestaña para preguntárselo.
+ * Luego se vino también la cascada, que en el mes en curso ocupa el sitio de
+ * la segunda pregunta: contestaban lo mismo, y verlas seguidas era leerlo dos veces.
  *
  * Y habla siempre de un periodo concreto, elegido arriba. Un periodo va de una
  * nómina a la siguiente, así que septiembre es del 25 de agosto al 24 de
@@ -54,7 +54,6 @@ export function montarResumen({ alCambiarTrato }) {
   requerir('mes-antes').addEventListener('click', () => mover(-1))
   requerir('mes-despues').addEventListener('click', () => mover(1))
   requerir('repartir-mes').addEventListener('click', abrirReparto)
-  if (location.hash === '#prevision') requerir('de-donde-sale').open = true
 
   requerir('horizonte').addEventListener('click', (e) => {
     const boton = e.target instanceof Element ? e.target.closest('[data-meses]') : null
@@ -104,9 +103,10 @@ export function pintarResumen(estado, { animar }) {
   pintarAvisos(estado)
   pintarNavegador(estado, periodo)
   pintarLlego(estado, periodo, animar)
-  // La cascada sólo sabe del mes en curso: bajo otro mes contaría otra cosa.
+  // La cascada sólo sabe contar el mes en curso; los demás los cuenta el bloque de vivir.
   const esElDeLaCascada = periodo.id === estado.cascada.mes
   requerir('de-donde-sale').hidden = !esElDeLaCascada
+  requerir('bloque-vivir').hidden = esElDeLaCascada
   pintarVivir(estado, periodo)
   pintarComoVas(periodo, esElDeLaCascada)
   pintarHastaDonde(estado)

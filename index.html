@@ -54,11 +54,10 @@
       <div id="lamina"></div>
     </section>
 
-    <!-- La cascada: el porqué de la cifra de arriba. Plegada, porque sólo se
-         mira cuando uno duda; y sólo en el mes en curso, que es del que habla. -->
-    <details class="bloque bloque-plegable" id="de-donde-sale">
-      <summary><span class="rotulo">¿De dónde sale?</span></summary>
-      <p class="rotulo rotulo-menor" id="cascada-rotulo">Tu mes</p>
+    <!-- El mes en curso se cuenta con la cascada; los demás, con el bloque de
+         abajo. Nunca los dos: dirían lo mismo dos veces seguidas. -->
+    <section class="bloque" id="de-donde-sale">
+      <p class="rotulo" id="cascada-rotulo">Tu mes</p>
       <p class="aclaracion" id="cascada-entradilla"></p>
       <ol id="cascada" class="cascada"></ol>
       <div id="cascada-saldo"></div>
@@ -77,9 +76,9 @@
         </div>
         <p class="nota" id="simulador-pie"></p>
       </div>
-    </details>
+    </section>
 
-    <section class="bloque">
+    <section class="bloque" id="bloque-vivir">
       <p class="rotulo" id="vivir-rotulo">Para el día a día</p>
       <div id="vivir"></div>
       <p class="nota" id="vivir-nota"></p>
