@@ -58,6 +58,8 @@ body {
   font-family: var(--cifras);
   font-variant-numeric: tabular-nums;
   font-feature-settings: 'tnum' 1;
+  /* Un importe partido en dos renglones deja el «€» solo abajo. */
+  white-space: nowrap;
 }
 
 main {
