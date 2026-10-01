@@ -374,6 +374,10 @@ guardaba, era de cuándo se hablaba.
 | `7201703` | **La tarjeta, por fin, con tus números: 565,30 el 30 y 346,77 el 31** |
 | `70d659d` | **El buzón ya no se pisa con lo que haya en un aparato a medias** |
 | `363def7` | Disney+ y HBO Max se llaman por su nombre, aunque los cobre PayPal |
+| `b4c3980` | Una pizzería, un cero sin signo y el código que sobraba |
+| `d99ec5b` | **El IBI de octubre ya no desaparece el día que toca** |
+| `7ce29ac` | **«Ya está pagado»: lo que sabes antes que el banco** |
+| `8c10c8d` | «Hoy tienes» ya descuenta lo que diste por pagado |
 
 La de la tarjeta es la importante, y la lección es de método: el dueño dijo
 «te he importado el Excel, ¿qué no ves ahí? debería estar claro», y lo estaba.
@@ -389,6 +393,11 @@ PayPal los tragaba a los dos, distinguidos sólo por el precio. Ahora tienen
 semilla propia antes que PayPal. Su `reciboId` pasó de `paypal#7`/`paypal#5`
 a `disney`/`hbo-max`: lo que el dueño hubiera decidido sobre los viejos queda
 huérfano.
+
+El IBI de octubre: de ese plazo sólo hay una vista (octubre de 2025) y
+`admitibles` lo daba por perdido **el mismo día que vencía**, porque pedía
+`sumarMeses(fecha, 12) > hoy`. Ahora usa `GRACIA.anual` (25 días). Al dueño se le
+contestó primero que eran «otros impuestos» y no: insistió y tenía razón.
 
 El aviso «tu saldo se pone en negativo el 24 de noviembre» que sale con sus
 datos **es real**, no un fallo: manda 968 € al mes a MyInvestor (500 el día 1
@@ -482,7 +491,7 @@ y a qué ritmo?** y **¿voy bien?**. Todo lo demás salió de ahí.
 
 ## Qué queda
 
-Repasado el 1 de octubre, 322 pruebas en verde, cero dependencias. El dueño
+Repasado el 1 de octubre, 324 pruebas en verde, cero dependencias. El dueño
 decidió qué se hace y qué no; respétalo:
 
 **Le toca a él**, no al código:
