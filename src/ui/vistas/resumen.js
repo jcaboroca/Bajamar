@@ -217,7 +217,7 @@ function pintarLlego(estado, periodo, animar) {
    * hay ahora mismo. Estaba, en letra pequeña dentro del gráfico.
    */
   requerir('suelo-saldo').textContent = periodo.estado === 'enCurso'
-    ? `Hoy tienes ${formatEurosRedondo(estado.saldoInicial)}`
+    ? `Hoy tienes ${formatEurosRedondo(estado.saldoHoy)}`
     : periodo.estado === 'futuro'
       ? `Entras con ${formatEurosRedondo(periodo.apertura)}`
       : `Empezaste con ${formatEurosRedondo(periodo.apertura)}`

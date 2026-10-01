@@ -459,6 +459,8 @@ export function construirEstado(crudos, opciones = {}) {
 
   const proyeccion = proyectar({ saldoInicial, desde: hoy, hasta, eventos: armar(hasta), ritmoPorDia: gota })
   const proyeccionLarga = proyectar({ saldoInicial, desde: hoy, hasta: finLargo, eventos: armar(finLargo), ritmoPorDia: gota })
+  // El extracto aún no lo trae, pero tú ya sabes que salió.
+  const saldoHoy = saldoInicial + proyeccion.eventos.reduce((t, e) => (e.marcado ? t + e.importe : t), 0)
 
   // El mismo periodo, suponiendo que se salta todo lo que se puede saltar. No
   // es una previsión alternativa: es la medida de cuánto margen tienes.
@@ -613,6 +615,7 @@ export function construirEstado(crudos, opciones = {}) {
     reparto: repartirGasto(habituales, ritmo),
     apagadas: Object.keys(apagadas).sort(),
     saldoInicial,
+    saldoHoy,
     pendienteTarjeta,
     proximoCobroTarjeta,
     proyeccion,

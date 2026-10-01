@@ -580,6 +580,7 @@ test('lo que das por pagado sale hoy, y cuando llega el extracto manda su import
   assert.equal(pagada.marcado, true)
   assert.equal(pagada.fecha, hoy, 'ha salido hoy, no el día 10')
   assert.equal(marcado.cascada.cierre, antes.cascada.cierre, 'el mes acaba igual: es el mismo dinero')
+  assert.equal(marcado.saldoHoy, antes.saldoHoy + pendiente.importe, 'tu saldo de hoy ya no lo tiene')
 
   // Llega el extracto con el cargo real, que ha subido un poco.
   const conReal = [...extracto(), fila('l-real', '2026-09-09', 'RECIBO HOLALUZ ENERGIA', -6150, 1100000)]
