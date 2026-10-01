@@ -15,7 +15,7 @@ fallaron; con los ficheros abiertos salió al céntimo a la primera.
 Cero dependencias, sin paso de compilación, JS vanilla. Node 22 o más.
 
 ```sh
-npm test      # 322 pruebas
+npm test      # 324 pruebas
 npm run dev   # http://localhost:4173
 npm run buzon # sólo si hay que volver a desplegar el worker
 ```
@@ -249,6 +249,11 @@ curso**; en los demás meses sale «Cómo fue agosto» (`#bloque-vivir`). Nunca
 los dos: decían lo mismo dos veces seguidas. El simulador sigue dentro del
 escalón «Día a día» de la cascada, y «Cómo vas» tiene un botón que lo abre
 (`abrirReparto`). Un `#prevision` guardado cae en Resumen.
+
+**«Ya está pagado»** (almacén `pagados`, base de datos **v14**, clave `reciboId|mes` como
+`saltados`): el evento se mueve a hoy con `marcado: true`, sale como pagado y
+`estado.saldoHoy` lo descuenta. Cuando el extracto trae el cargo, el recibo avanza
+de mes, la marca ya no casa con nada y manda el importe real. Sin limpiar nada.
 
 En la cascada, **lo pagado va en el color del texto y lo pendiente en ámbar**,
 como en toda la aplicación. Ámbar significa «todavía no ha pasado».
