@@ -564,3 +564,27 @@ test('el plazo de octubre del IBI se sigue previendo el mismo día que toca', ()
   assert.deepEqual(de('2026-09-30'), [-33071, -8025, -4891])
   assert.deepEqual(de('2026-10-01'), [-33071, -8025, -4891], 'el día que toca, todavía no ha pasado')
 })
+
+test('lo que das por pagado sale hoy, y cuando llega el extracto manda su importe', () => {
+  const hoy = '2026-09-05'
+  const luzDe = (/** @type {ReturnType<typeof construirEstado>} */ e) =>
+    [...e.cascada.fijos, ...e.cascada.toca].filter((f) => /HOLALUZ/i.test(f.nombre))
+  const antes = construirEstado(extracto(), { hoy })
+  const [pendiente] = luzDe(antes)
+  assert.equal(pendiente.previsto, true, 'la luz del 10 todavía no ha pasado')
+
+  const clave = `${pendiente.reciboId}|2026-09`
+  const marcado = construirEstado(extracto(), { hoy, pagados: { [clave]: true } })
+  const [pagada] = luzDe(marcado)
+  assert.equal(pagada.previsto, false)
+  assert.equal(pagada.marcado, true)
+  assert.equal(pagada.fecha, hoy, 'ha salido hoy, no el día 10')
+  assert.equal(marcado.cascada.cierre, antes.cascada.cierre, 'el mes acaba igual: es el mismo dinero')
+
+  // Llega el extracto con el cargo real, que ha subido un poco.
+  const conReal = [...extracto(), fila('l-real', '2026-09-09', 'RECIBO HOLALUZ ENERGIA', -6150, 1100000)]
+  const confirmado = construirEstado(conReal, { hoy: '2026-09-10', pagados: { [clave]: true } })
+  const luces = luzDe(confirmado)
+  assert.deepEqual(luces.map((l) => [l.importe, l.previsto, l.marcado]), [[-6150, false, false]],
+    'una sola línea, con el importe del banco')
+})

@@ -39,7 +39,7 @@ let ultimo = null
  */
 const abiertos = new Set()
 
-export function montarPrevision({ alCambiarTrato, alApagarCategoria, alMarcarInversion, alSaltarCobro, alAsignar, alRecuadrar }) {
+export function montarPrevision({ alCambiarTrato, alApagarCategoria, alMarcarInversion, alSaltarCobro, alMarcarPagado, alAsignar, alRecuadrar }) {
   montarSimulador({ alApagarCategoria, alAsignar, alRecuadrar })
   preguntarAlPulsar(requerir('cascada'), () => ultimo, alCambiarTrato)
 
@@ -49,6 +49,11 @@ export function montarPrevision({ alCambiarTrato, alApagarCategoria, alMarcarInv
     alMarcarInversion(casilla.dataset.inversion, casilla.checked)
   })
   requerir('cascada').addEventListener('click', (ev) => {
+    const pagar = ev.target instanceof Element ? ev.target.closest('[data-pagar]') : null
+    if (pagar instanceof HTMLElement && pagar.dataset.pagar && pagar.dataset.mes) {
+      alMarcarPagado(pagar.dataset.pagar, pagar.dataset.mes, pagar.dataset.puesto !== 'si')
+      return
+    }
     const boton = ev.target instanceof Element ? ev.target.closest('[data-saltar]') : null
     if (!(boton instanceof HTMLElement) || !boton.dataset.saltar || !boton.dataset.mes) return
     alSaltarCobro(boton.dataset.saltar, boton.dataset.mes, boton.dataset.puesto !== 'si')
@@ -320,10 +325,29 @@ function desglose(lista) {
     // siguiente vuelve solo—, así que no hace falta pedir permiso antes.
     // Las cuotas de lo aplazado no tienen recibo propio: no hay nada que
     // saltarse, el banco las cobra igual.
-    if (e.reciboId) li.append(botonDeSaltar(e))
+    const botones = nodo('div', 'cascada-botones')
+    if (e.reciboId && (e.previsto || e.marcado) && !e.saltado) botones.append(botonDePagar(e))
+    if (e.reciboId && !e.marcado) botones.append(botonDeSaltar(e))
+    if (botones.childElementCount > 0) li.append(botones)
     ul.append(li)
   }
   return ul
+}
+
+/**
+ * El banco tarda en contarlo y tú ya lo sabes. Cuando el extracto lo traiga,
+ * manda él, con su importe de verdad.
+ * @param {import('../../analisis/cascada.js').Escalon} e
+ */
+function botonDePagar(e) {
+  const boton = document.createElement('button')
+  boton.type = 'button'
+  boton.className = 'cascada-saltar'
+  boton.dataset.pagar = e.reciboId
+  boton.dataset.mes = e.mes ?? (e.fecha ?? '').slice(0, 7)
+  boton.dataset.puesto = e.marcado ? 'si' : 'no'
+  boton.textContent = e.marcado ? 'Aún no lo he pagado' : 'Ya está pagado'
+  return boton
 }
 
 /**

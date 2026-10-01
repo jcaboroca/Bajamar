@@ -185,6 +185,7 @@ function juntarCobros(cobros) {
  * @param {number} [opciones.colchon] céntimos por debajo de los cuales avisar
  * @param {number} [opciones.ventanaRitmo] meses que mira el goteo hacia atrás
  * @param {Record<string, true>} [opciones.saltados] reciboId|mes que este mes no se paga
+ * @param {Record<string, true>} [opciones.pagados] reciboId|mes que ya pagaste y el extracto aún no trae
  * @param {number} [opciones.meses] meses que abarca la proyección de portada
  */
 export function construirEstado(crudos, opciones = {}) {
@@ -383,6 +384,7 @@ export function construirEstado(crudos, opciones = {}) {
   const plazos = cuotasPendientes(movimientos, liquidacion?.ultimaVista ?? hoy)
   const proximoCobroTarjeta = juntarCobros([...plazos, ...(cargoTarjeta ? [cargoTarjeta] : [])])
   const saltados = opciones.saltados ?? {}
+  const pagados = opciones.pagados ?? {}
   const armar = (/** @type {string} */ fin) => eventosDesde({
     compromisos: vivos,
     ingresos,
@@ -394,6 +396,11 @@ export function construirEstado(crudos, opciones = {}) {
   })
     // Saltarse un mes no es darse de baja: sólo cae ese cobro, el resto sigue.
     .filter((e) => !(e.reciboId && saltados[`${e.reciboId}|${e.fecha.slice(0, 7)}`]))
+    // Lo que ya pagaste ha salido hoy. Cuando el extracto lo traiga, el recibo
+    // avanza de mes y esta marca ya no casa con nada: manda el cargo real.
+    .map((e) => (e.reciboId && pagados[`${e.reciboId}|${e.fecha.slice(0, 7)}`]
+      ? { ...e, mes: e.fecha.slice(0, 7), fecha: hoy, marcado: true }
+      : e))
     .map((e) => ({ ...e, aplazable: e.reciboId ? aplazables.has(e.reciboId) : false }))
 
   const hasta = ultimoDiaDelMes(sumarMeses(hoy, (opciones.meses ?? 2) - 1))

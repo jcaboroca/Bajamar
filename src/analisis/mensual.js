@@ -68,6 +68,8 @@ import { diasEntre } from '../dominio/tipos.js'
  * @property {string | null} reciboId   de qué recibo viene, si viene de uno
  * @property {boolean} aplazable        el usuario dice que un mes malo se lo salta
  * @property {boolean} previsto         todavía no ha pasado
+ * @property {boolean} [marcado]        lo diste por pagado tú; el extracto aún no lo trae
+ * @property {string} [mes]             yyyy-mm en que tocaba
  */
 
 /**
@@ -113,6 +115,8 @@ export function detallarPeriodos({ periodos, movimientos, proyeccion, ordinarios
       reciboId: m.reciboId ?? null,
       aplazable: m.aplazable === true,
       previsto,
+      marcado: m.marcado === true,
+      mes: m.mes ?? m.fecha.slice(0, 7),
     })
 
     for (const m of dentro) {
@@ -139,7 +143,7 @@ export function detallarPeriodos({ periodos, movimientos, proyeccion, ordinarios
     )
     const entraPrevisto = suma(futuros, (i) => i > 0)
     const conFechaPrevisto = suma(futuros, (i) => i < 0)
-    for (const e of futuros) anotar(e.importe > 0 ? 'entra' : 'conFecha', e, true)
+    for (const e of futuros) anotar(e.importe > 0 ? 'entra' : 'conFecha', e, e.marcado !== true)
     for (const lista of Object.values(desglose)) {
       lista.sort((a, b) => a.fecha.localeCompare(b.fecha))
     }

@@ -25,6 +25,8 @@ import { diasEntre, sumarMeses, ultimoDiaDelMes } from '../dominio/tipos.js'
  * @property {boolean} seguro    false si es una previsión, true si está confirmado
  * @property {string | null} [entidadId] de quién sale, cuando se puede decir que no vuelva
  * @property {string} [reciboId] qué recibo suyo, cuando el cobrador tiene varios
+ * @property {string} [mes]      yyyy-mm en que tocaba, aunque se haya movido de día
+ * @property {boolean} [marcado] lo diste por pagado tú, antes de que llegara al extracto
  */
 
 /**

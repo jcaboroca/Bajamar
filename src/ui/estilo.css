@@ -983,6 +983,7 @@ details.grupo > summary::marker { color: var(--secundario); }
   background: none; color: var(--secundario);
   border: 1px solid var(--linea); border-radius: 0.375rem;
 }
+.cascada-botones { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .cascada-saltar:hover { color: var(--texto); border-color: var(--acento); }
 .cascada-saltar:active { transform: scale(0.97); }
 .cascada-detalle li.saltado .cascada-nombre,

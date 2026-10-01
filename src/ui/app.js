@@ -29,6 +29,7 @@ import {
   ponerApunte,
   ponerColchon,
   ponerSaltado,
+  ponerPagado,
   ponerVentanaRitmo,
   ponerObjetivo,
   ponerAsignacion,
@@ -236,6 +237,13 @@ function montarVistas() {
       await refrescar()
       decir(saltado ? 'Este mes no cuenta.' : 'Vuelve a contar.')
     },
+    alMarcarPagado: async (reciboId, mes, pagado) => {
+      await ponerPagado(reciboId, mes, pagado)
+      await refrescar()
+      decir(pagado
+        ? 'Hecho: cuenta como pagado hoy. Cuando importes el extracto, mandará el importe del banco.'
+        : 'Vuelve a estar pendiente.')
+    },
   })
 
   montarPatrimonio({
@@ -325,6 +333,7 @@ async function refrescar({ animar = false, local = true } = {}) {
     apagadas: preferencias.apagadas,
     inversiones: preferencias.inversiones,
     saltados: preferencias.saltados,
+    pagados: preferencias.pagados,
     ventanaRitmo: preferencias.ventanaRitmo,
     colchon: preferencias.colchon,
   })

@@ -134,7 +134,7 @@ export function preguntarAlPulsar(caja, mirarEstado, alCambiar) {
     // Antes lo evitaban cortando la propagación, pero eso mataba también al
     // manejador que escucha en esta misma caja: el botón de «este mes no»
     // pintaba, guardaba sus datos y al pulsarlo no ocurría absolutamente nada.
-    if (objetivo.closest('[data-saltar], [data-apagar], [data-inversion], input, label')) return
+    if (objetivo.closest('[data-saltar], [data-pagar], [data-apagar], [data-inversion], input, label')) return
     const fila = objetivo.closest('[data-recibo]')
     if (!(fila instanceof HTMLElement)) return
     const reciboId = fila.dataset.recibo

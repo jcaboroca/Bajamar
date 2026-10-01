@@ -36,6 +36,8 @@ import { MESES_DE } from './fijos.js'
  * @property {string} [fecha]             cuándo cae, para saber de qué mes es
  * @property {boolean} [previsto]         todavía no ha pasado
  * @property {boolean} [saltado]          este mes no se paga: se ve, pero no suma
+ * @property {boolean} [marcado]          lo diste por pagado tú; falta que lo traiga el extracto
+ * @property {string} [mes]               yyyy-mm en que tocaba
  */
 
 /**
@@ -124,6 +126,8 @@ export function cascadaDelPeriodo({
       fecha: a.fecha,
       previsto: a.previsto,
       saltado: false,
+      marcado: a.marcado === true,
+      mes: a.mes ?? a.fecha.slice(0, 7),
     }
     if (inversion) listaInversiones.push(escalon)
     else if (cuota) listaPlazos.push(escalon)
@@ -207,6 +211,7 @@ export function cascadaDelPeriodo({
 function detalleDe(apunte, fijo, cuota) {
   if (cuota) return `cuota ${cuota.plazo} de ${PLAZOS} · aplazaste ${formatEuros(cuota.total)}`
   const dia = diaDe(apunte.fecha)
+  if (apunte.marcado) return `${dia} · pagado, falta que lo traiga el extracto`
   if (!apunte.previsto) return `${dia} · ya pagado`
   if (fijo && fijo.periodicidad !== 'mensual') return `${dia} · ${cada(fijo)}`
   return dia

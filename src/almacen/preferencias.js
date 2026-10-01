@@ -39,6 +39,7 @@ import { VENTANA_POR_DEFECTO } from '../analisis/compromisos.js'
  * @property {import('../dominio/tipos.js').Manual[]} manuales recibos que no pasan por la cuenta
  * @property {Record<string, true>} apagadas   categoría → no toca esta temporada
  * @property {Record<string, true>} saltados   reciboId|mes → este mes no se paga
+ * @property {Record<string, true>} pagados    reciboId|mes → ya lo pagaste, aunque no esté en el extracto
  * @property {Record<string, boolean>} inversiones reciboId → es inversión, no gasto
  * @property {Record<string, string>} devueltos  reciboId → quién te lo devuelve
  * @property {import('../dominio/tipos.js').Bulto[]} bultos
@@ -48,7 +49,7 @@ import { VENTANA_POR_DEFECTO } from '../analisis/compromisos.js'
 
 /** @returns {Promise<Preferencias>} */
 export async function cargar() {
-  const [retoques, presupuestos, objetivos, patrimonio, reglas, bultos, colchon, ventanaRitmo, tratos, apodos, unicos, anuales, apagadas, saltados, inversiones, planes, ritmos, manuales, devueltos] = await Promise.all([
+  const [retoques, presupuestos, objetivos, patrimonio, reglas, bultos, colchon, ventanaRitmo, tratos, apodos, unicos, anuales, apagadas, saltados, inversiones, planes, ritmos, manuales, devueltos, pagados] = await Promise.all([
     leerTodo('retoques'),
     leerTodo('presupuestos'),
     leerTodo('objetivos'),
@@ -68,6 +69,7 @@ export async function cargar() {
     leerTodo('ritmos'),
     leerTodo('manuales'),
     leerTodo('devueltos'),
+    leerTodo('pagados'),
   ])
 
   return {
@@ -91,6 +93,7 @@ export async function cargar() {
     manuales,
     apagadas: Object.fromEntries(apagadas.map((/** @type {any} */ a) => [a.id, true])),
     saltados: Object.fromEntries(saltados.map((/** @type {any} */ s) => [s.id, true])),
+    pagados: Object.fromEntries(pagados.map((/** @type {any} */ p) => [p.id, true])),
     inversiones: Object.fromEntries(inversiones.map((/** @type {any} */ i) => [i.id, i.esInversion])),
     devueltos: Object.fromEntries(devueltos.map((/** @type {any} */ d) => [d.id, d.quien])),
     colchon: Number(/** @type {any} */ (colchon)?.valor ?? 0),
@@ -312,6 +315,19 @@ export async function ponerSaltado(reciboId, mes, saltado) {
   const id = `${reciboId}|${mes}`
   if (!saltado) return borrar('saltados', id)
   return escribir('saltados', { id })
+}
+
+/**
+ * Dar por pagado un recibo antes de que el extracto lo traiga. Cuando llega el
+ * cargo de verdad, manda él, con su importe.
+ * @param {string} reciboId
+ * @param {string} mes  yyyy-mm en que tocaba
+ * @param {boolean} pagado
+ */
+export async function ponerPagado(reciboId, mes, pagado) {
+  const id = `${reciboId}|${mes}`
+  if (!pagado) return borrar('pagados', id)
+  return escribir('pagados', { id })
 }
 
 /**

@@ -8,7 +8,7 @@
  */
 
 const NOMBRE = 'bajamar'
-const VERSION = 13
+const VERSION = 14
 
 /**
  * Todo lo que el usuario decide a mano vive separado de los movimientos: si
@@ -26,6 +26,7 @@ const ALMACENES = [
   'manuales',    // recibos que no pasan por la cuenta y me dictas tú
   'apagadas',    // categoría → no toca esta temporada, fuera del goteo
   'saltados',    // reciboId|mes → este mes concreto no se paga
+  'pagados',     // reciboId|mes → ya lo pagaste, aunque el extracto aún no lo traiga
   'inversiones', // reciboId → sale de la cuenta pero no se gasta (o lo contrario)
   'devueltos',   // reciboId → quién te devuelve este recibo
   'bultos',      // gastos futuros anotados a mano
