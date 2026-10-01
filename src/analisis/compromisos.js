@@ -366,7 +366,8 @@ function cadenasDe(orden) {
 function admitibles(cadenas, hoy) {
   const confirmadas = cadenas.filter((c) => c.length >= 2)
   if (confirmadas.length < 2) return confirmadas
-  return cadenas.filter((c) => c.length >= 2 || sumarMeses(c[0].fecha, 12) > hoy)
+  // Con la misma gracia que cualquier anual: el día que toca, el banco aún no lo ha cobrado.
+  return cadenas.filter((c) => c.length >= 2 || diasEntre(sumarMeses(c[0].fecha, 12), hoy) <= GRACIA.anual)
 }
 
 /**

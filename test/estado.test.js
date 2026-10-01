@@ -541,3 +541,26 @@ test('el taller de la pizza es un restaurante, no un taller', () => {
   assert.equal(de('pz'), 'restaurantes')
   assert.equal(de('tl'), 'vehiculos', 'un taller de verdad sigue siendo un taller')
 })
+
+test('el plazo de octubre del IBI se sigue previendo el mismo día que toca', () => {
+  // Los recibos reales del ayuntamiento. El 1 de octubre de 2026, a primera hora,
+  // el banco aún no ha cobrado los tres de octubre y la app los daba por perdidos.
+  const movimientos = extracto()
+  const ibi = [
+    ['2025-03-03', [4228, 3029]], ['2025-05-02', [4891, 33071, 8025]], ['2025-06-02', [3029, 4228]],
+    ['2025-07-01', [11050, 6726, 11514, 4891, 33071, 8025]], ['2025-10-01', [4891, 33071, 8025]],
+    ['2025-12-01', [4892, 33072, 8023]], ['2026-03-02', [3029, 4228]], ['2026-05-04', [4891, 33071, 8025]],
+    ['2026-06-01', [4228, 3029]], ['2026-07-01', [11050, 6726, 11514, 4891, 33071, 8025]],
+  ]
+  for (const [fecha, importes] of ibi) {
+    for (const [i, importe] of /** @type {number[]} */ (importes).entries()) {
+      movimientos.push(fila(`ibi-${fecha}-${i}`, /** @type {string} */ (fecha), 'IMPUESTOS AJ. GAVA', -importe, 0))
+    }
+  }
+  const de = (/** @type {string} */ hoy) => construirEstado(movimientos, { hoy, meses: 2 }).compromisos
+    .filter((c) => /m10$/.test(c.reciboId))
+    .map((c) => c.importeEsperado)
+    .sort((a, b) => a - b)
+  assert.deepEqual(de('2026-09-30'), [-33071, -8025, -4891])
+  assert.deepEqual(de('2026-10-01'), [-33071, -8025, -4891], 'el día que toca, todavía no ha pasado')
+})
