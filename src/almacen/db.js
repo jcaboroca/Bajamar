@@ -8,7 +8,7 @@
  */
 
 const NOMBRE = 'bajamar'
-const VERSION = 14
+const VERSION = 15
 
 /**
  * Todo lo que el usuario decide a mano vive separado de los movimientos: si
@@ -31,11 +31,19 @@ const ALMACENES = [
   'devueltos',   // reciboId → quién te devuelve este recibo
   'bultos',      // gastos futuros anotados a mano
   'retoques',    // correcciones sobre un movimiento concreto
-  'objetivos',
   'presupuestos', // heredado: se migra a 'planes' y deja de escribirse
   'planes',       // mes → en qué has decidido que se va el día a día
-  'patrimonio',
   'lapidas',     // lo borrado, para que no resucite al sincronizar
+]
+
+/**
+ * Almacenes que existieron y ya no. Se borran al subir de versión, porque el
+ * `onupgradeneeded` sólo crea: quitar un nombre de la lista de arriba lo deja
+ * ahí para siempre en los navegadores que ya lo tenían.
+ */
+const RETIRADOS = [
+  'patrimonio', // v15: la pestaña no se mantenía al día y no aportaba
+  'objetivos',  // v15: vivían dentro de Patrimonio y se fueron con ella
 ]
 
 /** Lo que viaja entre dispositivos: todo menos los movimientos. */
@@ -57,6 +65,9 @@ export function abrir() {
       for (const nombre of ALMACENES) {
         if (nombre === 'movimientos') continue
         if (!db.objectStoreNames.contains(nombre)) db.createObjectStore(nombre, { keyPath: 'id' })
+      }
+      for (const nombre of RETIRADOS) {
+        if (db.objectStoreNames.contains(nombre)) db.deleteObjectStore(nombre)
       }
     }
     peticion.onsuccess = () => {

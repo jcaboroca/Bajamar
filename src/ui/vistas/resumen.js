@@ -215,12 +215,20 @@ function pintarLlego(estado, periodo, animar) {
    * ahorro acumulado dentro— pero leída sola, encima de un bloque que suma y
    * resta la nómina, parece flujo del mes. Faltaba el punto de partida: lo que
    * hay ahora mismo. Estaba, en letra pequeña dentro del gráfico.
+   *
+   * Va con rótulo y cifra propios, no en una frase: es el número que se mira
+   * primero. Más pequeño que la bajamar a propósito, que es la respuesta a
+   * «¿llego?» y esto sólo el punto de partida.
    */
-  requerir('suelo-saldo').textContent = periodo.estado === 'enCurso'
-    ? `Hoy tienes ${formatEurosRedondo(estado.saldoHoy)}`
+  requerir('hoy-rotulo').textContent = periodo.estado === 'enCurso'
+    ? 'Hoy tienes'
     : periodo.estado === 'futuro'
-      ? `Entras con ${formatEurosRedondo(periodo.apertura)}`
-      : `Empezaste con ${formatEurosRedondo(periodo.apertura)}`
+      ? 'Entras con'
+      : 'Empezaste con'
+
+  requerir('suelo-saldo').textContent = formatEurosRedondo(
+    periodo.estado === 'enCurso' ? estado.saldoHoy : periodo.apertura,
+  )
 
   const cifra = requerir('suelo-cifra')
   cifra.replaceChildren(...titular(formatEurosRedondo(periodo.suelo.saldo)))

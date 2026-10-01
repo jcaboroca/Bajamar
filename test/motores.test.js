@@ -9,8 +9,7 @@ import { cuotasPendientes } from '../src/analisis/fraccionados.js'
 import { cierresPorDia } from '../src/analisis/mensual.js'
 import { disponibleReal } from '../src/analisis/mes.js'
 import { revisarPresupuestos } from '../src/analisis/presupuestos.js'
-import { capacidadDeAhorro, progresoDe } from '../src/analisis/objetivos.js'
-import { balance, evolucion, variacion, vigentes } from '../src/analisis/patrimonio.js'
+import { capacidadDeAhorro } from '../src/analisis/objetivos.js'
 import { revisar } from '../src/analisis/alertas.js'
 import { proyectar } from '../src/analisis/bajamar.js'
 
@@ -234,78 +233,6 @@ describe('capacidad de ahorro', () => {
     const a = capacidadDeAhorro({ ingresos: 100_000, fijos: -20_000, ordinario: -10_000, reserva: 0 })
     const b = capacidadDeAhorro({ ingresos: 100_000, fijos: 20_000, ordinario: 10_000, reserva: 0 })
     assert.equal(a.capacidad, b.capacidad)
-  })
-})
-
-describe('objetivos', () => {
-  test('al ritmo puesto, la fecha de llegada', () => {
-    const p = progresoDe(
-      { id: '1', nombre: 'Camper', meta: 300_000, ahorrado: 120_000, aportacion: 30_000 },
-      '2026-09-26',
-    )
-    assert.equal(p.faltan, 180_000)
-    assert.equal(p.porcentaje, 40)
-    assert.equal(p.meses, 6)
-    assert.equal(p.fechaLlegada, '2027-03-26')
-  })
-
-  test('sin aportación no hay fecha, y se dice', () => {
-    const p = progresoDe({ id: '1', nombre: 'X', meta: 100_000, ahorrado: 0, aportacion: 0 }, '2026-09-26')
-    assert.equal(p.meses, Infinity)
-    assert.equal(p.alcanzable, false)
-    assert.equal(p.aportacionNecesaria, 100_000)
-  })
-
-  test('con fecha marcada dice cuánto haría falta', () => {
-    const p = progresoDe(
-      { id: '1', nombre: 'X', meta: 120_000, ahorrado: 0, aportacion: 10_000, fechaMeta: '2026-12-26' },
-      '2026-09-26',
-    )
-    assert.equal(p.aportacionNecesaria, 40_000)
-    assert.equal(p.alcanzable, false)
-  })
-
-  test('cumplido es cumplido', () => {
-    const p = progresoDe({ id: '1', nombre: 'X', meta: 100_000, ahorrado: 100_000, aportacion: 0 }, '2026-09-26')
-    assert.equal(p.porcentaje, 100)
-    assert.equal(p.meses, 0)
-  })
-})
-
-describe('patrimonio', () => {
-  /** @type {import('../src/analisis/patrimonio.js').Apunte[]} */
-  const apuntes = [
-    { id: '1', nombre: 'Furgoneta', grupo: 'bienes', valor: 1_200_000, fecha: '2026-01-01' },
-    { id: '2', nombre: 'Furgoneta', grupo: 'bienes', valor: 1_000_000, fecha: '2026-06-01' },
-    { id: '3', nombre: 'Fondo', grupo: 'inversiones', valor: 500_000, fecha: '2026-06-01' },
-    { id: '4', nombre: 'Préstamo', grupo: 'deudas', valor: 300_000, fecha: '2026-06-01' },
-  ]
-
-  test('cada partida vale lo que dice su foto más reciente', () => {
-    assert.equal(vigentes(apuntes).length, 3)
-    assert.equal(balance(apuntes).porGrupo.find((g) => g.grupo === 'bienes')?.total, 1_000_000)
-  })
-
-  test('mirar al pasado devuelve el valor de entonces', () => {
-    assert.equal(balance(apuntes, '2026-03-01').neto, 1_200_000)
-  })
-
-  test('las deudas restan aunque se escriban en positivo', () => {
-    const b = balance(apuntes)
-    assert.equal(b.activos, 1_500_000)
-    assert.equal(b.pasivos, -300_000)
-    assert.equal(b.neto, 1_200_000)
-  })
-
-  test('la evolución sólo tiene puntos donde hay datos', () => {
-    const serie = evolucion(apuntes)
-    assert.deepEqual(serie.map((p) => p.fecha), ['2026-01-01', '2026-06-01'])
-  })
-
-  test('la variación compara contra el punto anterior al corte', () => {
-    const v = variacion(evolucion(apuntes), 6)
-    assert.equal(v?.absoluta, 0)
-    assert.equal(variacion([{ fecha: '2026-01-01', neto: 100 }], 6), null)
   })
 })
 

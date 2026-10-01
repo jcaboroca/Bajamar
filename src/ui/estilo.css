@@ -1056,12 +1056,23 @@ details.grupo > summary::marker { color: var(--secundario); }
 #mes-estado { margin: 0 0 1.25rem; text-align: center; }
 
 /* El saldo de hoy, encima de la bajamar. Va antes que el titular porque es el
-   punto de partida: la bajamar es adónde llega ese número, no otro dinero. */
+   punto de partida: la bajamar es adónde llega ese número, no otro dinero.
+
+   Con cifra propia, no dentro de una frase en gris: es lo primero que se mira
+   al abrir. A un tercio del titular, que la respuesta a «¿llego?» sigue siendo
+   la bajamar y dos cifras del mismo tamaño no se ordenan solas. */
 .saldo-hoy {
-  margin: 0 0 0.25rem;
-  font-size: 0.9375rem;
-  color: var(--secundario);
+  margin: 0 0 2rem;
+  font-family: var(--cifras);
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(1.75rem, 6vw, 2.25rem);
+  font-weight: 300;
+  letter-spacing: -0.02em;
+  color: var(--texto);
 }
+
+/* Pegado a su cifra: el rótulo de arriba separa bloques, éste etiqueta. */
+.rotulo-hoy { margin-bottom: 0.375rem; }
 
 /* El rango del periodo en la tabla: pequeño, porque es contexto, no dato. */
 .mes-rango { margin: 0.125rem 0 0.375rem; font-size: 0.8125rem; color: var(--secundario); }

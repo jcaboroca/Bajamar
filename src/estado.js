@@ -17,7 +17,6 @@ import { gastoPorCategoria, revisarPresupuestos } from './analisis/presupuestos.
 import { cuadre as cuadrarPlan, ritmoDelPlan } from './analisis/plan.js'
 import { cierresPorDia, detallarPeriodos, residuoDe } from './analisis/mensual.js'
 import { cortesDeNomina, periodoDe, periodosEntre } from './analisis/periodos.js'
-import { balance, evolucion } from './analisis/patrimonio.js'
 import { capacidadDeAhorro } from './analisis/objetivos.js'
 import { revisar } from './analisis/alertas.js'
 import { hoyIso, diasEntre, mesDe, sumarMeses, ultimoDiaDelMes } from './dominio/tipos.js'
@@ -172,7 +171,6 @@ function juntarCobros(cobros) {
  * @param {string[]} [opciones.excepcionales] ids de movimientos marcados a mano
  * @param {Retoque[]} [opciones.retoques]
  * @param {Record<string, import('./analisis/plan.js').Plan>} [opciones.planes] mes → plan
- * @param {import('./analisis/patrimonio.js').Apunte[]} [opciones.patrimonio]
  * @param {Record<string, 'fijo' | 'suelto' | 'baja'>} [opciones.tratos] reciboId → cómo preverlo
  * @param {Record<string, string>} [opciones.apodos] reciboId → cómo lo llama el usuario
  * @param {Record<string, string>} [opciones.devueltos] reciboId → quién te lo devuelve
@@ -534,26 +532,6 @@ export function construirEstado(crudos, opciones = {}) {
     reserva: costes.reservaMensual,
   })
 
-  // El saldo del banco es patrimonio aunque nadie lo haya anotado: dejarlo
-  // fuera obligaría a teclear a mano un número que la aplicación ya sabe.
-  //
-  // La fecha nunca puede ir por delante de hoy. Los extractos traen apuntes con
-  // fecha valor posterior, y un apunte fechado mañana no cuenta como vigente:
-  // el patrimonio saldría cero justo cuando acaba de importarse todo.
-  const fechaSaldo = ultimo && ultimo.fecha < hoy ? ultimo.fecha : hoy
-  const apuntes = [
-    ...(saldoInicial !== 0
-      ? [{
-          id: 'auto:cuenta',
-          nombre: 'Cuenta corriente',
-          grupo: /** @type {const} */ ('cuentas'),
-          valor: saldoInicial,
-          fecha: fechaSaldo,
-        }]
-      : []),
-    ...(opciones.patrimonio ?? []),
-  ]
-
   return {
     hoy,
     movimientos,
@@ -641,8 +619,6 @@ export function construirEstado(crudos, opciones = {}) {
     presupuestos: periodoActual?.lineas ?? [],
     disponible,
     capacidad,
-    patrimonio: balance(apuntes, hoy),
-    evolucionPatrimonio: evolucion(apuntes, hoy),
     avisos: revisar({
       proyeccion,
       fijos,

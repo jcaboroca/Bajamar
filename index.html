@@ -24,7 +24,6 @@
     <button type="button" class="pestana" data-vista="resumen" aria-current="page">Resumen</button>
     <button type="button" class="pestana" data-vista="movimientos">Movimientos</button>
     <button type="button" class="pestana" data-vista="categorias">Categorías</button>
-    <button type="button" class="pestana" data-vista="patrimonio">Patrimonio</button>
     <button type="button" class="pestana" data-vista="ajustes">Ajustes</button>
   </nav>
 </header>
@@ -46,8 +45,9 @@
     <p class="aclaracion" id="mes-estado"></p>
 
     <section class="bloque portada" aria-labelledby="suelo-rotulo">
+      <p class="rotulo rotulo-hoy" id="hoy-rotulo">Hoy tienes</p>
+      <p class="saldo-hoy"><span id="suelo-saldo" class="cifras">—</span></p>
       <p class="rotulo" id="suelo-rotulo">La bajamar</p>
-      <p class="saldo-hoy" id="suelo-saldo"></p>
       <p class="titular"><span id="suelo-cifra" class="cifras">—</span></p>
       <p class="pie" id="suelo-pie"></p>
       <p class="pie pie-margen" id="suelo-margen" hidden></p>
@@ -163,36 +163,6 @@
       <ol id="apartados" class="eventos pulsables"></ol>
       <p class="nota">Esto no se prevé: o me lo dijiste tú, o lleva tres veces
         seguidas sin pasar. Tócalo si te equivocaste o si vuelve a estar en pie.</p>
-    </section>
-
-  </div>
-
-  <!-- ── Patrimonio ─────────────────────────────────────────────────────── -->
-  <div class="vista" id="vista-patrimonio" hidden>
-
-    <section class="bloque portada">
-      <p class="rotulo">Patrimonio neto</p>
-      <p class="titular"><span id="neto-cifra" class="cifras">—</span></p>
-      <p class="pie" id="neto-pie"></p>
-    </section>
-
-    <section class="bloque">
-      <p class="rotulo">De qué se compone</p>
-      <div id="patrimonio-grupos"></div>
-      <div class="acciones">
-        <button type="button" id="apunte-nuevo" class="boton boton-sobrio">Anotar una partida</button>
-      </div>
-      <p class="nota">La cuenta corriente sale sola de tus extractos. El resto lo
-        anotas tú, y vale lo que digas el día que lo digas: nadie puede saber lo
-        que vale hoy una furgoneta.</p>
-    </section>
-
-    <section class="bloque">
-      <p class="rotulo">Objetivos</p>
-      <div id="objetivos"></div>
-      <div class="acciones">
-        <button type="button" id="objetivo-nuevo" class="boton boton-sobrio">Nuevo objetivo</button>
-      </div>
     </section>
 
   </div>

@@ -164,8 +164,8 @@ describe('juntar lo decidido en dos sitios', () => {
 
   test('viajan todas las clases de decisión, no sólo los tratos', () => {
     const plan = fundir({}, {
-      objetivos: [{ id: 'o1', tocado: ANTES }],
-      patrimonio: [{ id: 'p1', tocado: ANTES }],
+      apodos: [{ id: 'a1', tocado: ANTES }],
+      planes: [{ id: '2026-10', tocado: ANTES }],
       reglas: [{ id: 'r1', tocado: ANTES }],
       retoques: [{ id: 'm1', tocado: ANTES }],
       presupuestos: [{ id: 'casa', tocado: ANTES }],
@@ -174,7 +174,7 @@ describe('juntar lo decidido en dos sitios', () => {
     })
     assert.deepEqual(
       plan.aEscribir.map(([almacen]) => almacen).sort(),
-      ['ajustes', 'bultos', 'objetivos', 'patrimonio', 'presupuestos', 'reglas', 'retoques'],
+      ['ajustes', 'apodos', 'bultos', 'planes', 'presupuestos', 'reglas', 'retoques'],
     )
   })
 })

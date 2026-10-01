@@ -15,8 +15,6 @@ import { VENTANA_POR_DEFECTO } from '../analisis/compromisos.js'
  * @typedef {import('../dominio/tipos.js').Retoque} Retoque
  * @typedef {import('../analisis/presupuestos.js').Presupuesto} Presupuesto
  * @typedef {import('../analisis/plan.js').Plan} Plan
- * @typedef {import('../analisis/objetivos.js').Objetivo} Objetivo
- * @typedef {import('../analisis/patrimonio.js').Apunte} Apunte
  */
 
 /**
@@ -28,8 +26,6 @@ import { VENTANA_POR_DEFECTO } from '../analisis/compromisos.js'
  * @property {Retoque[]} retoques
  * @property {Presupuesto[]} presupuestos      heredado: sólo vive para migrarse
  * @property {Record<string, Plan>} planes     mes → en qué se va el día a día
- * @property {Objetivo[]} objetivos
- * @property {Apunte[]} patrimonio
  * @property {Record<string, string>} reglas   entidadId → categoría
  * @property {Record<string, Trato>} tratos    reciboId → cómo preverlo
  * @property {Record<string, string>} apodos   reciboId → cómo lo llama el usuario
@@ -49,11 +45,9 @@ import { VENTANA_POR_DEFECTO } from '../analisis/compromisos.js'
 
 /** @returns {Promise<Preferencias>} */
 export async function cargar() {
-  const [retoques, presupuestos, objetivos, patrimonio, reglas, bultos, colchon, ventanaRitmo, tratos, apodos, unicos, anuales, apagadas, saltados, inversiones, planes, ritmos, manuales, devueltos, pagados] = await Promise.all([
+  const [retoques, presupuestos, reglas, bultos, colchon, ventanaRitmo, tratos, apodos, unicos, anuales, apagadas, saltados, inversiones, planes, ritmos, manuales, devueltos, pagados] = await Promise.all([
     leerTodo('retoques'),
     leerTodo('presupuestos'),
-    leerTodo('objetivos'),
-    leerTodo('patrimonio'),
     leerTodo('reglas'),
     leerTodo('bultos'),
     leer('ajustes', 'colchon'),
@@ -81,8 +75,6 @@ export async function cargar() {
       residuo: Number(p.residuo ?? 0),
       sello: p.sello ?? '',
     }])),
-    objetivos,
-    patrimonio,
     bultos,
     reglas: Object.fromEntries(reglas.map((/** @type {any} */ r) => [r.id, r.categoria])),
     tratos: Object.fromEntries(tratos.map((/** @type {any} */ t) => [t.id, t.trato])),
@@ -273,26 +265,6 @@ export async function migrarPresupuestosAlPlan({ mes, residuo, hoy }) {
 
   await escribir('ajustes', { id: 'presupuestosMigrados', valor: hoy })
   return viejos.length > 0 && !yaHayPlan
-}
-
-/** @param {Objetivo} objetivo */
-export async function ponerObjetivo(objetivo) {
-  return escribir('objetivos', { ...objetivo })
-}
-
-/** @param {string} id */
-export async function quitarObjetivo(id) {
-  return borrar('objetivos', id)
-}
-
-/** @param {Apunte} apunte */
-export async function ponerApunte(apunte) {
-  return escribir('patrimonio', { ...apunte })
-}
-
-/** @param {string} id */
-export async function quitarApunte(id) {
-  return borrar('patrimonio', id)
 }
 
 /** @param {number} centimos */

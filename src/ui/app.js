@@ -25,13 +25,10 @@ import { construirEstado } from '../estado.js'
 import { recuadrar, sellar } from '../analisis/plan.js'
 import {
   cargar as cargarPreferencias,
-  nuevoId,
-  ponerApunte,
   ponerColchon,
   ponerSaltado,
   ponerPagado,
   ponerVentanaRitmo,
-  ponerObjetivo,
   ponerAsignacion,
   ponerRegla,
   ponerUnico,
@@ -44,8 +41,6 @@ import {
   ponerTrato,
   ponerApodo,
   ponerDevuelto,
-  quitarApunte,
-  quitarObjetivo,
   migrarPresupuestosAlPlan,
   ponerPlan,
   repartirTratosViejos,
@@ -57,7 +52,6 @@ import { montarResumen, pintarResumen } from './vistas/resumen.js'
 import { montarMovimientos, pintarMovimientos } from './vistas/movimientos.js'
 import { montarPrevision, pintarPrevision } from './vistas/prevision.js'
 import { montarCategorias, pintarCategorias } from './vistas/categorias.js'
-import { montarPatrimonio, pintarPatrimonio } from './vistas/patrimonio.js'
 import { montarAjustes, pintarAjustes } from './vistas/ajustes.js'
 
 const barra = requerir('barra')
@@ -246,26 +240,6 @@ function montarVistas() {
     },
   })
 
-  montarPatrimonio({
-    nuevoId,
-    alGuardarApunte: async (apunte) => {
-      await ponerApunte(apunte)
-      await refrescar()
-    },
-    alBorrarApunte: async (id) => {
-      await quitarApunte(id)
-      await refrescar()
-    },
-    alGuardarObjetivo: async (objetivo) => {
-      await ponerObjetivo(objetivo)
-      await refrescar()
-    },
-    alBorrarObjetivo: async (id) => {
-      await quitarObjetivo(id)
-      await refrescar()
-    },
-  })
-
   montarAjustes({
     alGuardarColchon: async (centimos) => {
       await ponerColchon(centimos)
@@ -322,7 +296,6 @@ async function refrescar({ animar = false, local = true } = {}) {
     categoriasManuales: preferencias.reglas,
     retoques: preferencias.retoques,
     planes: preferencias.planes,
-    patrimonio: preferencias.patrimonio,
     tratos: preferencias.tratos,
     apodos: preferencias.apodos,
     unicos: preferencias.unicos,
@@ -351,7 +324,6 @@ async function refrescar({ animar = false, local = true } = {}) {
   pintarMovimientos(estado)
   pintarPrevision(estado)
   pintarCategorias(estado)
-  pintarPatrimonio(estado, preferencias.objetivos)
   pintarAjustes(estado, preferencias.colchon, preferencias.ventanaRitmo)
   pintarSincro()
 }

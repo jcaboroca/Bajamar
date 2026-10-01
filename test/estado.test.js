@@ -172,13 +172,6 @@ test('los eventos previstos dicen de quién salen, para poder decirles que no', 
   assert.equal(typeof luz.entidadId, 'string')
 })
 
-test('el saldo automático del patrimonio nunca se fecha por delante de hoy', () => {
-  const futuro = extracto()
-  futuro.push(fila('x', '2026-09-30', 'COMPRA SUPERMERCADO', -1000, 1000000))
-  const estado = construirEstado(futuro, { hoy: HOY })
-  assert.equal(estado.patrimonio.neto, 1000000)
-})
-
 test('el nombre que pone el usuario sustituye al del banco en todas partes', () => {
   const movimientos = extracto()
   for (let i = 0; i < 6; i += 1) {

@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * Navegación entre las cinco áreas.
+ * Navegación entre las cuatro áreas.
  *
  * Sin router ni historia falsa: el hash es el estado. Así se puede volver con
  * el botón atrás del móvil sin salir de la aplicación, que es lo que todo el
@@ -9,8 +9,9 @@
 
 import { requerir } from './piezas.js'
 
-// Previsión se fundió en Resumen: un #prevision guardado cae ahí por no estar en la lista.
-const AREAS = ['resumen', 'movimientos', 'categorias', 'patrimonio', 'ajustes']
+// Previsión se fundió en Resumen y Patrimonio se retiró: un #prevision o un
+// #patrimonio guardado cae en Resumen por no estar en la lista.
+const AREAS = ['resumen', 'movimientos', 'categorias', 'ajustes']
 
 /**
  * @param {(vista: string) => void} alCambiar
