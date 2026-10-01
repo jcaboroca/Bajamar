@@ -15,7 +15,7 @@ fallaron; con los ficheros abiertos salió al céntimo a la primera.
 Cero dependencias, sin paso de compilación, JS vanilla. Node 22 o más.
 
 ```sh
-npm test      # 324 pruebas
+npm test      # 314 pruebas
 npm run dev   # http://localhost:4173
 npm run buzon # sólo si hay que volver a desplegar el worker
 ```
@@ -232,7 +232,7 @@ Y al acabar, `db.vaciar()`.
 
 ## Qué contesta cada pestaña
 
-Son cinco y cada una tiene una pregunta. Si te encuentras añadiendo algo que no
+Son cuatro y cada una tiene una pregunta. Si te encuentras añadiendo algo que no
 contesta la de su pestaña, va en otra.
 
 | | |
@@ -240,7 +240,6 @@ contesta la de su pestaña, va en otra.
 | **Resumen** | ¿Llego? ¿De dónde sale y cuánto tengo para vivir? ¿Voy bien? ¿Y más allá? |
 | **Movimientos** | ¿En qué se fue esto? Y, con el filtro Tarjeta, cuánto me van a cobrar |
 | **Categorías** | En qué se me va el día a día, y qué se repite |
-| **Patrimonio** | Lo que no está en la cuenta |
 | **Ajustes** | Colchón, ventana del ritmo, sincronización |
 
 **Previsión ya no existe como pestaña**: el dueño vio que repetía el Resumen.
@@ -250,7 +249,15 @@ los dos: decían lo mismo dos veces seguidas. El simulador sigue dentro del
 escalón «Día a día» de la cascada, y «Cómo vas» tiene un botón que lo abre
 (`abrirReparto`). Un `#prevision` guardado cae en Resumen.
 
-**«Ya está pagado»** (almacén `pagados`, base de datos **v14**, clave `reciboId|mes` como
+**Patrimonio tampoco existe** desde el 1 de octubre (`0a98b33`): no se mantenía
+al día y su pregunta ya la contesta el Resumen. Se fueron con ella los
+objetivos de ahorro. Los almacenes `patrimonio` y `objetivos` se **borran de
+verdad** al abrir la base de datos (**v15**, lista `RETIRADOS` en `db.js`): el
+`onupgradeneeded` sólo creaba, así que quitar un nombre lo dejaba ahí para
+siempre. Si retiras otro almacén, va a esa lista. Un `#patrimonio` cae en
+Resumen. «Hoy tienes» tiene rótulo y cifra propios, a un tercio del titular.
+
+**«Ya está pagado»** (almacén `pagados`, desde la base de datos v14, clave `reciboId|mes` como
 `saltados`): el evento se mueve a hoy con `marcado: true`, sale como pagado y
 `estado.saldoHoy` lo descuenta. Cuando el extracto trae el cargo, el recibo avanza
 de mes, la marca ya no casa con nada y manda el importe real. Sin limpiar nada.
@@ -297,10 +304,10 @@ const pref = await import('/Bajamar/src/almacen/preferencias.js')
 const p = await pref.cargar()
 const e = est.construirEstado(await db.leerTodo('movimientos'), {
   categoriasManuales: p.reglas, retoques: p.retoques, planes: p.planes,
-  patrimonio: p.patrimonio, tratos: p.tratos, apodos: p.apodos, unicos: p.unicos,
+  tratos: p.tratos, apodos: p.apodos, unicos: p.unicos,
   anuales: p.anuales, ritmos: p.ritmos, manuales: p.manuales, apagadas: p.apagadas,
   inversiones: p.inversiones, saltados: p.saltados, ventanaRitmo: p.ventanaRitmo,
-  colchon: p.colchon, devueltos: p.devueltos,
+  colchon: p.colchon, devueltos: p.devueltos, pagados: p.pagados,
 })
 ```
 
@@ -378,6 +385,7 @@ guardaba, era de cuándo se hablaba.
 | `d99ec5b` | **El IBI de octubre ya no desaparece el día que toca** |
 | `7ce29ac` | **«Ya está pagado»: lo que sabes antes que el banco** |
 | `8c10c8d` | «Hoy tienes» ya descuenta lo que diste por pagado |
+| `0a98b33` | **Fuera Patrimonio, y lo que tienes hoy con cifra propia** (desde otro aparato) |
 
 La de la tarjeta es la importante, y la lección es de método: el dueño dijo
 «te he importado el Excel, ¿qué no ves ahí? debería estar claro», y lo estaba.
@@ -491,7 +499,7 @@ y a qué ritmo?** y **¿voy bien?**. Todo lo demás salió de ahí.
 
 ## Qué queda
 
-Repasado el 1 de octubre, 324 pruebas en verde, cero dependencias. El dueño
+Repasado el 1 de octubre, 314 pruebas en verde, cero dependencias. El dueño
 decidió qué se hace y qué no; respétalo:
 
 **Le toca a él**, no al código:
