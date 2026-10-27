@@ -60,6 +60,29 @@ function fila(id, fecha, concepto, importe, saldo) {
 /** @param {Record<string, 'fijo' | 'suelto' | 'baja'>} [tratos] */
 const armar = (tratos) => construirEstado(extracto(), { hoy: HOY, tratos, meses: 3 })
 
+test('previsión y periodos comparten el día 27 con adelanto al viernes, sin cambiar el histórico', () => {
+  const movimientos = ['2026-06-26', '2026-07-27', '2026-08-27', '2026-09-25']
+    .map((fecha, i) => fila(`n${i}`, fecha, 'NOMINA ERNI CONSULTING ESPANA SLU', 280000, 300000))
+  const estado = construirEstado(movimientos, { hoy: '2026-10-20', meses: 4 })
+  const fechas = ['2026-10-27', '2026-11-27', '2026-12-25', '2027-01-27']
+  assert.deepEqual(estado.proyeccion.eventos.filter((e) => e.tipo === 'ingreso').map((e) => e.fecha), fechas)
+  for (const fecha of fechas) {
+    assert.ok(estado.periodos.some((p) => p.desde === fecha), `falta el corte de ${fecha}`)
+  }
+  assert.ok(estado.periodos.some((p) => p.desde === '2026-09-25' && p.hasta === '2026-10-26'))
+  assert.deepEqual(estado.movimientos.map((m) => m.fecha), movimientos.map((m) => m.fecha))
+})
+
+test('una nómina ya ingresada antes del 27 no se vuelve a prever ese mes', () => {
+  const movimientos = ['2026-07-27', '2026-08-27', '2026-09-25', '2026-10-26']
+    .map((fecha, i) => fila(`n${i}`, fecha, 'NOMINA ERNI CONSULTING ESPANA SLU', 280000, 300000))
+  const estado = construirEstado(movimientos, { hoy: '2026-10-27', meses: 2 })
+  assert.deepEqual(
+    estado.proyeccion.eventos.filter((e) => e.tipo === 'ingreso').map((e) => e.fecha),
+    ['2026-11-27'],
+  )
+})
+
 /**
  * El mismo banco cobrando dos cosas que no son la misma: una aportación
  * mensual y la letra de una furgoneta.

@@ -63,6 +63,7 @@
  * @property {number} importeEsperado  mediana de la serie, en céntimos
  * @property {string} ultimaVista      ISO
  * @property {string} proximaPrevista  ISO
+ * @property {boolean} [calendarioNomina] día 27 mensual, adelantado al viernes en fin de semana
  * @property {number} observaciones
  * @property {string[]} cobros         los movimientos de los que sale la serie
  * @property {'activo' | 'retrasado' | 'extinto'} estado
@@ -143,6 +144,20 @@ export function sumarMeses(iso, meses) {
   const anio = Math.floor(total / 12)
   const mes = (total % 12) + 1
   return `${anio}-${String(mes).padStart(2, '0')}-${String(Math.min(d, diasDelMes(anio, mes))).padStart(2, '0')}`
+}
+
+/**
+ * @param {Pick<Compromiso, 'periodicidad' | 'calendarioNomina'>} compromiso
+ * @param {string} fecha
+ */
+export function siguienteFechaPrevista(compromiso, fecha) {
+  const meses = { mensual: 1, bimestral: 2, trimestral: 3, semestral: 6, anual: 12 }
+  const siguiente = sumarMeses(fecha, meses[compromiso.periodicidad])
+  if (!compromiso.calendarioNomina || compromiso.periodicidad !== 'mensual') return siguiente
+  const mes = siguiente.slice(0, 7)
+  const diaSemana = new Date(`${mes}-27T00:00:00Z`).getUTCDay()
+  const dia = diaSemana === 0 ? 25 : diaSemana === 6 ? 26 : 27
+  return `${mes}-${dia}`
 }
 
 /**

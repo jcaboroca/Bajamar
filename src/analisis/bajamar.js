@@ -9,7 +9,7 @@
  * el mínimo de la proyección y el día en que ocurre, no la suma.
  */
 
-import { diasEntre, sumarMeses, ultimoDiaDelMes } from '../dominio/tipos.js'
+import { diasEntre, siguienteFechaPrevista, sumarMeses, ultimoDiaDelMes } from '../dominio/tipos.js'
 
 /**
  * @typedef {import('../dominio/tipos.js').Compromiso} Compromiso
@@ -135,7 +135,6 @@ export function sumarDias(iso, dias) {
 export function eventosDesde({ compromisos, ingresos, bultos, tarjeta, plazos = [], desde, hasta }) {
   /** @type {Evento[]} */
   const eventos = []
-  const meses = { mensual: 1, bimestral: 2, trimestral: 3, semestral: 6, anual: 12 }
 
   for (const grupo of [
     { lista: compromisos, tipo: /** @type {const} */ ('compromiso') },
@@ -157,7 +156,7 @@ export function eventosDesde({ compromisos, ingresos, bultos, tarjeta, plazos = 
             reciboId: c.reciboId,
           })
         }
-        fecha = sumarMeses(fecha, meses[c.periodicidad])
+        fecha = siguienteFechaPrevista(c, fecha)
         vueltas += 1
       }
     }

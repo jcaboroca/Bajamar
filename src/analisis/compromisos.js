@@ -18,7 +18,7 @@
  */
 
 import { mediana } from '../dominio/dinero.js'
-import { diasEntre, hoyIso, sumarMeses } from '../dominio/tipos.js'
+import { diasEntre, hoyIso, siguienteFechaPrevista, sumarMeses } from '../dominio/tipos.js'
 
 /**
  * @typedef {import('../dominio/tipos.js').Movimiento} Movimiento
@@ -549,9 +549,11 @@ export function detectarCompromisos(movimientos, nombres, opciones = {}) {
    */
   function construirCon(entidadId, nombre, orden, periodicidad, separado = false, factura) {
     const periodo = PERIODOS.find((p) => p.nombre === periodicidad)
-    const meses = periodo?.meses ?? 1
+    const calendarioNomina = buscaIngresos && periodicidad === 'mensual' && categorias.get(entidadId) === 'nomina'
+    const calendario = { periodicidad, calendarioNomina }
     const ultima = orden[orden.length - 1].fecha
-    let proxima = sumarMeses(ultima, meses)
+    const prevista = siguienteFechaPrevista(calendario, ultima)
+    let proxima = prevista
     // Si han pasado varios periodos sin aparecer, proyectar al siguiente futuro
     // para no anunciar un recibo con fecha del pasado. Pero unos días de
     // retraso siguen siendo el cobro de este periodo, no el del siguiente:
@@ -559,11 +561,11 @@ export function detectarCompromisos(movimientos, nombres, opciones = {}) {
     // el recibo que está a punto de caer.
     let saltos = 0
     while (proxima < hoy && diasEntre(proxima, hoy) > GRACIA[periodicidad] && saltos < 24) {
-      proxima = sumarMeses(proxima, meses)
+      proxima = siguienteFechaPrevista(calendario, proxima)
       saltos += 1
     }
     if (proxima < hoy) proxima = hoy
-    const retraso = diasEntre(sumarMeses(ultima, meses), hoy)
+    const retraso = diasEntre(prevista, hoy)
     // Un recibo puede retrasarse; tres seguidos sin pasar no es retraso, es que
     // se acabó. Seguir contándolo hunde la previsión con un gasto que ya no
     // existe, y nadie debería tener que venir a avisar de cada cuota que
@@ -584,6 +586,7 @@ export function detectarCompromisos(movimientos, nombres, opciones = {}) {
       importeEsperado,
       ultimaVista: ultima,
       proximaPrevista: proxima,
+      ...(calendarioNomina ? { calendarioNomina } : {}),
       observaciones: orden.length,
       cobros: factura ? factura.cobros : orden.map((m) => m.id),
       estado: muerto ? 'extinto' : retraso > GRACIA[periodicidad] ? 'retrasado' : 'activo',

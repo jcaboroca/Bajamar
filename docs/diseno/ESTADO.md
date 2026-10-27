@@ -46,6 +46,11 @@ nóminas para lo ya vivido y las previstas para lo que viene; quién corta lo
 decide `estado.js` (las entidades categorizadas como `nomina`, y si no hay
 ninguna, el mayor ingreso que se repita).
 
+Las nóminas mensuales se prevén el **27, o el viernes anterior si cae en fin de
+semana**. El calendario se recalcula cada mes: un adelanto no arrastra el día
+25 o 26 a los meses siguientes. Proyección y periodos futuros comparten esa
+regla; el histórico conserva las fechas reales. No se ajustan festivos.
+
 Casos resueltos y con prueba, no los redescubras:
 
 - Cobrar el 23 en vez del 25 acorta ese periodo; los siguientes no se mueven.

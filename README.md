@@ -36,6 +36,10 @@ que reimportar actualiza en lugar de duplicar.
 - **La bajamar.** Proyecta día a día: saldo actual, menos el ritmo de gasto
   ordinario, más y menos todo lo que se sabe que viene. Devuelve el mínimo.
 - **Lo que viene.** Distingue lo confirmado de lo previsto y lo dice.
+- **La nómina prevista.** Los ingresos mensuales categorizados como nómina se
+  prevén el día 27; si cae en sábado o domingo, el viernes anterior. Se aplica
+  tanto a la proyección como a los periodos futuros, sin cambiar las fechas
+  reales de los extractos. No se ajustan festivos.
 - **No lo sé.** Lo que ha aparecido una o dos veces no se da por hecho: se
   pregunta.
 - **En qué se va.** Reparto por categorías, con lo que no encaja visible como

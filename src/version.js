@@ -1,3 +1,3 @@
 // @ts-check
 // Lo escribe scripts/sellar.mjs. No se edita a mano.
-export const SELLO = 'b3fc2f5aa199'
+export const SELLO = 'd5ee9f542554'

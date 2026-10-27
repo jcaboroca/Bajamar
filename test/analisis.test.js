@@ -2,7 +2,7 @@
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { detectarCompromisos, gastoOrdinario, ritmoOrdinario } from '../src/analisis/compromisos.js'
+import { detectarCompromisos, detectarIngresos, gastoOrdinario, ritmoOrdinario } from '../src/analisis/compromisos.js'
 import { eventosDesde, proyectar, sumarDias } from '../src/analisis/bajamar.js'
 
 /**
@@ -29,6 +29,57 @@ function mov(fecha, importe, extra = {}) {
 }
 
 const NOMBRES = new Map([['e', 'Entidad']])
+
+describe('calendario previsto de nómina', () => {
+  const movimientos = ['2026-06-26', '2026-07-27', '2026-08-27', '2026-09-25']
+    .map((fecha) => mov(fecha, 280000))
+  const categorias = new Map([['e', 'nomina']])
+
+  test('el adelanto de septiembre no arrastra el día 25 a octubre', () => {
+    const [nomina] = detectarIngresos(movimientos, NOMBRES, { hoy: '2026-10-20', categorias })
+    assert.equal(nomina.proximaPrevista, '2026-10-27')
+    assert.equal(nomina.ultimaVista, '2026-09-25')
+    assert.equal(nomina.importeEsperado, 280000)
+  })
+
+  test('el calendario se recalcula cada mes, también tras fines de semana y cambio de año', () => {
+    const ingresos = detectarIngresos(movimientos, NOMBRES, { hoy: '2026-10-20', categorias })
+    const eventos = eventosDesde({
+      compromisos: [], ingresos, bultos: [], tarjeta: null,
+      desde: '2026-10-20', hasta: '2027-04-30',
+    })
+    assert.deepEqual(eventos.map((e) => e.fecha), [
+      '2026-10-27', '2026-11-27', '2026-12-25', '2027-01-27',
+      '2027-02-26', '2027-03-26', '2027-04-27',
+    ])
+  })
+
+  test('una nómina pendiente hoy sigue prevista hoy y no desplaza las siguientes', () => {
+    const ingresos = detectarIngresos(movimientos, NOMBRES, { hoy: '2026-10-28', categorias })
+    const eventos = eventosDesde({
+      compromisos: [], ingresos, bultos: [], tarjeta: null,
+      desde: '2026-10-28', hasta: '2026-12-31',
+    })
+    assert.deepEqual(eventos.map((e) => e.fecha), ['2026-10-28', '2026-11-27', '2026-12-25'])
+  })
+
+  test('el margen de retraso se cuenta desde el 27, no desde el último adelanto', () => {
+    const [nomina] = detectarIngresos(movimientos, NOMBRES, { hoy: '2026-11-01', categorias })
+    assert.equal(nomina.proximaPrevista, '2026-11-01')
+    assert.equal(nomina.estado, 'activo')
+  })
+
+  test('los demás ingresos y los gastos conservan su calendario', () => {
+    const otros = detectarIngresos(movimientos, NOMBRES, {
+      hoy: '2026-10-20', categorias: new Map([['e', 'otros']]),
+    })
+    assert.equal(otros[0].proximaPrevista, '2026-10-25')
+    const gastos = detectarCompromisos(movimientos.map((m) => ({ ...m, importe: -280000 })), NOMBRES, {
+      hoy: '2026-10-20', categorias,
+    })
+    assert.equal(gastos.compromisos[0].proximaPrevista, '2026-10-25')
+  })
+})
 
 describe('periodicidad', () => {
   test('un recibo mensual el mismo día se reconoce', () => {

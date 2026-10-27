@@ -19,7 +19,7 @@ import { cierresPorDia, detallarPeriodos, residuoDe } from './analisis/mensual.j
 import { cortesDeNomina, periodoDe, periodosEntre } from './analisis/periodos.js'
 import { capacidadDeAhorro } from './analisis/objetivos.js'
 import { revisar } from './analisis/alertas.js'
-import { hoyIso, diasEntre, mesDe, sumarMeses, ultimoDiaDelMes } from './dominio/tipos.js'
+import { hoyIso, diasEntre, mesDe, siguienteFechaPrevista, sumarMeses, ultimoDiaDelMes } from './dominio/tipos.js'
 import { limpiarConcepto } from './entidades/limpiar.js'
 import { indicePorAlias, reconciliar } from './entidades/reconciliar.js'
 import { CATEGORIAS } from './entidades/semillas.js'
@@ -74,18 +74,16 @@ const LIQUIDACION_TARJETA = /TARJETA\s+(DE\s+)?CREDITO/i
  * falta antes de proyectar: es el plan del periodo en curso el que decide el
  * ritmo con el que se proyecta.
  *
- * @param {{ proximaPrevista: string, periodicidad: string }} compromiso
+ * @param {Compromiso} compromiso
  * @param {string} hasta
  */
 function fechasPrevistas(compromiso, hasta) {
-  const meses = { mensual: 1, bimestral: 2, trimestral: 3, semestral: 6, anual: 12 }
-  const paso = meses[compromiso.periodicidad] ?? 1
   const fechas = []
   let fecha = compromiso.proximaPrevista
   let vueltas = 0
   while (fecha <= hasta && vueltas < 24) {
     fechas.push({ fecha })
-    fecha = sumarMeses(fecha, paso)
+    fecha = siguienteFechaPrevista(compromiso, fecha)
     vueltas += 1
   }
   return fechas
