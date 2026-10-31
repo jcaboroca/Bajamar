@@ -170,7 +170,7 @@ function tienenElMismoPrecio(serie) {
   const importes = serie.map((m) => Math.abs(m.importe))
   if (casiIguales(importes)) return true
   // Un mes prorrateado no separa la tarifa antigua de la nueva ya confirmada.
-  if (Math.abs(importeEsperadoDe(serie)) !== mediana(importes)) return true
+  if (importeEsperadoDe(serie) !== mediana(serie.map((m) => m.importe))) return true
   // Cada precio deja un tramo plano y seguido. Y los precios cambian más de una
   // vez: Netflix pasó de 13,99 a 6,99 y de ahí a 8,99 en año y medio. Se van
   // mordiendo tramos lo más largos posible; si alguno sale de uno solo, esto no

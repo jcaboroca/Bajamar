@@ -581,6 +581,22 @@ describe('lo que costará la próxima vez', () => {
     assert.equal(compromisos[0].importeEsperado, -4000)
   })
 
+  test('el redondeo de una mediana negativa no parte un recibo variable ni pierde su último cobro', () => {
+    const fechas = ['2025-01-29', '2025-03-26', '2025-05-26', '2025-07-24', '2025-09-24',
+      '2025-11-24', '2026-01-27', '2026-03-27', '2026-05-25', '2026-07-28', '2026-09-25']
+    const importes = [-6034, -6120, -6243, -6266, -5914, -6178, -6334, -6479, -6438, -6299, -5727]
+    const { compromisos } = detectarCompromisos(
+      fechas.map((fecha, i) => mov(fecha, importes[i], { entidadId: 'agua' })),
+      new Map([['agua', 'Agua']]),
+      { hoy: '2026-10-31' },
+    )
+    assert.equal(compromisos.length, 1)
+    assert.equal(compromisos[0].observaciones, 11)
+    assert.equal(compromisos[0].ultimaVista, '2026-09-25')
+    assert.equal(compromisos[0].proximaPrevista, '2026-11-25')
+    assert.equal(compromisos[0].importeEsperado, -6243)
+  })
+
   test('unas compras parecidas espaciadas tres meses no son un recibo trimestral', () => {
     const compras = [
       ['2025-03-18', -699], ['2025-07-30', -767], ['2025-10-06', -645], ['2026-01-12', -690],
