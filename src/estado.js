@@ -377,7 +377,12 @@ export function construirEstado(crudos, opciones = {}) {
   const vivos = compromisos.filter((c) => c.estado !== 'extinto' && c !== liquidacion)
   // Con todos los movimientos, no sólo los de cuenta: la cuota de verdad, con
   // sus intereses, sólo está escrita en el extracto de la tarjeta.
-  const plazos = cuotasPendientes(movimientos, liquidacion?.ultimaVista ?? hoy)
+  // El cargo puede estar contabilizado antes de su fecha valor de fin de mes.
+  const liquidadoHasta = cuenta.reduce((fecha, m) => (
+    liquidacion && m.fecha === liquidacion.ultimaVista && liquidacion.cobros.includes(m.id)
+      && m.fechaValor > fecha ? m.fechaValor : fecha
+  ), liquidacion?.ultimaVista ?? hoy)
+  const plazos = cuotasPendientes(movimientos, liquidadoHasta)
   const proximoCobroTarjeta = juntarCobros([...plazos, ...(cargoTarjeta ? [cargoTarjeta] : [])])
   const saltados = opciones.saltados ?? {}
   const pagados = opciones.pagados ?? {}

@@ -553,6 +553,34 @@ describe('lo que costará la próxima vez', () => {
     assert.equal(compromisos[0].importeEsperado, -3092, 'dos meses baratos no son una bajada de precio')
   })
 
+  for (const nuevo of [-6000, -3000]) {
+    test(`la tarifa de ${nuevo} se mantiene tras el mes prorrateado y los siguientes recibos`, () => {
+      const historial = [
+        ...fibra(['2025-01-02', '2025-02-03', '2025-03-03', '2025-04-01',
+          '2025-05-02', '2025-06-02', '2025-07-01', '2025-08-01'], -4000),
+        mov('2025-09-01', (-4000 + nuevo) / 2, { entidadId: 'o2' }),
+      ]
+      for (const fecha of ['2025-10-01', '2025-11-03', '2025-12-01']) {
+        historial.push(mov(fecha, nuevo, { entidadId: 'o2' }))
+        const { compromisos } = detectarCompromisos(historial, new Map([['o2', 'Fibra']]), { hoy: fecha })
+        assert.equal(compromisos.length, 1)
+        assert.equal(compromisos[0].importeEsperado, nuevo, `no debe volver a la tarifa vieja en ${fecha}`)
+      }
+    })
+  }
+
+  test('un tramo variable después de una cuota fija no confirma una nueva tarifa estable', () => {
+    const { compromisos } = detectarCompromisos([
+      ...fibra(['2025-01-02', '2025-02-03', '2025-03-03', '2025-04-01',
+        '2025-05-02', '2025-06-02', '2025-07-01', '2025-08-01'], -4000),
+      mov('2025-09-01', -4500, { entidadId: 'o2' }),
+      mov('2025-10-01', -6000, { entidadId: 'o2' }),
+      mov('2025-11-03', -5000, { entidadId: 'o2' }),
+    ], new Map([['o2', 'Fibra']]), { hoy: '2025-11-20' })
+    assert.equal(compromisos.length, 1)
+    assert.equal(compromisos[0].importeEsperado, -4000)
+  })
+
   test('unas compras parecidas espaciadas tres meses no son un recibo trimestral', () => {
     const compras = [
       ['2025-03-18', -699], ['2025-07-30', -767], ['2025-10-06', -645], ['2026-01-12', -690],

@@ -89,10 +89,12 @@ no encoge tus categorías para que la suma vuelva a cuadrar: te dice que te
 quedan 40 € menos y decides tú de dónde salen. Un reparto que se corrige a tus
 espaldas es la aplicación gastando tu dinero por ti.
 
-**El importe esperado es la mediana, nunca la media.** Con 50 · 55 · 70 la media
+**El importe esperado parte de la mediana, nunca de la media.** Con 50 · 55 · 70 la media
 dice 58 y el último valor dice 70. La mediana dice 55, que es lo que de verdad
 cuesta. Una sola factura rara desplaza una media y la deja inservible para
-predecir.
+predecir. Si una cuota antes estable cambia de tarifa, se reconoce el nuevo
+importe tras dos cobros: el primero puede estar prorrateado y los siguientes
+deben mantener el nuevo precio.
 
 **Con dos apariciones no se infiere una periodicidad, salvo que no quede lugar
 a duda.** Dos fechas dan un solo intervalo, y un intervalo de 365 días no

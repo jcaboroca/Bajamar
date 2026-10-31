@@ -157,6 +157,19 @@ La liquidación se busca por **categoría `tarjeta`**, no por el texto del banco
 en cuanto la entidad se reconoce el compromiso se llama «Liquidación de la
 VISA» y la expresión `TARJETA CREDITO` ya no casaba nunca.
 
+**Las cuotas pagadas se cortan por la fecha de liquidación más avanzada entre
+operación y valor.** El banco puede contabilizar el cargo el viernes con fecha
+valor del último día del mes. Usar sólo la operación vuelve a prever las cuotas
+de ese cierre aunque ya estén descontadas del saldo. Se toma la fecha valor
+del cargo identificado, no la de otros movimientos, y no se cambian las fechas
+del histórico ni se eliminan las cuotas de meses posteriores.
+
+**Una tarifa nueva no vuelve a la mediana antigua al tercer cobro.** Tras un
+tramo estable, dos cobros en la misma dirección confirman el cambio; el primero
+puede ser prorrateado y los siguientes deben mantener el nuevo importe. Ese
+tramo de transición tampoco debe partir un recibo en dos series distintas.
+Los recibos variables conservan la mediana.
+
 ## Un recibo troceado sigue siendo un recibo
 
 El ayuntamiento cobra el mismo día el IBI de una casa, el de la otra y la basura,

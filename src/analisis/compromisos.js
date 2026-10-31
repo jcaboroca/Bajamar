@@ -80,10 +80,9 @@ function desviacionDia(dia, tipico) {
  * Normalmente la mediana, por la regla 1. Pero un recibo que llevaba veinte
  * meses cobrando exactamente lo mismo y de pronto cobra más dos veces seguidas
  * no está variando: ha subido de precio, y la mediana seguiría prometiendo el
- * precio viejo durante un año. Se exige que el pasado fuera plano —la luz varía
- * todos los meses y nunca cambia de precio— y que las dos últimas vayan en la
- * misma dirección. La cifra buena es la última: en una subida, la primera vuelta
- * suele venir prorrateada a medias.
+ * precio viejo durante un año. Se exige un tramo anterior plano y al menos dos
+ * cobros nuevos en la misma dirección. El primero puede estar prorrateado;
+ * los siguientes deben mantener la nueva tarifa para no volver a la antigua.
  * @param {Movimiento[]} orden  ordenados por fecha ascendente
  */
 function importeEsperadoDe(orden) {
@@ -91,14 +90,19 @@ function importeEsperadoDe(orden) {
   const base = mediana(importes)
   if (importes.length < 6) return base
 
-  const cuerpo = importes.slice(0, -2).map(Math.abs)
-  const tipico = mediana(cuerpo)
-  if (!cuerpo.every((v) => Math.abs(v - tipico) <= Math.max(10, tipico * 0.02))) return base
+  const ultimo = importes[importes.length - 1]
+  for (let corte = importes.length - 2; corte >= 4; corte -= 1) {
+    const cuerpo = importes.slice(0, corte).map(Math.abs)
+    const tipico = mediana(cuerpo)
+    if (!cuerpo.every((v) => Math.abs(v - tipico) <= Math.max(10, tipico * 0.02))) continue
 
-  const salto = Math.max(50, tipico * 0.05)
-  const cola = importes.slice(-2).map(Math.abs)
-  const cambio = cola.every((v) => v - tipico > salto) || cola.every((v) => tipico - v > salto)
-  return cambio ? importes[importes.length - 1] : base
+    const salto = Math.max(50, tipico * 0.05)
+    const cola = importes.slice(corte).map(Math.abs)
+    const cambio = cola.every((v) => v - tipico > salto) || cola.every((v) => tipico - v > salto)
+    const estable = cola.slice(1).every((v) => Math.abs(v - Math.abs(ultimo)) <= Math.max(10, Math.abs(ultimo) * 0.02))
+    if (cambio && estable) return ultimo
+  }
+  return base
 }
 
 /**
@@ -165,6 +169,8 @@ function casiIguales(importes) {
 function tienenElMismoPrecio(serie) {
   const importes = serie.map((m) => Math.abs(m.importe))
   if (casiIguales(importes)) return true
+  // Un mes prorrateado no separa la tarifa antigua de la nueva ya confirmada.
+  if (Math.abs(importeEsperadoDe(serie)) !== mediana(importes)) return true
   // Cada precio deja un tramo plano y seguido. Y los precios cambian más de una
   // vez: Netflix pasó de 13,99 a 6,99 y de ahí a 8,99 en año y medio. Se van
   // mordiendo tramos lo más largos posible; si alguno sale de uno solo, esto no

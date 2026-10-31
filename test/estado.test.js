@@ -530,6 +530,51 @@ test('el próximo cobro de la tarjeta junta los plazos de ese día', () => {
   assert.equal(e.pendienteTarjeta, 0, 'lo fraccionado va en sus plazos, no en la liquidación')
 })
 
+for (const caso of [
+  {
+    nombre: 'la fecha valor de la liquidación retira la cuota ya pagada al cierre del mes',
+    operacion: '2026-10-30', valor: '2026-10-31',
+    pendientes: ['2026-11-30', '2026-12-31'], cierre: 411000,
+  },
+  {
+    nombre: 'una fecha valor anterior no resucita cuotas ya liquidadas',
+    operacion: '2026-10-31', valor: '2026-10-30',
+    pendientes: ['2026-11-30', '2026-12-31'], cierre: 411000,
+  },
+  {
+    nombre: 'la fecha valor de otro movimiento no liquida cuotas de la tarjeta',
+    operacion: '2026-10-30', valor: '2026-10-30',
+    pendientes: ['2026-10-31', '2026-11-30', '2026-12-31'], cierre: 396000,
+  },
+]) {
+  test(caso.nombre, () => {
+    const movimientos = ['2026-07-31', '2026-08-31', '2026-09-30', caso.operacion]
+      .map((fecha, i) => fila(`visa${i}`, fecha, 'TARJETA CREDITO', -15000, 500000 - (i + 1) * 15000))
+    movimientos[3].fechaValor = caso.valor
+    movimientos.push({
+      ...fila('otro', caso.operacion, 'TRANSFERENCIA RECIBIDA', 1000, 441000),
+      fechaValor: '2026-11-30',
+    })
+    movimientos.push({
+      ...fila('tarjeta:2026-10-31-abcd:0', '2026-09-22', 'TIENDA EJEMPLO', -15000, 0),
+      origen: 'tarjeta', fraccionado: true, foto: '2026-10-31 x',
+    })
+
+    const e = construirEstado(movimientos, { hoy: '2026-10-31', meses: 3 })
+    assert.deepEqual(e.plazos.map((p) => p.fecha), caso.pendientes)
+    assert.deepEqual(
+      e.proyeccion.eventos.filter((ev) => ev.tipo === 'plazo').map((ev) => ev.fecha),
+      caso.pendientes,
+    )
+    assert.equal(e.proximoCobroTarjeta?.fecha, caso.pendientes[0])
+    assert.equal(e.proximoCobroTarjeta?.importe, -15000)
+    assert.equal(e.proximoCobroTarjeta?.hasta, '2026-12-31')
+    assert.equal(e.proyeccion.saldoFinal, caso.cierre)
+    assert.equal(e.movimientos.find((m) => m.id === 'visa3')?.fecha, caso.operacion)
+    assert.equal(e.movimientos.find((m) => m.id === 'visa3')?.fechaValor, caso.valor)
+  })
+}
+
 test('Disney+ y HBO Max se reconocen aunque los cobre PayPal', () => {
   const movimientos = extracto()
   for (const [i, mes] of ['06', '07', '08', '09'].entries()) {
